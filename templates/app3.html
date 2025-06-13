@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PITK Stock Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Light Theme Color Scheme */
+        :root {
+            --primary-dark: #1a237e;
+            --primary-light: #534bae;
+            --secondary-dark: #303f9f;
+            --accent-color: #00bcd4;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+            --info-color: #2196f3;
+            --background-dark: #121212;
+            --card-dark: #1e1e1e;
+            --text-light: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --border-dark: #333333;
+
+            /* Light theme specific variables */
+            --background-light: #f4f4f4;
+            --text-dark: #333;
+            --card-light: #ffffff;
+            --card-header-light: #f8f9fa;
+            --border-light: #e0e0e0;
+        }
+
+        /* Light Theme Styles */
+        body {
+            background-color: var(--background-light);
+            color: var(--text-dark);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container-fluid,
+        .container {
+            background-color: transparent;
+        }
+
+        .col-12.scan-card {
+            background-color: transparent !important;
+            border: none !important;
+        }
+
+        .scan-card .card {
+            background-color: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .scan-card .card-header {
+            background-color: #f8f9fa !important;
+            border-bottom: 1px solid #e0e0e0 !important;
+        }
+
+        .navbar {
+            background-color: var(--card-light) !important;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            color: var(--text-light) !important;
+            font-size: 1.5rem;
+            text-decoration: none;
+            cursor: default;
+        }
+
+        .navbar-brand img {
+            margin-right: 10px;
+            height: 40px;
+        }
+
+        .table {
+            background-color: var(--card-light) !important;
+            color: var(--text-dark) !important;
+        }
+
+        .table thead {
+            background-color: var(--card-header-light) !important;
+            color: var(--text-dark) !important;
+        }
+
+        .table tbody tr {
+            background-color: var(--card-light) !important;
+            color: var(--text-dark) !important;
+        }
+
+        .table tbody tr:nth-child(even) {
+            background-color: #f2f2f2 !important;
+        }
+
+        /* Light Theme Scan Card Table Hover Styles */
+        .scan-card .table-hover tbody tr:hover {
+            background-color: rgba(33, 150, 243, 0.1) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        .scan-card .table-hover tbody tr:hover td {
+            color: #2196f3 !important;
+        }
+
+        /* Dark Theme Scan Card Table Hover Styles */
+        .dark-theme .scan-card .table-hover tbody tr:hover {
+            background-color: rgba(33, 150, 243, 0.2) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        .dark-theme .scan-card .table-hover tbody tr:hover td {
+            color: #64b5f6 !important;
+        }
+
+        /* Dark Theme Styles */
+        body.dark-theme {
+            background-color: var(--background-dark) !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .container-fluid,
+        .dark-theme .container {
+            background-color: transparent;
+        }
+
+        .dark-theme .col-12.scan-card {
+            background-color: transparent !important;
+            border: none !important;
+        }
+
+        .dark-theme .scan-card .card {
+            background-color: #1e1e1e !important;
+            border: 1px solid #333 !important;
+        }
+
+        .dark-theme .scan-card .card-header {
+            background-color: #2a2a2a !important;
+            border-bottom: 1px solid #444 !important;
+        }
+
+        .dark-theme .navbar {
+            background-color: var(--card-dark) !important;
+            border-bottom: 1px solid var(--border-dark) !important;
+        }
+
+        .dark-theme .navbar-brand {
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table {
+            background-color: var(--card-dark) !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table thead {
+            background-color: #2a2a2a !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table tbody tr {
+            background-color: var(--card-dark) !important;
+            color: var(--text-light) !important;
+            border-color: var(--border-dark) !important;
+        }
+
+        .dark-theme .table tbody tr:nth-child(even) {
+            background-color: #252525 !important;
+        }
+
+        /* Theme toggle button */
+        .theme-toggle-btn {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            color: var(--accent-color);
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+
+        .navbar-buttons {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            color: var(--text-light) !important;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .navbar-brand img {
+            margin-right: 10px;
+            height: 40px;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.2));
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #00c853, #64dd17);
+            color: var(--text-light);
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .conditions-btn {
+            background: linear-gradient(45deg, #ff6d00, #ffd740);
+            color: var(--text-light);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .settings-btn {
+            background: linear-gradient(45deg, #2979ff, #00b0ff);
+            color: var(--text-light);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .refresh-btn:hover, .settings-btn:hover, .conditions-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+
+        .refresh-btn i, .settings-btn i, .conditions-btn i {
+            margin-right: 8px;
+            font-size: 1.1em;
+        }
+
+        .scan-card {
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .scan-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .card {
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            background-color: var(--card-dark);
+        }
+
+        .card:hover {
+            transform: scale(1.02);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            color: var(--primary-dark);
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--primary-light);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        /* Vibrant Gradient Card Headers */
+        .scan-card:nth-child(1) .card-header { 
+            background: linear-gradient(135deg, #8E24AA, #D81B60); 
+            color: white !important;
+        }
+        .scan-card:nth-child(2) .card-header { 
+            background: linear-gradient(135deg, #00695C, #009688); 
+            color: white !important;
+        }
+        .scan-card:nth-child(3) .card-header { 
+            background: linear-gradient(135deg, #D32F2F, #FF5722); 
+            color: white !important;
+        }
+        .scan-card:nth-child(4) .card-header { 
+            background: linear-gradient(135deg, #1976D2, #2196F3); 
+            color: white !important;
+        }
+        .scan-card:nth-child(5) .card-header { 
+            background: linear-gradient(135deg, #388E3C, #4CAF50); 
+            color: white !important;
+        }
+        .scan-card:nth-child(6) .card-header { 
+            background: linear-gradient(135deg, #00838F, #00BCD4); 
+            color: white !important;
+        }
+        .scan-card:nth-child(7) .card-header { 
+            background: linear-gradient(135deg, #C2185B, #E91E63); 
+            color: white !important;
+        }
+        .scan-card:nth-child(8) .card-header { 
+            background: linear-gradient(135deg, #FFA000, #FFC107); 
+            color: white !important;
+        }
+        .scan-card:nth-child(9) .card-header { 
+            background: linear-gradient(135deg, #2E7D32, #4CAF50); 
+            color: white !important;
+        }
+        .scan-card:nth-child(10) .card-header { 
+            background: linear-gradient(135deg, #1565C0, #2196F3); 
+            color: white !important;
+        }
+        .scan-card:nth-child(11) .card-header { 
+            background: linear-gradient(135deg, #00695C, #009688); 
+            color: white !important;
+        }
+        .scan-card:nth-child(12) .card-header { 
+            background: linear-gradient(135deg, #9C27B0, #E91E63); 
+            color: white !important;
+        }
+        .scan-card:nth-child(13) .card-header { 
+            background: linear-gradient(135deg, #512DA8, #7C4DFF); 
+            color: white !important;
+        }
+        .scan-card:nth-child(14) .card-header { 
+            background: linear-gradient(135deg, #5108fc, #7C4DFF); 
+            color: white !important;
+        }
+        .scan-card:nth-child(15) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+        .scan-card:nth-child(16) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+        .scan-card:nth-child(17) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+        .scan-card:nth-child(18) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+
+        /* Dark Theme Adjustments */
+        .dark-theme .scan-card:nth-child(1) .card-header { 
+            background: linear-gradient(135deg, #6A1B9A, #9C27B0); 
+        }
+        .dark-theme .scan-card:nth-child(2) .card-header { 
+            background: linear-gradient(135deg, #00534D, #00796B); 
+        }
+        .dark-theme .scan-card:nth-child(3) .card-header { 
+            background: linear-gradient(135deg, #B71C1C, #D32F2F); 
+        }
+        .dark-theme .scan-card:nth-child(4) .card-header { 
+            background: linear-gradient(135deg, #0D47A1, #1976D2); 
+        }
+        .dark-theme .scan-card:nth-child(5) .card-header { 
+            background: linear-gradient(135deg, #1B5E20, #2E7D32); 
+        }
+        .dark-theme .scan-card:nth-child(6) .card-header { 
+            background: linear-gradient(135deg, #006064, #00838F); 
+        }
+        .dark-theme .scan-card:nth-child(7) .card-header { 
+            background: linear-gradient(135deg, #880E4F, #AD1457); 
+        }
+        .dark-theme .scan-card:nth-child(8) .card-header { 
+            background: linear-gradient(135deg, #FF6F00, #FFA000); 
+        }
+        .dark-theme .scan-card:nth-child(9) .card-header { 
+            background: linear-gradient(135deg, #1B5E20, #2E7D32); 
+        }
+        .dark-theme .scan-card:nth-child(10) .card-header { 
+            background: linear-gradient(135deg, #0D47A1, #1976D2); 
+        }
+        .dark-theme .scan-card:nth-child(11) .card-header { 
+            background: linear-gradient(135deg, #00534D, #00796B); 
+        }
+        .dark-theme .scan-card:nth-child(12) .card-header { 
+            background: linear-gradient(135deg, #6A1B9A, #9C27B0); 
+        }
+        .dark-theme .scan-card:nth-child(13) .card-header { 
+            background: linear-gradient(135deg, #4527A0, #673AB7); 
+        }
+        .dark-theme .scan-card:nth-child(14) .card-header { 
+            background: linear-gradient(135deg, #673AB7, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(15) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(16) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(17) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(18) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+
+
+        .card-header {
+            color: white;
+            border: none;
+            padding: 15px;
+            font-weight: 500;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .scan-card .card-header:hover {
+            transform: translateY(-1px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .scan-card .card-header {
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .scan-card {
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        .scan-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        .stock-table {
+            font-size: 0.9em;
+            margin: 0;
+            background: var(--card-dark);
+            color: var(--text-light);
+        }
+
+        .stock-table th {
+            background: var(--background-dark);
+            font-weight: 600;
+            color: var(--text-light);
+            padding: 1rem;
+            border-bottom: 2px solid var(--border-dark);
+        }
+
+        .stock-table td {
+            vertical-align: middle;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .table-responsive {
+            overflow: hidden;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .timestamp-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 0;
+            margin-bottom: 20px;
+        }
+        
+        .timestamp-container {
+            font-size: 0.95rem;
+            color: #6c757d;
+            padding: 8px 15px;
+            border-radius: 6px;
+            float: right;
+            margin-right: 15px;
+        }
+        
+        #lastUpdateTime {
+            color: #fff;
+        }
+
+        .last-update {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin: 1.5rem 0;
+            display: flex;
+            align-items: center;
+            background: var(--card-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .last-update i {
+            margin-right: 8px;
+            color: var(--accent-color);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .alert {
+            border-radius: 8px;
+            border: none;
+            padding: 1rem;
+            margin-bottom: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background: var(--card-dark);
+            color: var(--text-light);
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #0d47a1, #2196f3);
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #b71c1c, #f44336);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(5px);
+        }
+
+        .dark-theme .loading-overlay {
+            background-color: rgba(18, 18, 18, 0.9);
+        }
+
+        .loading-overlay img {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+        }
+
+        .loading-message {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #333;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .dark-theme .loading-message {
+            color: #e0e0e0;
+        }
+
+        /* Loading Text Animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .loading-message {
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 576px) {
+            .loading-overlay img {
+                width: 100px;
+                height: 100px;
+            }
+
+            .loading-message {
+                font-size: 1rem;
+            }
+        }
+
+        /* Preference Modal */
+        .preference-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preference-modal-content {
+            background: var(--card-dark);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            color: var(--text-light);
+        }
+
+        .preference-modal h3 {
+            color: var(--text-light);
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .preference-option {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--border-dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--background-dark);
+        }
+
+        .preference-option:hover {
+            border-color: var(--accent-color);
+            background: var(--card-dark);
+        }
+
+        .preference-option.selected {
+            border-color: var(--accent-color);
+            background: var(--primary-dark);
+        }
+
+        .preference-option i {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            color: var(--accent-color);
+        }
+
+        .preference-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .preference-btn {
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preference-btn-primary {
+            background: var(--accent-color);
+            color: var(--text-light);
+        }
+
+        .preference-btn-primary:hover {
+            background: #00acc1;
+            transform: translateY(-1px);
+        }
+
+        .preference-btn-secondary {
+            background: var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .preference-btn-secondary:hover {
+            background: #404040;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+            
+            .navbar-brand img {
+                height: 30px;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .stock-table th,
+            .stock-table td {
+                padding: 0.6rem;
+            }
+        }
+
+        .icon {
+            margin-left: 5px;
+        }
+        
+        .condition-checkbox {
+            width: 20px;
+            height: 20px;
+        }
+
+        .condition-link {
+            text-shadow: 1px 1px 8px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Settings Modal */
+        .settings-section {
+            background: var(--primary-dark);
+            padding: 1.5rem;
+            border-radius: 10px;
+        }
+        
+        .form-check-input {
+            cursor: pointer;
+        }
+        
+        .form-check-label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .timestamp-container {
+            font-size: 0.9rem;
+            color: #6c757d;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 8px 15px;
+            border-radius: 6px;
+            float: right;
+            margin-right: 15px;
+        }
+        
+        #lastUpdateTime {
+            color: #fff;
+        }
+
+        .nifty-btn {
+            background: linear-gradient(45deg, #9c27b0, #e91e63);
+            color: var(--text-light);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .nifty-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+
+        .nifty-btn i {
+            margin-right: 8px;
+            font-size: 1.1em;
+        }
+
+        #niftyModal .table {
+            margin-bottom: 0;
+        }
+        #niftyModal .table th {
+            background-color: var(--primary-dark);
+            color: var(--text-light);
+            border-color: var(--border-dark);
+        }
+        #niftyModal .table td {
+            border-color: var(--border-dark);
+        }
+
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+        }
+
+        #niftyReloadBtn {
+            transition: transform 0.3s ease;
+        }
+
+        #niftyReloadBtn:hover {
+            transform: rotate(180deg);
+        }
+
+        #niftyLastUpdatedTime {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        
+        /* Last Update Styles */
+        .last-update {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .last-update .far.fa-clock {
+            margin-right: 0.5rem;
+            color: var(--accent-color);
+        }
+
+        .dark-theme .last-update {
+            color: var(--text-light);
+            opacity: 0.8;
+        }
+
+        .dark-theme .last-update .far.fa-clock {
+            color: var(--accent-color);
+        }
+
+        /* Dark theme styles */
+        body.dark-theme {
+            background-color: #121212 !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .navbar {
+            background-color: #1f1f1f !important;
+            border-bottom: 1px solid #333 !important;
+        }
+        
+        body.dark-theme .card {
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border: 1px solid #333 !important;
+        }
+        
+        body.dark-theme .table {
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .modal-content {
+            background-color: #2c2c2c !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .form-control {
+            background-color: #333 !important;
+            color: #e0e0e0 !important;
+            border-color: #555 !important;
+        }
+        
+        /* Theme toggle button styles */
+        .theme-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-color, inherit);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        
+        .theme-toggle-btn:hover {
+            color: var(--accent-color, #00bcd4);
+        }
+
+        /* Dark theme global styles */
+        body.dark-theme {
+            background-color: #121212 !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* Navbar */
+        body.dark-theme .navbar {
+            background-color: #1f1f1f !important;
+            border-bottom: 1px solid #333 !important;
+        }
+
+        body.dark-theme .navbar-brand {
+            color: #e0e0e0 !important;
+        }
+
+        /* Cards */
+        body.dark-theme .card {
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border: 1px solid #333 !important;
+        }
+
+        body.dark-theme .card-header {
+            background-color: #2a2a2a !important;
+            color: #e0e0e0 !important;
+            border-bottom: 1px solid #444 !important;
+        }
+
+        /* Tables */
+        body.dark-theme .table {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .table-dark {
+            background-color: #1e1e1e !important;
+        }
+
+        body.dark-theme .table thead {
+            background-color: #2a2a2a !important;
+            color: var(--text-light) !important;
+        }
+
+        /* Modals */
+        body.dark-theme .modal-content {
+            background-color: #2c2c2c !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .modal-header {
+            border-bottom: 1px solid #444 !important;
+        }
+
+        body.dark-theme .modal-footer {
+            border-top: 1px solid #444 !important;
+        }
+
+        /* Form controls */
+        body.dark-theme .form-control {
+            background-color: #333 !important;
+            color: #e0e0e0 !important;
+            border-color: #555 !important;
+        }
+
+        body.dark-theme .form-control:focus {
+            background-color: #3a3a3a !important;
+            color: #e0e0e0 !important;
+            border-color: #666 !important;
+            box-shadow: 0 0 0 0.25rem rgba(100, 100, 100, 0.25) !important;
+        }
+
+        /* Buttons */
+        body.dark-theme .btn-primary {
+            background-color: #3f51b5 !important;
+            border-color: #3f51b5 !important;
+        }
+
+        body.dark-theme .btn-secondary {
+            background-color: #555 !important;
+            border-color: #666 !important;
+        }
+
+        /* Alerts */
+        body.dark-theme .alert {
+            background-color: #2a2a2a !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+
+        /* Theme toggle button */
+        body.dark-theme .theme-toggle-btn {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .theme-toggle-btn:hover {
+            color: #00bcd4 !important;
+        }
+
+        /* Scrollbar (for webkit browsers) */
+        body.dark-theme::-webkit-scrollbar {
+            width: 12px;
+            background-color: #1e1e1e !important;
+        }
+
+        body.dark-theme::-webkit-scrollbar-thumb {
+            background-color: #555 !important;
+            border-radius: 6px !important;
+        }
+
+        /* Light Theme Table Styles */
+        .table {
+            background-color: #ffffff !important;
+            color: #333 !important;
+        }
+
+        .table thead {
+            background-color: #f8f9fa !important;
+            color: #333 !important;
+        }
+
+        .table tbody tr {
+            background-color: #ffffff !important;
+            color: #333 !important;
+        }
+
+        .table tbody tr:nth-child(even) {
+            background-color: #f2f2f2 !important;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(0,0,0,0.075) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Dark Theme Table Styles */
+        .dark-theme .table {
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+        }
+
+        .dark-theme .table thead {
+            background-color: #2a2a2a !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table tbody tr {
+            color: #e0e0e0 !important;
+            border-color: #333 !important;
+        }
+
+        .dark-theme .table tbody tr:nth-child(even) {
+            background-color: #252525 !important;
+        }
+
+        .dark-theme .table-hover tbody tr:hover {
+            background-color: rgba(255,255,255,0.1) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Ensure table styles work with existing theme */
+        .table {
+            --bs-table-bg: transparent;
+            --bs-table-accent-bg: transparent;
+            --bs-table-striped-bg: rgba(0, 0, 0, 0.05);
+            --bs-table-hover-bg: rgba(0, 0, 0, 0.075);
+        }
+
+        .dark-theme .table {
+            --bs-table-bg: transparent;
+            --bs-table-accent-bg: transparent;
+            --bs-table-striped-bg: rgba(255, 255, 255, 0.1);
+            --bs-table-hover-bg: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 768px) {
+            .container {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .scan-card {
+                margin-bottom: 15px;
+            }
+
+            .navbar {
+                padding: 10px 0;
+            }
+
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+
+            .table-responsive {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .container-fluid {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+
+            .scan-card .card-header {
+                padding: 10px;
+            }
+
+            .table-responsive {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Back to Top Button */
+        .back-to-top-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .back-to-top-btn.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, #5a0ebd 0%, #1a5afc 100%);
+        }
+
+        .dark-theme .back-to-top-btn {
+            background: linear-gradient(135deg, #2196f3, #00bcd4);
+        }
+
+        .dark-theme .back-to-top-btn:hover {
+            background: linear-gradient(135deg, #1976d2, #0097a7);
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 576px) {
+            .back-to-top-btn {
+                width: 40px;
+                height: 40px;
+                bottom: 15px;
+                right: 15px;
+            }
+
+            .back-to-top-btn i {
+                font-size: 1rem;
+            }
+        }
+        
+        .copy-icon {
+            cursor: pointer;
+            margin-left: 8px;
+            color: var(--text-muted);
+            transition: color 0.2s ease;
+        }
+        
+        .copy-icon:hover {
+            color: var(--accent-color);
+        }
+        
+        .dark-theme .copy-icon {
+            color: var(--text-light);
+        }
+        
+        .dark-theme .copy-icon:hover {
+            color: var(--accent-color);
+        }
+    </style>
+    <script>
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;"> <!-- Adjust the size as needed -->
+        <div class="loading-message">
+            <h3><center>PRICE IS THE KING</center></h3>
+            <p><center>Fetching Latest Data...</center></p>
+        </div>
+    </div>
+
+    <!-- TradingView Preference Modal -->
+    <div class="preference-modal" id="preferenceModal" style="display: none;">
+        <div class="preference-modal-content">
+            <h3>Open TradingView Charts In</h3>
+            <div class="preference-option">
+                <input type="radio" id="browserOption" name="preference" value="browser" checked onclick="selectPreference(this)">
+                <label for="browserOption">
+                    <i class="fas fa-globe"></i>
+                    <div>
+                        <h5>Web Browser</h5>
+                        <small class="text-muted">Open charts in your default web browser</small>
+                    </div>
+                </label>
+            </div>
+            <div class="preference-option">
+                <input type="radio" id="appOption" name="preference" value="app" onclick="selectPreference(this)">
+                <label for="appOption">
+                    <i class="fas fa-desktop"></i>
+                    <div>
+                        <h5>Desktop App</h5>
+                        <small class="text-muted">Open charts in TradingView desktop application</small>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h6 class="mb-3">TradingView Launch Preference</h6>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="tradingViewPreference" id="appPreference" value="app">
+                            <label class="form-check-label" for="appPreference">
+                                <i class="fas fa-desktop me-2"></i>TradingView Desktop App
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tradingViewPreference" id="browserPreference" value="browser">
+                            <label class="form-check-label" for="browserPreference">
+                                <i class="fas fa-globe me-2"></i>Web Browser
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nifty Modal -->
+    <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="niftyModalLabel">
+                        <i class="fas fa-chart-line me-2"></i>Nifty Indices
+                    </h5>
+                    <div class="modal-header-actions">
+                        <button id="niftyReloadBtn" class="btn btn-outline-light me-2" title="Reload Data" onclick="fetchNiftyData()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body" id="niftyModalBody">
+                    <!-- Content will be dynamically loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <small class="text-muted" id="niftyLastUpdatedTime"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-brand">
+                <img src="/static/pitk-logo.svg" alt="PITK Logo" class="me-2">
+                PRICE IS THE KING
+                <span id="next-refresh">
+                    <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i> <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span> <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
+                </span>
+            </div>
+            <div class="navbar-buttons">
+                <button class="conditions-btn" onclick="showConditionsModal()">
+                    <i class="fas fa-list-check"></i> Conditions
+                </button>
+                <button class="settings-btn" onclick="showSettingsModal()">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
+                <button class="refresh-btn" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button class="btn nifty-btn" onclick="showNiftyModal()">
+                    <i class="fas fa-chart-line me-2"></i>Nifty
+                </button>
+                <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
+                    <i class="fas fa-moon" id="themeToggleIcon"></i>
+                </button>
+                <button class="theme-toggle-btn" id="muteButton" title="Mute Sound">
+                    <i class="fas fa-volume-mute" id="muteIcon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Timestamp Section -->
+    <div class="timestamp-section">
+        <div class="container">
+            <div class="timestamp-container">
+                <i class="fas fa-clock"></i>
+                Last Updated:
+                <span id="lastUpdateTime" class="ms-2"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conditions Modal -->
+    <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="conditionsModalLabel">Select Conditions</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary me-2" onclick="checkAllConditions(true)">
+                            <i class="fas fa-check-square"></i> Check All
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="checkAllConditions(false)">
+                            <i class="fas fa-square"></i> Uncheck All
+                        </button>
+                    </div>
+                    <div id="conditionsContainer">
+                        <!-- Conditions will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="applyConditions()">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        {% if flash_message %}
+        <div class="alert alert-{{ flash_message.type }} alert-dismissible fade show" role="alert">
+            <i class="fas {{ flash_message.icon }} me-2"></i>
+            <strong>{{ flash_message.title }}:</strong> {{ flash_message.message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+        
+        
+        <!-- Added these because we need to show the first card below the nav bar -->
+        <br><br><br>
+        
+        <div class="row" id="scanResults">
+            {% if conditions is defined and conditions %}
+                {% for condition in conditions %}
+                    <div class="col-12 scan-card">
+                    <div class="card">
+                        <div class="card-header {% if 'buy' in condition.name|lower %}bg-success text-white{% elif 'sell' in condition.name|lower %}bg-danger text-white{% else %}bg-primary text-white{% endif %}">
+                            <h5 class="card-title mb-0 d-flex align-items-center">
+                                <span style="color: white;">{{ condition.name if condition.name is defined else 'Unnamed Condition' }}</span>
+                                <a href="{{ condition.link }}" target="_blank" class="text-light ms-2" title="Open in Chartink">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if condition.stocks is defined and condition.stocks|length > 0 %}
+                                {% if condition.name == "Buy Suggestions" or condition.name == "Sell Suggestions" %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th>Change %</th>
+                                            <th>Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in condition.stocks %}
+                                            <tr>
+                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
+                                                <td>{{ stock.volume|format_number }}</td>
+                                                <td>{{ stock.potential_score|format_number('score') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% else %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th>Chartink</th>
+                                            <th>Change %</th>
+                                            <th>Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in condition.stocks %}
+                                            <tr>
+                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
+                                                <td>
+    <!-- Screener link (scan definition) -->
+    {% if condition.link %}
+    <a href="{{ condition.link }}" target="_blank" class="text-success me-2" title="Open Screener">
+        <i class="fas fa-search"></i>
+    </a>
+    {% else %}
+    <span class="text-secondary me-2" title="Screener link not available">
+        <i class="fas fa-search"></i>
+    </span>
+    {% endif %}
+    
+    <!-- Chart link (stock chart for this scan) -->
+    {% if condition.chart_link and stock.nsecode %}
+    <a href="{{ condition.chart_link }}{{ stock.nsecode }}" target="_blank" class="text-success" title="Open Chart">
+        <i class="fas fa-chart-line"></i>
+    </a>
+    {% else %}
+    <span class="text-secondary" title="Chart link not available">
+        <i class="fas fa-chart-line"></i>
+    </span>
+    {% endif %}
+</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
+                                                <td>{{ stock.volume|format_number }}</td>
+                                                <td>{{ stock.potential_score|format_number('score') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            {% else %}
+                                <div class="alert alert-warning">No stocks found for this scan.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="container mt-4">
+            <div class="row">
+                <!-- Buy Suggestions -->
+                <div class="col-md-6 scan-card">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-arrow-up"></i> Buy Suggestions</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if buy_suggestions %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th>Change %</th>
+                                            <th>Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in buy_suggestions %}
+                                            <tr>
+                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('percentage') }}%</td>
+                                                <td>{{ stock.volume | format_number }}</td>
+                                                <td>{{ stock.potential_score | format_number('score') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p class="text-muted">No buy suggestions available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            
+                <!-- Sell Suggestions -->
+                <div class="col-md-6 scan-card">
+                    <div class="card">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0"><i class="fas fa-arrow-down"></i> Sell Suggestions</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if sell_suggestions %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th>Change %</th>
+                                            <th>Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in sell_suggestions %}
+                                            <tr>
+                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('percentage') }}%</td>
+                                                <td>{{ stock.volume | format_number }}</td>
+                                                <td>{{ stock.potential_score | format_number('score') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p class="text-muted">No sell suggestions available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="back-to-top-btn" onclick="scrollToTop()" title="Back to Top">
+        <i class="fas fa-arrow-up"></i>
+    </div>
+
+    <div id="filterModal" class="modal" tabindex="-1" role="dialog" style="display:none;">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Filter Stocks by Potential Score</h5>
+                    <button type="button" class="close" onclick="document.getElementById('filterModal').style.display='none';">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="number" id="scoreInput" placeholder="Enter potential score" />
+                </div>
+                <div class="modal-footer">
+                    <button id="applyFilter" class="btn btn-primary">Apply</button>
+                    <button id="cancelFilter" class="btn btn-secondary" onclick="document.getElementById('filterModal').style.display='none';">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
+    <script src="{{ url_for('static', filename='js/mute.js') }}"></script>
+    
+    <script>
+        // Initialize all modals
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get all modal elements
+            const modals = {
+                conditions: new bootstrap.Modal(document.getElementById('conditionsModal')),
+                settings: new bootstrap.Modal(document.getElementById('settingsModal')),
+                nifty: new bootstrap.Modal(document.getElementById('niftyModal'))
+            };
+            
+            // Store modals globally
+            window.appModals = modals;
+        });
+        
+        function showConditionsModal() {
+            populateConditions();
+            if (window.appModals && window.appModals.conditions) {
+                window.appModals.conditions.show();
+            }
+        }
+        
+        function showSettingsModal() {
+            // Load current preference
+            fetch('/get-settings')
+                .then(response => response.json())
+                .then(settings => {
+                    const preference = settings.app_selected || 'app';
+                    document.querySelector(`input[name="tradingViewPreference"][value="${preference}"]`).checked = true;
+                });
+            
+            if (window.appModals && window.appModals.settings) {
+                window.appModals.settings.show();
+            }
+        }
+        
+        function showNiftyModal() {
+            fetch('/get_nifty_data')
+                .then(response => response.json())
+                .then(data => {
+                    // Predefined order of indices
+                    const indexOrder = [
+                        'Nifty 50', 
+                        'Nifty 100', 
+                        'Nifty 200', 
+                        'Nifty 500', 
+                        'Nifty ALPHA 50', 
+                        'Nifty BANK', 
+                        'Nifty ENERGY', 
+                        'Nifty FMCG', 
+                        'Nifty HIGH BETA 50', 
+                        'Nifty HOUSING', 
+                        'Nifty METAL', 
+                        'Nifty PRIVATE BANK', 
+                        'Nifty PSE', 
+                        'Nifty PSU BANK', 
+                        'Nifty REALTY', 
+                        'Nifty OIL & GAS',
+                        'Nifty PHARMA'
+                    ];
+
+                    const modalBody = document.getElementById('niftyModalBody');
+                    modalBody.innerHTML = `
+                        <div class="mb-3">
+                            <input type="text" id="niftySearchInput" class="form-control" placeholder="Search Nifty Indices...">
+                        </div>
+                        <table class="table table-dark table-hover" id="niftyIndicesTable">
+                            <thead>
+                                <tr>
+                                    <th>Index</th>
+                                    <th>Open Price</th>
+                                    <th>Last Price</th>
+                                    <th>Change</th>
+                                    <th>% Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${indexOrder.filter(index => data[index]).map(index => {
+                                    const details = data[index];
+                                    // Determine text color based on percentage change
+                                    const changeColor = parseFloat(details.pChange) <= 0 
+                                        ? 'red' // Red for zero or negative
+                                        : 'green'; // Green for positive
+                                    
+                                    return `
+                                        <tr>
+                                            <td class="${changeColor}">${index}</td>
+                                            <td>${details.open}</td>
+                                            <td>${details.last}</td>
+                                            <td class="${changeColor}">${details.change}</td>
+                                            <td class="${changeColor}">${details.pChange}%</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    // Add search functionality
+                    const searchInput = document.getElementById('niftySearchInput');
+                    const table = document.getElementById('niftyIndicesTable');
+                    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+                    searchInput.addEventListener('keyup', function() {
+                        const searchTerm = this.value.toLowerCase();
+                        
+                        for (let row of rows) {
+                            const indexCell = row.getElementsByTagName('td')[0];
+                            const indexText = indexCell.textContent.toLowerCase();
+                            
+                            // Show/hide rows based on search term
+                            row.style.display = indexText.includes(searchTerm) ? '' : 'none';
+                        }
+                    });
+                    
+                    // Show the modal
+                    const niftyModal = new bootstrap.Modal(document.getElementById('niftyModal'));
+                    niftyModal.show();
+                })
+                .catch(error => {
+                    console.error('Error fetching Nifty data:', error);
+                    alert('Failed to fetch Nifty data');
+                });
+        }
+
+        function hardRefresh() {
+            updateDashboard();
+            // Reset the timer
+            startAutoRefresh();
+        }
+
+        function selectPreference(element) {
+            document.querySelectorAll('.preference-option').forEach(opt => {
+                opt.classList.remove('selected');
+                if (opt.dataset.value === selectedPreference) {
+                    opt.classList.add('selected');
+                }
+            });
+            element.classList.add('selected');
+            selectedPreference = element.dataset.value;
+            console.log('Preference selected:', selectedPreference);
+
+            // Update Browser and App values
+            if (selectedPreference === 'browser') {
+                localStorage.setItem('Browser', '1');
+                localStorage.setItem('App', '0');
+            } else if (selectedPreference === 'app') {
+                localStorage.setItem('Browser', '0');
+                localStorage.setItem('App', '1');
+            }
+        }
+
+        // Initialize selected preference
+        document.addEventListener('DOMContentLoaded', () => {
+            if (selectedPreference) {
+                document.querySelector(`.preference-option[data-value="${selectedPreference}"]`)?.classList.add('selected');
+            }
+        });
+
+        function showPreferenceModal(stockSymbol = null) {
+            currentStockSymbol = stockSymbol;
+            document.getElementById('preferenceModal').style.display = 'flex';
+        }
+
+        function hidePreferenceModal() {
+            document.getElementById('preferenceModal').style.display = 'none';
+            if (!currentStockSymbol) selectedPreference = localStorage.getItem('tradingViewPreference');
+            currentStockSymbol = null;
+        }
+
+        function savePreference() {
+            const selectedOption = document.querySelector('.preference-option.selected')?.dataset.value;
+            if (!selectedOption) return;
+
+            fetch('/update-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    selected_option: selectedOption
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    hidePreferenceModal();
+                    if (currentStockSymbol) {
+                        openTradingView(currentStockSymbol);
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function skipPreference() {
+            hidePreferenceModal();
+            if (currentStockSymbol) {
+                openTradingView(currentStockSymbol, 'browser');
+            }
+        }
+
+        function openTradingView(symbol, forcedPreference = null) {
+            const preference = forcedPreference || localStorage.getItem('tradingViewPreference');
+            const stockSymbol = `NSE:${symbol}`;
+
+            if (!preference) {
+                showPreferenceModal(symbol);
+                return;
+            }
+
+            if (preference === 'app') {
+                // First try to focus existing window
+                try {
+                    // Try to open in desktop app with window.open
+                    const desktopWindow = window.open(`tradingview://`, '_blank');
+                    
+                    // After a short delay, try to open the specific chart
+                    setTimeout(() => {
+                        window.open(`tradingview://chart?symbol=${stockSymbol}`, '_blank');
+                        
+                        // Close the initial window if it was created
+                        if (desktopWindow) {
+                            desktopWindow.close();
+                        }
+                    }, 500);
+
+                    // Fallback to browser if app doesn't respond
+                    setTimeout(() => {
+                        if (!document.hidden) {
+                            console.log('Desktop app not responding, falling back to browser');
+                            window.open(`https://www.tradingview.com/chart?symbol=${stockSymbol}`, '_blank');
+                        }
+                    }, 1500);
+                } catch (e) {
+                    console.error('Failed to open TradingView desktop app:', e);
+                    // Fallback to browser
+                    window.open(`https://www.tradingview.com/chart?symbol=${stockSymbol}`, '_blank');
+                }
+            } else {
+                window.open(`https://www.tradingview.com/chart?symbol=${stockSymbol}`, '_blank');
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function updateDashboard() {
+            showLoading();
+            
+            // Use setTimeout to mimic timing in other functions
+            setTimeout(() => {
+                fetch('/get-scan-results')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Error:', data.error);
+                            hideLoading();
+                            return;
+                        }
+                        
+                        const container = document.querySelector('.container-fluid');
+                        container.innerHTML = ''; // Clear existing content
+                        
+                        // Create cards for each condition
+                        Object.entries(data).forEach(([condition, stocks]) => {
+                            console.log('Creating card for condition:', condition);
+                            console.log('Stocks data:', stocks);
+                            const card = createCard(condition, stocks);
+                            container.appendChild(card);
+                        });
+                        
+                        // Update timestamp
+                        updateLastRefreshTime();
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        const container = document.querySelector('.container-fluid');
+                        container.innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                Error loading scan results. Please try again.
+                            </div>`;
+                    })
+                    .finally(() => {
+                        // Delay hiding loading to match other functions
+                        setTimeout(hideLoading, 500);
+                    });
+            }, 500);  // Initial delay similar to other functions
+        }
+
+        function createCard(condition, stocks) {
+            const isSuggestionCard = condition === "Buy Suggestions" || condition === "Sell Suggestions";
+            const card = document.createElement('div');
+            card.className = 'col-md-6 scan-card';
+            card.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">${condition}</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Stock</th>
+                                        <th>Close</th>
+                                        ${!isSuggestionCard ? '<th>Chartink</th>' : ''}
+                                        <th>Change %</th>
+                                        <th>Volume</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${stocks.map(stock => `
+                                        <tr>
+                                            <td>
+                                                <div style="display: flex; align-items: center;">
+                                                    ${stock.symbol}
+                                                    <a href="#" onclick="showPreferenceModal('${stock.symbol}')" style="margin-left: 8px;">
+                                                        <img src="/static/hyperlink.svg" alt="Link" style="width: 16px; height: 16px;">
+                                                    </a>
+                                                </div>
+                                            </td>
+                                            <td>${formatNumber(stock.close, 'close')}</td>
+                                            ${!isSuggestionCard ? `
+                                            <td>
+                                                <a href="javascript:void(0);" onclick="openChartinkLink('${stock.nsecode}', '${condition}')" class="text-primary">
+                                                    <i class="fas fa-chart-line"></i>
+                                                </a>
+                                            </td>
+                                            ` : ''}
+                                            <td class="${stock.per_chg >= 0 ? 'text-success' : 'text-danger'}">${formatNumber(stock.per_chg, 'change_percent')}</td>
+                                            <td>${formatNumber(stock.volume, 'volume')}</td>
+                                            <td>${formatNumber(stock.potential_score, 'score')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        // Auto-refresh setup
+        let refreshTimer = null;
+
+        function startAutoRefresh() {
+            // Clear any existing timer
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+            
+            // Initial update
+            updateDashboard();
+            
+            // Set up new timer (2 minutes = 120000 ms)
+            refreshTimer = setInterval(updateDashboard, 120000);
+            console.log('Auto-refresh started, will refresh every 2 minutes');
+        }
+
+        // Start auto-refresh when page loads
+        window.addEventListener('load', () => {
+            startAutoRefresh();
+            console.log('Page loaded, starting auto-refresh');
+        });
+
+        function showConditionsModal() {
+            populateConditions(); // Load conditions before showing modal
+            const modal = new bootstrap.Modal(document.getElementById('conditionsModal'));
+            modal.show();
+        }
+
+        function populateConditions() {
+            const container = document.getElementById('conditionsContainer');
+            container.innerHTML = '<div class="text-center"><div class="spinner-border text-light" role="status"></div><p class="mt-2">Loading conditions...</p></div>';
+            
+            // Get current settings
+            fetch('/get-settings')
+                .then(response => response.json())
+                .then(settings => {
+                    const selectedConditions = settings.conditions || [];
+                    
+                    // Get all available conditions
+                    return fetch('/conditions')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(conditions => {
+                            container.innerHTML = ''; // Clear loading spinner
+                            
+                            if (!Array.isArray(conditions) || conditions.length === 0) {
+                                container.innerHTML = `
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-circle me-2"></i>
+                                        No conditions available
+                                    </div>`;
+                                return;
+                            }
+                            
+                            // Add "Select All" checkbox
+                            const selectAllDiv = document.createElement('div');
+                            selectAllDiv.className = 'form-check mb-3 border-bottom pb-2';
+                            selectAllDiv.innerHTML = `
+                                <input class="form-check-input" type="checkbox" id="selectAllConditions"
+                                    onclick="checkAllConditions(this.checked)">
+                                <label class="form-check-label" for="selectAllConditions">
+                                    <strong>Select All Conditions</strong>
+                                </label>
+                            `;
+                            container.appendChild(selectAllDiv);
+                            
+                            // Add individual condition checkboxes
+                            conditions.forEach(condition => {
+                                const div = document.createElement('div');
+                                div.className = 'form-check mb-3';
+                                div.innerHTML = `
+                                    <input class="form-check-input condition-checkbox" type="checkbox" 
+                                        value="${condition.name}" 
+                                        id="condition_${condition.name.replace(/\s+/g, '_')}"
+                                        ${selectedConditions.includes(condition.name) ? 'checked' : ''}>
+                                    <label class="form-check-label d-flex justify-content-between align-items-center" 
+                                        for="condition_${condition.name.replace(/\s+/g, '_')}">
+                                        ${condition.name}
+                                        <a href="${condition.link}" target="_blank" class="text-light ms-2" title="Open in Chartink">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    </label>
+                                `;
+                                container.appendChild(div);
+                            });
+                            
+                            // Update "Select All" checkbox state
+                            const allCheckboxes = container.querySelectorAll('.condition-checkbox');
+                            const selectAllCheckbox = document.getElementById('selectAllConditions');
+                            selectAllCheckbox.checked = Array.from(allCheckboxes).every(cb => cb.checked);
+                        })
+                        .catch(error => {
+                            console.error('Error loading conditions:', error);
+                            container.innerHTML = `
+                                <div class="alert alert-danger">
+                                    <i class="fas fa-exclamation-circle me-2"></i>
+                                    Failed to load conditions. Please try again.
+                                </div>`;
+                        });
+                })
+                .catch(error => {
+                    console.error('Error loading settings:', error);
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Failed to load settings. Please try again.
+                        </div>`;
+                });
+        }
+
+        function applyConditions() {
+            const selectedConditions = [];
+            const checkboxes = document.querySelectorAll('#conditionsContainer input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedConditions.push(checkbox.value);
+                }
+            });
+            
+            // Check if at least one condition is selected
+            if (selectedConditions.length === 0) {
+                // Remove any existing warning
+                const existingAlert = document.querySelector('.alert-warning');
+                if (existingAlert) {
+                    existingAlert.remove();
+                }
+                
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alertDiv.style.backgroundColor = '#dc3545';
+                alertDiv.style.color = '#fff';
+                alertDiv.style.borderColor = '#dc3545';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Please select at least one condition to continue.</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.getElementById('conditionsContainer').insertAdjacentElement('beforebegin', alertDiv);
+                return;
+            }
+            
+            fetch('/update-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ conditions: selectedConditions })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('conditionsModal'));
+                    modal.hide();
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error saving conditions:', error);
+                alert('Error saving conditions. Please try again.');
+            });
+        }
+
+        function checkAllConditions(checked) {
+            const checkboxes = document.querySelectorAll('#conditionsContainer input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = checked;
+            });
+            // Remove any existing warning if user checks any condition
+            if (checked) {
+                const alertDiv = document.querySelector('#conditionsContainer').previousElementSibling;
+                if (alertDiv && alertDiv.classList.contains('alert')) {
+                    alertDiv.remove();
+                }
+            }
+        }
+
+        function showSettingsModal() {
+            // Load current preference
+            fetch('/get-settings')
+                .then(response => response.json())
+                .then(settings => {
+                    const preference = settings.app_selected || 'app';
+                    document.querySelector(`input[name="tradingViewPreference"][value="${preference}"]`).checked = true;
+                });
+            
+            const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+            modal.show();
+        }
+
+        function saveSettings() {
+            const selectedPreference = document.querySelector('input[name="tradingViewPreference"]:checked').value;
+            
+            fetch('/update-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    selected_option: selectedPreference
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+                    modal.hide();
+                    // Reload to apply changes
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error saving settings:', error);
+                alert('Error saving settings. Please try again.');
+            });
+        }
+
+        function formatNumber(num, type = 'default') {
+            // If input is not a number, return as is
+            if (num === null || num === undefined || isNaN(Number(num))) {
+                return num;
+            }
+
+            // Convert to number
+            num = Number(num);
+
+            // Specific handling for different types
+            switch(type) {
+                case 'close':
+                case 'volume':
+                    // Convert K and L to full numbers
+                    if (num < 1000) {
+                        return num.toFixed(2);
+                    } else if (num < 100000) {
+                        // 1.47K → 1,470
+                        return Math.round(num * 10 / 10).toLocaleString('en-IN');
+                    } else {
+                        // 2.60L → 260,000
+                        return Math.round(num * 100 / 100).toLocaleString('en-IN');
+                    }
+                
+                case 'percentage':
+                    // Ensure percentage is shown with 2 decimal places and % sign
+                    return (num >= 0 ? '+' : '') + num.toFixed(2) + '%';
+                
+                case 'default':
+                default:
+                    // Simply convert to integer
+                    return Math.round(num).toLocaleString('en-IN');
+            }
+        }
+
+        // Start auto-refresh when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            startAutoRefresh();
+            
+            // Also restart auto-refresh when tab becomes visible
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    console.log('Tab became visible, restarting auto-refresh');
+                    startAutoRefresh();
+                }
+            });
+        });
+        
+        // Theme toggle functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggleBtn = document.getElementById("themeToggleBtn");
+            const themeToggleIcon = document.getElementById("themeToggleIcon");
+
+            // Check for saved theme preference or default to light
+            const savedTheme = localStorage.getItem("theme") || "light";
+
+            function applyTheme(theme) {
+                if (theme === "dark") {
+                    document.body.classList.add("dark-theme");
+                    themeToggleIcon.classList.replace("fa-moon", "fa-sun");
+                    localStorage.setItem("theme", "dark");
+                } else {
+                    document.body.classList.remove("dark-theme");
+                    themeToggleIcon.classList.replace("fa-sun", "fa-moon");
+                    localStorage.setItem("theme", "light");
+                }
+            }
+
+            // Apply saved theme on page load
+            applyTheme(savedTheme);
+
+            themeToggleBtn.addEventListener("click", () => {
+                // Toggle dark/light theme
+                const currentTheme = document.body.classList.contains("dark-theme") ? "dark" : "light";
+                applyTheme(currentTheme === "light" ? "dark" : "light");
+            });
+        });
+
+        // Mute button functionality is now in the consolidated script block below
+        
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // Show/Hide Back to Top Button
+        window.addEventListener('scroll', function() {
+            const backToTopBtn = document.querySelector('.back-to-top-btn');
+            if (window.pageYOffset > 300) {
+                backToTopBtn.classList.add('show');
+            } else {
+                backToTopBtn.classList.remove('show');
+            }
+        });
+
+        function refreshData() {
+            // Show loading overlay
+            showLoading();
+            
+            // Trigger dashboard update
+            updateDashboard();
+            
+            // Optional: Add a toast or notification
+            setTimeout(() => {
+                // Create a temporary notification
+                const notification = document.createElement('div');
+                notification.classList.add('toast', 'show', 'position-fixed', 'bottom-0', 'end-0', 'm-3', 'bg-success', 'text-white');
+                notification.style.zIndex = '1100';
+                notification.innerHTML = `
+                    <div class="toast-body">
+                        <i class="fas fa-check-circle me-2"></i>Data Refreshed Successfully
+                    </div>
+                `;
+                document.body.appendChild(notification);
+                
+                // Remove notification after 3 seconds
+                setTimeout(() => {
+                    notification.remove();
+                }, 3000);
+            }, 1000);
+        }
+    </script>
+    <script>
+        function playAlert() {
+            var audio = new Audio('static/alert.mp3'); // Ensure the path is correct
+            audio.play().catch(function(error) {
+                console.error('Error playing sound:', error);
+            });
+        }
+
+        function fetchUpdatedData() {
+            fetch('/get_updated_data')  // Fetch updated data from the Flask route
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data); // Log the data to check its structure
+                    updateStockCards(data); // Implement this function to update the UI with new data
+                    playAlert(); // Play the alert sound after updating the data
+                })
+                .catch(error => console.error('Error fetching updated data:', error));
+        }
+        function fetchNiftyData() {
+            fetch("/nifty-data?timestamp=" + new Date().getTime())
+                .then(response => {
+                    console.log("Response Status:", response.status); // Log status
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Nifty Data:", data);  // Check what data is received
+                    
+                    // Create a structured HTML representation as a table
+                    let htmlContent = '<table class="table"><thead><tr><th>Index</th><th>Open Price</th><th>Last Price</th><th>Change</th><th>% Change</th></tr></thead><tbody>';
+                    for (const [index, values] of Object.entries(data)) {
+                        // Determine the color based on the change value
+                        const changeColor = parseFloat(values.change) <= 0 
+                            ? 'red' // Red for zero or negative
+                            : 'green'; // Green for positive
+                        
+                        htmlContent += `<tr>
+                            <td><strong>${index}</strong></td>
+                            <td>${values.open}</td>
+                            <td>${values.last}</td>
+                            <td style="color: ${changeColor};">${values.change}</td>
+                            <td style="color: ${changeColor};">${values.pChange}%</td>
+                        </tr>`;
+                    }
+                    htmlContent += '</tbody></table>';
+                    
+                    document.getElementById("niftyModalBody").innerHTML = htmlContent;
+                })
+                .catch(error => console.error("Error fetching Nifty data:", error));
+        }
+        
+        // Call fetchNiftyData() when the modal is opened to apply colors initially
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchNiftyData(); // Fetch data when the page loads
+        });
+
+        // Set interval to fetch updated data every 2 minutes
+        setInterval(fetchUpdatedData, 120000); // 120000 milliseconds = 2 minutes
+    </script>
+    <script>
+        function updateStockCards(data) {
+            // Existing logic to update stock cards...
+
+            // Update suggestions
+            document.getElementById('buy-suggestions').innerHTML = '';
+            document.getElementById('sell-suggestions').innerHTML = '';
+
+            data.buy_suggestions.forEach(function(stock) {
+                var li = document.createElement('li');
+                li.textContent = stock;
+                document.getElementById('buy-suggestions').appendChild(li);
+            });
+
+            data.sell_suggestions.forEach(function(stock) {
+                var li = document.createElement('li');
+                li.textContent = stock;
+                document.getElementById('sell-suggestions').appendChild(li);
+            });
+        }
+    </script>
+    <script>
+        function refreshData() {
+            console.log("Refreshing data...");
+            location.reload();  // Reload the page
+        }
+        
+        setInterval(refreshData, 120000);  // Refresh every 2 minutes
+    </script>
+    <script>
+        document.querySelectorAll('.decimal-format').forEach(td => {
+            td.textContent = parseFloat(td.textContent).toFixed(2);
+        });
+    </script>
+    <script>
+      document.getElementById('applyFilter').onclick = function() {
+        const score = document.getElementById('scoreInput').value;
+        fetch('/filter_stocks', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({score: score})
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Handle displaying the filtered stocks here
+          console.log(data);
+          // Close the modal
+          document.getElementById('filterModal').style.display = 'none';
+        });
+      };
+      
+      document.getElementById('cancelFilter').onclick = function() {
+        document.getElementById('filterModal').style.display = 'none';
+      };
+    </script>
+    <script>
+        document.getElementById('filterButton').onclick = function() {
+            console.log("Filter button clicked"); // Test log
+            document.getElementById('filterModal').style.display = 'block';
+        };
+        
+        document.getElementById('applyFilter').onclick = function() {
+            const score = document.getElementById('scoreInput').value;
+            fetch('/filter_stocks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({score: score})
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data); // Log the filtered stocks
+
+                // Clear existing stock cards
+                const stockContainer = document.getElementById('stockContainer'); // Adjust this ID to match your actual container ID
+                if (stockContainer) {
+                    stockContainer.innerHTML = ''; // Clear existing cards
+
+                    // Sort the filtered stocks by potential score in descending order
+                    data.sort((a, b) => b.potential_score - a.potential_score); 
+
+                    // Create and display new stock cards
+                    data.forEach(stock => {
+                        const card = document.createElement('div');
+                        card.className = 'stock-card'; // Add your card class
+                        card.innerHTML = `<h5>${stock.name}</h5><p>Score: ${stock.potential_score}</p>`;
+                        stockContainer.appendChild(card);
+                    });
+                }
+
+                // Close the modal
+                document.getElementById('filterModal').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error fetching filtered stocks:', error);
+                showToast('Failed to filter stocks', true);
+            });
+        };
+    </script>
+    <script>
+        let refreshInterval = 120; // Refresh every 120 seconds
+        let timerElement = document.getElementById('refresh-timer');
+
+        function updateTimer() {
+            timerElement.textContent = `${refreshInterval} seconds`;
+        }
+
+        // Call this function to initialize the timer display
+        updateTimer();
+
+        // Set an interval to update the timer display every second
+        setInterval(() => {
+            if (refreshInterval > 0) {
+                refreshInterval--;
+                timerElement.textContent = `${refreshInterval} seconds`;
+            }
+        }, 1000);
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Initialize audio context if it doesn't exist
+            if (!window.audioContext) {
+                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const muteButton = document.getElementById("muteButton");
+            const muteIcon = document.getElementById("muteIcon");
+
+            // Function to update UI based on mute state
+            function updateMuteUI(isMuted) {
+                if (isMuted) {
+                    muteIcon.classList.remove("fa-volume-up");
+                    muteIcon.classList.add("fa-volume-mute");
+                    // Mute the sound
+                    if (window.audioContext.state === 'running') {
+                        window.audioContext.suspend();
+                    }
+                } else {
+                    muteIcon.classList.remove("fa-volume-mute");
+                    muteIcon.classList.add("fa-volume-up");
+                    // Unmute the sound
+                    if (window.audioContext.state === 'suspended') {
+                        window.audioContext.resume();
+                    } else if (window.audioContext.state === 'closed') {
+                        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                }
+            }
+
+            // Load mute status from the server on page load
+            fetch("/get-mute-status", { method: "GET" })
+                .then(response => response.json())
+                .then(data => {
+                    updateMuteUI(data.isMuted);
+                })
+                .catch(error => console.error("Error loading mute status:", error));
+
+            // Handle mute button click
+            muteButton.addEventListener("click", function() {
+                const isMuted = !muteIcon.classList.contains("fa-volume-mute");
+                
+                // Update server
+                fetch("/update_mute_status", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ isMuted: isMuted })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        updateMuteUI(data.isMuted);
+                    } else {
+                        console.error("Mute status update failed:", data.message);
+                    }
+                })
+                .catch(error => console.error("Error updating mute status:", error));
+            });
+        });
+    </script>
+    <script>
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+    <script>
+        // Toast notification function
+        function showToast(message, isError = false) {
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = isError ? 'toast show error' : 'toast show success';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.right = '20px';
+            toast.style.backgroundColor = isError ? '#f44336' : '#4caf50';
+            toast.style.color = 'white';
+            toast.style.padding = '15px';
+            toast.style.borderRadius = '4px';
+            toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+            toast.style.zIndex = '9999';
+            toast.style.transition = 'opacity 0.3s';
+            toast.textContent = message;
+            
+            // Add to body
+            document.body.appendChild(toast);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+        
+        // Handle copying text to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(`Copied ${text} to clipboard`, false);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                showToast('Failed to copy to clipboard', true);
+            });
+        }
+    </script>
+    <script>
+        // Function to open ChartInk links
+        function openChartinkLink(symbol, conditionName) {
+            fetch('/db.json')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.condition_urls && data.condition_urls[conditionName]) {
+                        const baseUrl = data.condition_urls[conditionName].url;
+                        const fullUrl = baseUrl + encodeURIComponent(symbol);
+                        window.open(fullUrl, '_blank');
+                    } else {
+                        console.error('Condition URL not found:', conditionName);
+                        showToast('Chart link not available for this condition', true);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Failed to load chart link', true);
+                });
+        }
+    </script>
+    <!-- Ensure all JS is properly closed and structured -->
+    <script>
+        // Initialize any remaining JS functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('All scripts loaded successfully');
+            // Sanity check that all required functions exist
+            if (typeof showToast === 'function') {
+                console.log('showToast function is available');
+            }
+        });
+    </script>
+</body>
+</html>

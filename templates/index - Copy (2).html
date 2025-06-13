@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PITK Stock Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>:root {
+            --primary-dark: #1a237e;
+            --primary-light: #534bae;
+            --secondary-dark: #303f9f;
+            --accent-color: #00bcd4;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+            --info-color: #2196f3;
+            --background-dark: #121212;
+            --card-dark: #1e1e1e;
+            --text-light: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --border-dark: #333333;
+        }
+
+        body {
+            background-color: var(--background-dark);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-light);
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+
+        .navbar-buttons {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            color: var(--text-light) !important;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .navbar-brand img {
+            margin-right: 10px;
+            height: 40px;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.2));
+        }
+
+        .refresh-btn, .settings-btn {
+            background: var(--accent-color);
+            color: var(--text-light);
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .settings-btn {
+            background: var(--secondary-dark);
+            padding: 0.5rem 1rem;
+        }
+
+        .refresh-btn:hover, .settings-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .refresh-btn i, .settings-btn i {
+            margin-right: 8px;
+        }
+
+        .scan-card {
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .scan-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .card {
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            background-color: var(--card-dark);
+        }
+
+        .card:hover {
+            transform: scale(1.02);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            color: var(--primary-dark);
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--primary-light);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        /* Different colors for different scan sections */
+        .scan-card:nth-child(1) .card-header { background: linear-gradient(135deg, #4a148c, #7c4dff); }
+        .scan-card:nth-child(2) .card-header { background: linear-gradient(135deg, #004d40, #00bfa5); }
+        .scan-card:nth-child(3) .card-header { background: linear-gradient(135deg, #b71c1c, #f44336); }
+        .scan-card:nth-child(4) .card-header { background: linear-gradient(135deg, #0d47a1, #2196f3); }
+        .scan-card:nth-child(5) .card-header { background: linear-gradient(135deg, #1b5e20, #4caf50); }
+        .scan-card:nth-child(6) .card-header { background: linear-gradient(135deg, #24aec0, #0bc5e1); }
+        .scan-card:nth-child(7) .card-header { background: linear-gradient(135deg, #d9219b, #f110e6); }
+        .scan-card:nth-child(8) .card-header { background: linear-gradient(135deg, #f09e11, #e8be53); }
+        .scan-card:nth-child(9) .card-header { background: linear-gradient(135deg, #00dc1a, #9fec9b); }
+        .scan-card:nth-child(11) .card-header { background: linear-gradient(135deg, #00dc1a, #9fec9b); }
+        .scan-card:nth-child(12) .card-header { background: linear-gradient(135deg, #e423736b, #c61aba); }
+        .scan-card:nth-child(13) .card-header { background: linear-gradient(135deg, #18d2506b, #d83ed8); }
+        
+        .card-header {
+            color: var(--text-light);
+            border-radius: 12px 12px 0 0 !important;
+            padding: 1.2rem;
+            border: none;
+        }
+
+        .stock-table {
+            font-size: 0.9em;
+            margin: 0;
+            background: var(--card-dark);
+            color: var(--text-light);
+        }
+
+        .stock-table th {
+            background: var(--background-dark);
+            font-weight: 600;
+            color: var(--text-light);
+            padding: 1rem;
+            border-bottom: 2px solid var(--border-dark);
+        }
+
+        .stock-table td {
+            vertical-align: middle;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .table-responsive {
+            overflow: hidden;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .last-update {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin: 1.5rem 0;
+            display: flex;
+            align-items: center;
+            background: var(--card-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .last-update i {
+            margin-right: 8px;
+            color: var(--accent-color);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .alert {
+            border-radius: 8px;
+            border: none;
+            padding: 1rem;
+            margin-bottom: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background: var(--card-dark);
+            color: var(--text-light);
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #0d47a1, #2196f3);
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #b71c1c, #f44336);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+
+        .loading-overlay img {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            color: var(--text-light);
+            font-size: 1.2rem;
+            font-weight: 500;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        /* Preference Modal */
+        .preference-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preference-modal-content {
+            background: var(--card-dark);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            color: var(--text-light);
+        }
+
+        .preference-modal h3 {
+            color: var(--text-light);
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .preference-option {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--border-dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--background-dark);
+        }
+
+        .preference-option:hover {
+            border-color: var(--accent-color);
+            background: var(--card-dark);
+        }
+
+        .preference-option.selected {
+            border-color: var(--accent-color);
+            background: var(--primary-dark);
+        }
+
+        .preference-option i {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            color: var(--accent-color);
+        }
+
+        .preference-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .preference-btn {
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preference-btn-primary {
+            background: var(--accent-color);
+            color: var(--text-light);
+        }
+
+        .preference-btn-primary:hover {
+            background: #00acc1;
+            transform: translateY(-1px);
+        }
+
+        .preference-btn-secondary {
+            background: var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .preference-btn-secondary:hover {
+            background: #404040;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+            
+            .navbar-brand img {
+                height: 30px;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .stock-table th,
+            .stock-table td {
+                padding: 0.6rem;
+            }
+        }
+
+        .icon {
+            margin-left: 5px;
+        }
+        
+        .condition-checkbox {
+            width: 20px;
+            height: 20px;
+        }
+
+        .condition-link {
+            text-shadow: 1px 1px 8px rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;"> <!-- Adjust the size as needed -->
+        <div class="loading-message">
+            <h3><center>PRICE IS THE KING</center></h3>
+            <p><center>Fetching Latest Data...</center></p>
+        </div>
+    </div>
+
+    <!-- TradingView Preference Modal -->
+    <div class="preference-modal" id="preferenceModal" style="display: none;">
+        <div class="preference-modal-content">
+            <h3>Open TradingView Charts In</h3>
+            <div class="preference-option">
+                <input type="radio" id="browserOption" name="preference" value="browser" checked onclick="selectPreference(this)">
+                <label for="browserOption">
+                    <i class="fas fa-globe"></i>
+                    <div>
+                        <h5>Web Browser</h5>
+                        <small class="text-muted">Open charts in your default web browser</small>
+                    </div>
+                </label>
+            </div>
+            <div class="preference-option">
+                <input type="radio" id="appOption" name="preference" value="app" onclick="selectPreference(this)">
+                <label for="appOption">
+                    <i class="fas fa-desktop"></i>
+                    <div>
+                        <h5>Desktop App</h5>
+                        <small class="text-muted">Open charts in TradingView desktop application</small>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="/static/pitk-logo.svg" alt="PITK Logo">
+                PITK Stock Scanner
+            </a>
+            <div class="navbar-buttons">
+                <button class="settings-btn" onclick="showPreferenceModal()">
+                    <i class="fas fa-cog"></i>
+                    Settings
+                </button>
+                <button class="refresh-btn" onclick="hardRefresh()">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh Data
+                </button>
+                <button class="settings-btn" id="selectConditionsButton">Select Conditions</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <div class="last-update">
+            <i class="far fa-clock"></i>
+            Last Update: <span id="lastUpdateTime" class="ms-2 fw-bold">Loading...</span>
+        </div>
+        
+        <div class="row" id="scanResults">
+            {% if conditions is defined and conditions %}
+                {% for condition in conditions %}
+                <div class="col-12 scan-card">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <span style="color: white;">{{ condition.name if condition.name is defined else 'Unnamed Condition' }}</span>
+                                &nbsp;&nbsp;
+                                <a href="https://www.example.com/{{ condition.name if condition.name is defined else 'Unnamed Condition' }}" target="_blank" class="condition-link">
+                                    <i class="fas fa-link"></i>
+                                </a>
+                            </h5>
+                            <a href="https://www.example.com/{{ condition.name if condition.name is defined else 'Unnamed Condition' }}" target="_blank" class="condition-link">
+                                <i class="fas fa-link"></i>
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            {% if condition.stocks is defined and condition.stocks|length > 0 %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th>Change %</th>
+                                            <th>Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in condition.stocks %}
+                                            <tr>
+                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td>{{ stock.close }}</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                                    {% if stock.per_chg >= 0 %}+{{ stock.per_chg }}%{% else %}{{ stock.per_chg }}%{% endif %}
+                                                </td>
+                                                <td>{{ stock.volume }}</td>
+                                                <td>{{ stock.potential_score }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <div class="alert alert-warning">No stocks found for this scan.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-danger">Error: No scan conditions available.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Clear cache on page load
+        window.onload = function() {
+            if (window.caches) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
+            }
+        };
+
+        let selectedPreference = localStorage.getItem('tradingViewPreference') || null;
+        let currentStockSymbol = null;
+
+        function selectPreference(element) {
+            document.querySelectorAll('.preference-option').forEach(opt => {
+                opt.classList.remove('selected');
+                if (opt.dataset.value === selectedPreference) {
+                    opt.classList.add('selected');
+                }
+            });
+            element.classList.add('selected');
+            selectedPreference = element.dataset.value;
+            console.log('Preference selected:', selectedPreference);
+
+            // Update Browser and App values
+            if (selectedPreference === 'browser') {
+                localStorage.setItem('Browser', '1');
+                localStorage.setItem('App', '0');
+            } else if (selectedPreference === 'app') {
+                localStorage.setItem('Browser', '0');
+                localStorage.setItem('App', '1');
+            }
+        }
+
+        // Initialize selected preference
+        document.addEventListener('DOMContentLoaded', () => {
+            if (selectedPreference) {
+                document.querySelector(`.preference-option[data-value="${selectedPreference}"]`)?.classList.add('selected');
+            }
+        });
+
+        function showPreferenceModal(stockSymbol = null) {
+            currentStockSymbol = stockSymbol;
+            document.getElementById('preferenceModal').style.display = 'flex';
+        }
+
+        function hidePreferenceModal() {
+            document.getElementById('preferenceModal').style.display = 'none';
+            if (!currentStockSymbol) selectedPreference = localStorage.getItem('tradingViewPreference');
+            currentStockSymbol = null;
+        }
+
+        function savePreference() {
+    if (selectedPreference) {
+        // Determine values based on selection
+        let browserValue = selectedPreference === 'browser' ? '1' : '0';
+        let appValue = selectedPreference === 'app' ? '1' : '0';
+
+        // Send a POST request to update settings.txt
+        fetch('/updateModal', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ browser: browserValue, app: appValue })
+        }).then(response => {
+            if (response.ok) {
+                console.log('settings.txt updated successfully');
+            } else {
+                console.error('Failed to update settings.txt');
+            }
+        });
+
+        hidePreferenceModal();
+        if (currentStockSymbol) {
+            openTradingView(currentStockSymbol);
+        }
+    }
+}
+
+        function skipPreference() {
+            hidePreferenceModal();
+            if (currentStockSymbol) {
+                openTradingView(currentStockSymbol, 'browser');
+            }
+        }
+
+        function openTradingView(symbol, forcedPreference = null) {
+            const preference = forcedPreference || localStorage.getItem('tradingViewPreference');
+            const stockSymbol = `NSE:${symbol}`;
+
+            if (!preference) {
+                showPreferenceModal(symbol);
+                return;
+            }
+
+            if (preference === 'app') {
+                // First try to focus existing window
+                try {
+                    // Try to open in desktop app with window.open
+                    const desktopWindow = window.open(`tradingview://`, '_blank');
+                    
+                    // After a short delay, try to open the specific chart
+                    setTimeout(() => {
+                        window.open(`tradingview://chart?symbol=${stockSymbol}`, '_blank');
+                        
+                        // Close the initial window if it was created
+                        if (desktopWindow) {
+                            desktopWindow.close();
+                        }
+                    }, 500);
+
+                    // Fallback to browser if app doesn't respond
+                    setTimeout(() => {
+                        if (!document.hidden) {
+                            console.log('Desktop app not responding, falling back to browser');
+                            window.open(`https://www.tradingview.com/chart?symbol=${stockSymbol}`, '_blank');
+                        }
+                    }, 1500);
+                } catch (e) {
+                    console.error('Failed to open TradingView desktop app:', e);
+                    // Fallback to browser
+                    window.open(`https://www.tradingview.com/chart?symbol=${stockSymbol}`, '_blank');
+                }
+            } else {
+                window.open(`https://www.tradingview.com/chart?symbol=${stockSymbol}`, '_blank');
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function hardRefresh() {
+            showLoading();
+            window.location.reload(true);
+        }
+
+        function formatNumber(num) {
+            return Math.round(num).toLocaleString('en-IN', {
+                maximumFractionDigits: 0
+            });
+        }
+
+        function updateDashboard() {
+            showLoading();
+            console.log('Fetching updated data...');
+
+            // Assuming you have a loop or processing logic here
+            // Add cache-busting parameters
+            const url = '/api/scan_results?' + new Date().getTime();
+            
+            console.log('Fetching data from:', url);
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                },
+                cache: 'no-store'
+            })
+            .then(response => {
+                console.log('Response received:', response);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received:', data);
+                hideLoading();
+                const resultsContainer = document.getElementById('scanResults');
+                let html = '';
+                // Update the last update time
+                const now = new Date();
+                console.log('Updating last update time to:', now.toLocaleString('en-IN'));
+                
+                // Check if the lastUpdateTime element exists
+                const lastUpdateElement = document.getElementById('lastUpdateTime');
+                if (lastUpdateElement) {
+                    lastUpdateElement.innerText = 'Test Time'; // Set a static value for testing
+                    console.log('Last Update Element found, setting static value.');
+                } else {
+                    console.log('Last Update Element not found!');
+                }
+
+                if (data.results && Object.keys(data.results).length > 0) {
+                    for (const [conditionName, stocks] of Object.entries(data.results)) {
+                        if (stocks.length === 0) {
+                            html += `<div class="col-12"><div class="alert alert-warning">${conditionName}: No stocks found.</div></div>`;
+                        } else {
+                            html += `
+                                <div class="col-12 scan-card">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="card-title mb-0" style="display: flex; justify-content: flex-start; align-items: center;">
+                                                <span style="color: white;">${conditionName ? conditionName : 'Unnamed Condition'}</span>
+                                                &nbsp;&nbsp;
+                                                <a href="https://www.example.com/${conditionName ? conditionName : 'Unnamed Condition'}" target="_blank" class="condition-link">
+                                                    <i class="fas fa-link"></i>
+                                                </a>
+                                            </h5>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover stock-table mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Stock</th>
+                                                            <th>Close</th>
+                                                            <th>Change %</th>
+                                                            <th>Volume</th>
+                                                            <th>Score</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        ${stocks.map(stock => `
+                                                            <tr>
+                                                                <td class="fw-bold stock-name">
+                                                                    <a href="https://www.tradingview.com/chart?symbol=${stock.nsecode}" target="_blank" style="display: flex; justify-content: flex-start; align-items: center;">
+                                                                        ${stock.nsecode}
+                                                                        <i class="fas fa-link icon"></i>
+                                                                    </a>
+                                                                </td>
+                                                                <td>${formatNumber(stock.close)}</td>
+                                                                <td class="${stock.per_chg >= 0 ? 'text-success' : 'text-danger'}">
+                                                                    ${stock.per_chg >= 0 ? '+' + stock.per_chg + '%' : stock.per_chg + '%'}
+                                                                </td>
+                                                                <td>${formatNumber(stock.volume)}</td>
+                                                                <td>${formatNumber(stock.potential_score)}</td>
+                                                            </tr>
+                                                        `).join('')}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                } else {
+                    html = `<div class="col-12"><div class="alert alert-info">No scan results available.</div></div>`;
+                }
+
+                resultsContainer.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+                hideLoading();
+                const resultsContainer = document.getElementById('scanResults');
+                resultsContainer.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Error fetching data: ${error.message}
+                        </div>
+                    </div>
+                `;
+                
+            });
+        }
+
+        // Update initially and then every 120 seconds
+        updateDashboard();
+        setInterval(updateDashboard, 120000);
+
+        document.getElementById('selectConditionsButton').addEventListener('click', function() {
+            document.getElementById('conditionModal').style.display = 'block'; // Show the modal
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Select Condition Modal -->
+<div id="conditionModal" class="preference-modal" style="display: none;">
+    <div class="preference-modal-content">
+        <h3>Select Conditions</h3>
+        <div id="conditionsContainer" class="mb-3"></div>
+        <div class="preference-buttons">
+            <button class="preference-btn preference-btn-secondary" onclick="closeConditionModal()">Cancel</button>
+            <button class="preference-btn preference-btn-primary" onclick="applyConditions()">Apply</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function applyConditions() {
+        let conditions_status = {};
+        document.querySelectorAll('.condition-checkbox').forEach(el => {
+            conditions_status[el.value] = el.checked ? 1 : 0; // Save checkbox status as 1 or 0
+        });
+
+        // Call the function to save settings with the selected conditions
+        saveSettings(conditions_status); // Ensure this function is defined to handle the saving
+        closeConditionModal(); // Close the modal after saving
+    }
+
+    function closeConditionModal() {
+        document.getElementById('conditionModal').style.display = 'none';
+    }
+
+    document.getElementById('selectConditionsButton').onclick = function() {
+        document.getElementById('conditionModal').style.display = 'block';
+    };
+
+    function saveSettings(conditions_status) {
+        // Implement the logic to send conditions_status to the server or save it directly
+        // Example AJAX call to save settings
+        fetch('/api/save_settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ conditions_status: conditions_status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Settings saved:', data);
+        })
+        .catch((error) => {
+            console.error('Error saving settings:', error);
+        });
+    }
+
+    function populateConditions() {
+        fetch('/api/get_conditions')  // API endpoint to get conditions
+            .then(response => response.json())
+            .then(conditions => {
+                const conditionsContainer = document.getElementById('conditionsContainer');
+                conditions.forEach(condition => {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = condition.name;
+                    checkbox.value = condition.name;
+                    checkbox.className = 'condition-checkbox';
+                    checkbox.checked = condition.status === 1;
+
+                    const label = document.createElement('label');
+                    label.htmlFor = condition.name;
+                    label.appendChild(document.createTextNode(condition.name));
+
+                    const div = document.createElement('div');
+                    div.appendChild(checkbox);
+                    div.appendChild(label);
+                    conditionsContainer.appendChild(div);
+                });
+            })
+            .catch(error => console.error('Error fetching conditions:', error));
+    }
+
+    document.getElementById('selectConditionsButton').onclick = function() {
+        document.getElementById('conditionModal').style.display = 'block';
+        populateConditions(); // Call to populate conditions dynamically
+    };
+</script>
+</body>
+</html>

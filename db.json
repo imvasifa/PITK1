@@ -1,0 +1,58 @@
+{
+    "mute_status": true,
+    "app_selected": "app",
+    "conditions": [
+        "on",
+        "DeepSeek",
+        "KHAIZER",
+        "CROSSED",
+        "15 MIN Breakout",
+        "STRONG STOCKS POSITIVE",
+        "ATR STOCKS",
+        "MULTI TIMEFRAME SCAN",
+        "HARSH SELL STOCKS",
+        "Volume Shocker",
+        "HARSH BUY STOCKS",
+        "EMA 11 CHANU",
+        "MAGIC FILTER RAHIM",
+        "STRONG STOCKS NEGATIVE",
+        "RA Inventor BUY",
+        "RA Inventor SELL",
+        "RA Inventor 20 Candles BUY",
+        "DST BUY",
+        "85 Volume Shock",
+        "DST SELL"
+    ],
+    "condition_urls": {
+        "KHAIZER": {
+            "name": "KHAIZER",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:78d1fc5151e3a3d90e6ae7786f63cca8&timeframe=daily&symbol="
+        },
+        "STRONG STOCKS POSITIVE": {
+            "name": "STRONG STOCKS POSITIVE",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7302638654ee1d6e47747b50291acf65&timeframe=daily&symbol="
+        },
+        "15 MIN Breakout": {
+            "name": "15 MIN Breakout",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:d54b5e1d428ff9fd372e94622da24fa7&timeframe=15_minute&symbol="
+        },
+        "RA Inventor BUY": {
+            "name": "RA Inventor BUY",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:24679f454fd1690bb64e19ac0d079642&timeframe=30_minute&symbol="
+        },
+        "RA Inventor SELL": {
+            "name": "RA Inventor SELL",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:d8727051a55f9faa83353f9430739d74&timeframe=30_minute&symbol="
+        },
+        "MULTI TIMEFRAME SCAN": {
+            "name": "MULTI TIMEFRAME SCAN",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:2fe482a179bd69e0bcdc74bde5972b89&timeframe=5_minute&symbol="
+        },
+        "HARSH SELL STOCKS": {
+            "name": "HARSH SELL STOCKS",
+            "url": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:55f8772c0dee1c48e0d916b06b33ff4b&timeframe=10_minute&symbol="
+        }
+    },
+    "browser": "0",
+    "app": "1"
+}

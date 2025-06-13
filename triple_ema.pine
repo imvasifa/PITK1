@@ -1,0 +1,61 @@
+//@version=5
+strategy("Triple EMA Strategy", overlay=true, initial_capital=100000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Input parameters
+stopLossPercent = input.float(2.0, "Stop Loss %", minval=0.1, maxval=10.0, step=0.1)
+enableReentry = input.bool(true, "Enable Re-entry after Stop Loss")
+cooldownBars = input.int(3, "Cooldown Bars after Stop Loss", minval=1, maxval=20)
+
+// Calculate EMAs
+ema9 = ta.ema(close, 9)
+ema21 = ta.ema(close, 21)
+ema50 = ta.ema(close, 50)
+
+// Plot EMAs with different colors
+plot(ema9, color=color.blue, linewidth=2, title="EMA 9")
+plot(ema21, color=color.green, linewidth=2, title="EMA 21")
+plot(ema50, color=color.red, linewidth=2, title="EMA 50")
+
+// Trading conditions
+longCondition = ta.crossover(ema9, ema21) and close > ema50
+shortCondition = ta.crossunder(ema9, ema21) and close < ema50
+
+// Variables for tracking stop loss and cooldown
+var stopLossPrice = 0.0
+var lastStopLossBar = 0
+var inCooldown = false
+
+// Update cooldown status
+if inCooldown
+    inCooldown := bar_index - lastStopLossBar < cooldownBars
+
+// Calculate stop loss prices
+longStopLoss = strategy.position_avg_price * (1 - stopLossPercent/100)
+shortStopLoss = strategy.position_avg_price * (1 + stopLossPercent/100)
+
+// Check if stop loss is hit
+longStopHit = strategy.position_size > 0 and low <= longStopLoss
+shortStopHit = strategy.position_size < 0 and high >= shortStopLoss
+
+// Close positions on stop loss
+if longStopHit
+    strategy.close("Long", comment="Long Stop Loss")
+    lastStopLossBar := bar_index
+    inCooldown := true
+
+if shortStopHit
+    strategy.close("Short", comment="Short Stop Loss")
+    lastStopLossBar := bar_index
+    inCooldown := true
+
+// Entry logic with re-entry conditions
+if not inCooldown
+    if longCondition and strategy.position_size <= 0
+        strategy.entry("Long", strategy.long)
+    
+    if shortCondition and strategy.position_size >= 0
+        strategy.entry("Short", strategy.short)
+
+// Plot stop loss levels when in position
+plot(strategy.position_size > 0 ? longStopLoss : na, color=color.red, style=plot.style_circles, title="Long Stop Loss")
+plot(strategy.position_size < 0 ? shortStopLoss : na, color=color.red, style=plot.style_circles, title="Short Stop Loss")

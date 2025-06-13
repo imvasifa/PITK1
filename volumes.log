@@ -1,0 +1,64 @@
+2025-06-13 18:42:22,894 - volumes - INFO - Fetching volumes for RELIANCE
+2025-06-13 18:42:27,386 - volumes - ERROR - Exception while fetching volume for RELIANCE: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\models.py", line 974, in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\__init__.py", line 514, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\decoder.py", line 386, in decode
+    obj, end = self.raw_decode(s)
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\decoder.py", line 416, in raw_decode
+    return self.scan_once(s, idx=_w(s, idx).end())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\scanner.py", line 79, in scan_once
+    return _scan_once(string, idx)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\scanner.py", line 70, in _scan_once
+    raise JSONDecodeError(errmsg, string, idx)
+simplejson.errors.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\MY PC\My Drive\Strong\volumes.py", line 156, in try_nse_direct_approach
+    data = response.json()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\models.py", line 978, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+2025-06-13 18:42:27,591 - volumes - ERROR - Exception in alternative approach: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\models.py", line 974, in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\__init__.py", line 514, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\decoder.py", line 386, in decode
+    obj, end = self.raw_decode(s)
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\decoder.py", line 416, in raw_decode
+    return self.scan_once(s, idx=_w(s, idx).end())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\scanner.py", line 79, in scan_once
+    return _scan_once(string, idx)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\simplejson\scanner.py", line 70, in _scan_once
+    raise JSONDecodeError(errmsg, string, idx)
+simplejson.errors.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\MY PC\My Drive\Strong\volumes.py", line 180, in try_nse_alternative_approach
+    data = response.json()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\MY PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\requests\models.py", line 978, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+2025-06-13 18:42:27,896 - volumes - INFO - Successfully fetched volume from Yahoo Finance for RELIANCE: 9756483
+2025-06-13 18:42:27,899 - volumes - INFO - Downloading NSE bhavcopy for 12-06-2025
+2025-06-13 18:42:28,958 - volumes - ERROR - Error extracting bhavcopy data: File is not a zip file

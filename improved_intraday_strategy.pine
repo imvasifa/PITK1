@@ -1,0 +1,88 @@
+//@version=4
+strategy(title="Enhanced RA UT Bot - Intraday NSE", overlay=true, initial_capital=10000, default_qty_type=strategy.cash, default_qty_value=10000, commission_type=strategy.commission.percent, commission_value=0.1)
+
+// Inputs
+a = input(3, title="Key Value (Sensitivity)")
+c = input(5, title="ATR Period")
+h = input(false, title="Use Heikin Ashi Candles")
+stopLossPercent = input(1.0, title="Stop Loss %")
+takeProfitPercent = input(2.0, title="Take Profit %")
+useVolFilter = input(true, title="Use Volume Filter")
+minVolMultiplier = input(1.5, title="Minimum Volume Multiplier")
+
+// Trade Direction Checkboxes
+longEnabled  = input(true, title="Enable Long Trades")
+shortEnabled = input(true, title="Enable Short Trades")
+
+// Intraday Session Parameters (NSE India)
+inSession = (hour >= 9 and minute >= 15) and (hour < 15 or (hour == 15 and minute <= 20))
+endOfSession = hour == 15 and minute >= 20
+avoidLunchHour = (hour >= 12 and hour < 13)  // Avoid trading during lunch hour
+
+// Calculate ATR and trailing stop loss
+xATR  = atr(c)
+nLoss = a * xATR
+
+// Determine source data
+src = h ? security(heikinashi(syminfo.tickerid), timeframe.period, close, lookahead=false) : close
+
+// Calculate trailing stop with session reset
+var float xATRTrailingStop = na
+var bool newSession = na
+
+// Volume Filter
+volMA = sma(volume, 20)
+isHighVolume = volume > (volMA * minVolMultiplier)
+
+// Moving Averages
+sma200 = sma(close, 200)
+ema20 = ema(close, 20)
+ema50 = ema(close, 50)
+
+// Detect new trading session (9:15 AM)
+newSession := (hour == 9 and minute >= 15) and not (hour[1] == 9 and minute[1] >= 15)
+
+// Reset trailing stop at session start
+if newSession
+    xATRTrailingStop := src - nLoss
+else
+    xATRTrailingStop := na(xATRTrailingStop[1]) ? src - nLoss : 
+       src > xATRTrailingStop[1] and src[1] > xATRTrailingStop[1] ? max(xATRTrailingStop[1], src - nLoss) :
+       src < xATRTrailingStop[1] and src[1] < xATRTrailingStop[1] ? min(xATRTrailingStop[1], src + nLoss) :
+       src > xATRTrailingStop[1] ? src - nLoss : src + nLoss
+
+// Trend Conditions
+upTrend = src > sma200 and ema20 > ema50
+downTrend = src < sma200 and ema20 < ema50
+
+// Generate signals (only during trading hours and considering all conditions)
+validTradingTime = inSession and not avoidLunchHour
+volumeCondition = not useVolFilter or isHighVolume
+
+buySignal  = crossover(src, xATRTrailingStop) and validTradingTime and longEnabled and upTrend and volumeCondition
+sellSignal = crossunder(src, xATRTrailingStop) and validTradingTime and shortEnabled and downTrend and volumeCondition
+
+// Execute trades with stop loss and take profit
+if buySignal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=strategy.position_avg_price * (1 - stopLossPercent/100), 
+                 limit=strategy.position_avg_price * (1 + takeProfitPercent/100))
+
+if sellSignal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=strategy.position_avg_price * (1 + stopLossPercent/100), 
+                 limit=strategy.position_avg_price * (1 - takeProfitPercent/100))
+
+// Square off all positions at 3:20 PM
+if endOfSession
+    strategy.close_all()
+
+// Plotting
+plot(xATRTrailingStop, color=color.orange, title="Trailing Stop")
+plot(sma200, title="200 SMA", color=color.yellow, linewidth=2)
+plot(ema20, title="20 EMA", color=color.blue, linewidth=1)
+plot(ema50, title="50 EMA", color=color.red, linewidth=1)
+barcolor(buySignal ? color.green : sellSignal ? color.red : na)
+
+// Plot volume analysis
+plot(series=useVolFilter ? (isHighVolume ? 1 : 0) : 0, title="Volume Filter", style=plot.style_circles, color=color.purple, linewidth=2)
