@@ -323,7 +323,7 @@ conditions = [
         "scan_clause": """( {57960} ( [0] 15 minute ema ( [0] 15 minute close , 11 ) > [0] 15 minute ema ( [0] 15 minute close , 22 ) and [ -1 ] 15 minute ema ( [0] 15 minute close , 11 )<= [ -1 ] 15 minute ema ( [0] 15 minute close , 22 ) and latest adx ( 14 ) >= 20 ) ) """
     },
     {
-        "name": "Smart Cash Flow - Chanu ✅",
+        "name": "Smart Cash Flow - Chanu 🟢 ",
         "link": "https://chartink.com/screener/copy-85-volume-shameem",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:e93d77e49e9b94220daecb5bae1e6ff8&timeframe=daily&symbol=",
         "scan_clause": """( {cash} ( 
@@ -335,7 +335,15 @@ conditions = [
         ) )"""
     },
     {
-        "name": "CHANU VOLATILITY SPIKE ✅",
+        "name": "30min Volume Spike 🚀",
+        "link": "https://chartink.com/screener/30min-volume-spike",
+        "chart_link": "https://chartink.com/stocks-new?symbol=",
+        "scan_clause": """( {cash} ( 
+            [=0] 30 minute volume > [0] 30 minute sma( [0] 30 minute volume , 30 ) * 3 
+        ) )"""
+    },
+    {
+        "name": "CHANU VOLATILITY SPIKE ",
         "link": "https://chartink.com/screener/copy-volume-shockers-stocks-with-rising-volumes-1111145289",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c7fa7b37712fa79e1b96d4155e7d64d5&timeframe=daily&symbol=",
         "scan_clause": """( {57960} ( 

@@ -1364,11 +1364,14 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <button type="button" class="btn btn-outline-primary me-2" onclick="checkAllConditions(true)">
-                            <i class="fas fa-check-square"></i> Check All
+                            <i class="fas fa-check-square me-1"></i> Check All
                         </button>
                         <button type="button" class="btn btn-outline-secondary" onclick="checkAllConditions(false)">
-                            <i class="fas fa-square"></i> Uncheck All
+                            <i class="fas fa-square me-1"></i> Uncheck All
                         </button>
+                    </div>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="conditionSearchInput" placeholder="Search conditions..." oninput="filterConditions()">
                     </div>
                     <div id="conditionsContainer">
                         <!-- Conditions will be populated here -->
@@ -1985,7 +1988,14 @@
             modal.show();
         }
 
-        function populateConditions() {
+        function filterConditions() {
+    const search = document.getElementById('conditionSearchInput').value.toLowerCase();
+    document.querySelectorAll('#conditionsContainer .condition-item').forEach(function(item) {
+        item.style.display = item.textContent.toLowerCase().includes(search) ? '' : 'none';
+    });
+}
+
+function populateConditions() {
             const container = document.getElementById('conditionsContainer');
             container.innerHTML = '<div class="text-center"><div class="spinner-border text-light" role="status"></div><p class="mt-2">Loading conditions...</p></div>';
             
@@ -2030,7 +2040,7 @@
                             // Add individual condition checkboxes
                             conditions.forEach(condition => {
                                 const div = document.createElement('div');
-                                div.className = 'form-check mb-3';
+                                div.className = 'form-check mb-3 condition-item';
                                 div.innerHTML = `
                                     <input class="form-check-input condition-checkbox" type="checkbox" 
                                         value="${condition.name}" 
