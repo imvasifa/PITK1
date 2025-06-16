@@ -337,7 +337,7 @@ conditions = [
     {
         "name": "30min Volume Spike 🚀",
         "link": "https://chartink.com/screener/30min-volume-spike",
-        "chart_link": "https://chartink.com/stocks-new?symbol=",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:99b7045b2e7fc79cc51b0d0ae46e7fac&timeframe=30_minute&symbol=",
         "scan_clause": """( {cash} ( 
             [=0] 30 minute volume > [0] 30 minute sma( [0] 30 minute volume , 30 ) * 3 
         ) )"""

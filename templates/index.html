@@ -218,18 +218,22 @@
         }
 
         .refresh-btn {
-            background: linear-gradient(45deg, #00c853, #64dd17);
-            color: var(--text-light);
-            border: none;
-            padding: 0.5rem 1.5rem;
-            border-radius: 25px;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            font-weight: 500;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+    background: linear-gradient(45deg, #00c853, #64dd17);
+    color: var(--text-light);
+    border: none;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.3rem;
+}
 
         .conditions-btn {
             background: linear-gradient(45deg, #ff6d00, #ffd740);
@@ -246,18 +250,22 @@
         }
 
         .settings-btn {
-            background: linear-gradient(45deg, #2979ff, #00b0ff);
-            color: var(--text-light);
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            font-weight: 500;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+    background: linear-gradient(45deg, #2979ff, #00b0ff);
+    color: var(--text-light);
+    border: none;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.3rem;
+}
 
         .refresh-btn:hover, .settings-btn:hover, .conditions-btn:hover {
             transform: translateY(-2px);
@@ -265,10 +273,26 @@
             filter: brightness(1.1);
         }
 
-        .refresh-btn i, .settings-btn i, .conditions-btn i {
-            margin-right: 8px;
-            font-size: 1.1em;
+        .refresh-btn:hover, .settings-btn:hover {
+            transform: translateY(-2px) scale(1.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
         }
+
+        .refresh-btn:focus, .settings-btn:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
+        .refresh-btn i, .settings-btn i, .nifty-btn i {
+    margin: 0;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
 
         .scan-card {
             margin-bottom: 20px;
@@ -797,18 +821,22 @@
         }
 
         .nifty-btn {
-            background: linear-gradient(45deg, #9c27b0, #e91e63);
-            color: var(--text-light);
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            font-weight: 500;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+    background: linear-gradient(45deg, #9c27b0, #e91e63);
+    color: var(--text-light);
+    border: none;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.3rem;
+}
 
         .nifty-btn:hover {
             transform: translateY(-2px);
@@ -1324,13 +1352,13 @@
                     <i class="fas fa-list-check"></i> Conditions
                 </button>
                 <button class="settings-btn" onclick="showSettingsModal()">
-                    <i class="fas fa-cog"></i> Settings
+                    <i class="fas fa-cog"></i>
                 </button>
                 <button class="refresh-btn" onclick="refreshData()">
-                    <i class="fas fa-sync-alt"></i> Refresh
+                    <i class="fas fa-sync-alt"></i>
                 </button>
                 <button class="btn nifty-btn" onclick="showNiftyModal()">
-                    <i class="fas fa-chart-line me-2"></i>Nifty
+                    <i class="fas fa-chart-line me-2"></i>
                 </button>
                 <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
                     <i class="fas fa-moon" id="themeToggleIcon"></i>
