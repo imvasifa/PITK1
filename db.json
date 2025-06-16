@@ -2,26 +2,10 @@
     "mute_status": true,
     "app_selected": "app",
     "conditions": [
-        "on",
-        "DeepSeek",
-        "KHAIZER",
-        "CROSSED",
-        "15 MIN Breakout",
-        "STRONG STOCKS POSITIVE",
-        "ATR STOCKS",
-        "MULTI TIMEFRAME SCAN",
-        "HARSH SELL STOCKS",
-        "Volume Shocker",
-        "HARSH BUY STOCKS",
-        "EMA 11 CHANU",
-        "MAGIC FILTER RAHIM",
-        "STRONG STOCKS NEGATIVE",
-        "RA Inventor BUY",
-        "RA Inventor SELL",
-        "RA Inventor 20 Candles BUY",
-        "DST BUY",
-        "85 Volume Shock",
-        "DST SELL"
+        "VOLUME SHOCKER \u2705",
+        "85 VOLUME SHOCK \u2705",
+        "CHANU VOLATILITY SPIKE \u2705",
+        "Vijay Thakkar \ud83d\udfe2"
     ],
     "condition_urls": {
         "KHAIZER": {

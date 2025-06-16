@@ -271,8 +271,8 @@ conditions = [
         "scan_clause": """( {57960} ( [=1] 10 minute open > [=1] 10 minute close and( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < -2 ) ) and( {166311} not( latest close > 0 ) ) and( {136699} not( latest close > 0 ) ) and( {136699} not( latest close > 0 ) ) and( {167068} not( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
     },
     {
-    "name": "Volume Shocker",
-    "link": "https://chartink.com/screener/copy-volume-rahim",
+    "name": "VOLUME SHOCKER ✅",
+    "link": "https://chartink.com/screener/p45789",
     "chart_link": "https://chartink.com/stocks-new?symbol=",
     "scan_clause": """( {57960} ( 
         latest volume > 1 day ago volume and 
@@ -286,19 +286,31 @@ conditions = [
     ) )"""
     },
     {
-        "name": "85 Volume Shock",
+    "name": "High Volume Spike",
+    "link": "https://chartink.com/screener/shock-19",
+    "chart_link": "https://chartink.com/stocks-new?symbol=",    
+    "scan_clause": """( {57960} ( 
+        latest volume > latest sma( latest volume , 5 ) * 2 and 
+        latest close > 1 day ago close and 
+        latest volume > 500000 
+    ) )"""
+    },
+    {
+        "name": "85 VOLUME SHOCK ✅",
         "link": "https://chartink.com/screener/copy-volume-rahim",
         "chart_link": "https://chartink.com/stocks-new?symbol=",
         "scan_clause": """( {57960} ( 
-        latest volume > 1 day ago volume * 0.85 and 
-        1 day ago volume > 2 days ago volume and 
-        latest close > 1 day ago close and 
-        1 day ago close > 2 days ago close and 
-        latest volume > 1000000 and 
-        1 day ago volume > 500000 and 
-        latest close > latest open * 1.03 and 
-        latest open > 1 day ago close 
-    ) )"""
+            latest volume > 1 day ago volume * 0.85 and 
+            1 day ago volume > 2 days ago volume and 
+            latest close > 1 day ago close and 
+            1 day ago close > 2 days ago close and 
+            latest volume > 1000000 and 
+            1 day ago volume > 500000 and 
+            latest close > latest open * 1.025 and 
+            [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
+            latest open > 1 day ago close and 
+            latest volume > latest sma( latest volume , 5 ) * 2 
+        ) )"""
     },
     {
         "name": "HARSH BUY STOCKS",
@@ -309,6 +321,30 @@ conditions = [
         "name": "EMA 11 CHANU",
         "link": "https://chartink.com/screener/ema-22-271",
         "scan_clause": """( {57960} ( [0] 15 minute ema ( [0] 15 minute close , 11 ) > [0] 15 minute ema ( [0] 15 minute close , 22 ) and [ -1 ] 15 minute ema ( [0] 15 minute close , 11 )<= [ -1 ] 15 minute ema ( [0] 15 minute close , 22 ) and latest adx ( 14 ) >= 20 ) ) """
+    },
+    {
+        "name": "CHANU VOLATILITY SPIKE ✅",
+        "link": "https://chartink.com/screener/copy-volume-shockers-stocks-with-rising-volumes-1111145289",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c7fa7b37712fa79e1b96d4155e7d64d5&timeframe=daily&symbol=",
+        "scan_clause": """( {57960} ( 
+            latest volume > latest sma( volume , 10 ) * 2 and 
+            ( {cash} ( 
+                latest close > 1 day ago close * 1.05 or 
+                latest close < 1 day ago close * 0.95 
+            ) ) 
+        ) )"""
+    },
+    {
+        "name": "Vijay Thakkar 🟢",
+        "link": "https://chartink.com/screener/vijay-thakkar-27107",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
+        "scan_clause": """( {57960} ( 
+            latest volume > latest sma( latest volume , 20 ) * 3 and 
+            latest close > 100 and 
+            ( ( latest close - 1 candle ago close ) / 1 candle ago close ) * 100 >= 3 and 
+            latest sma( latest volume , 20 ) >= 25000 and 
+            latest volume > 100000 
+        ) )"""
     },
     {
     "name": "MAGIC FILTER RAHIM",
@@ -370,20 +406,6 @@ conditions = [
     )"""
     },
     {
-        "name": "85 Volume Shock",
-        "link": "https://chartink.com/screener/copy-volume-rahim",
-        "chart_link": "",
-        "scan_clause": """( {57960} ( 
-        latest volume > 1 day ago volume * 0.85 and 
-        1 day ago volume > 2 days ago volume and 
-        latest close > 1 day ago close and 
-        1 day ago close > 2 days ago close and 
-        latest volume > 1000000 and 
-        latest close > latest open * 1.04 and 
-        latest open > 1 day ago close 
-    ) )"""
-    },
-    {
     "name": "DST SELL",  
     "link": "https://chartink.com/screener/dst-sell-4",  
     "scan_clause": """(
@@ -395,8 +417,6 @@ conditions = [
         [0]5 minute wma([0]5 minute close, 21) < [0]5 minute sma([0]5 minute close, 21)
     )"""
 },
-    
-    
 ]
 
 # Global variables
