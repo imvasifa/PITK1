@@ -237,6 +237,23 @@ conditions = [
         ) )"""
     },
     {
+        "name": "Deep Seek Volume & Range Break ✅",
+        "link": "https://chartink.com/screener/ds-2206",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:9eadb2a72344cf751b91a835fc23e4a0&timeframe=daily&symbol=",
+        "scan_clause": """( {cash} ( 
+        latest close > 100 and 
+        latest close < 2000 and 
+        latest volume > latest sma( latest volume , 5 ) * 2.5 and 
+        latest volume > 1 day ago volume * 1.8 and 
+        latest volume > latest sma( latest volume , 20 ) * 2 and 
+        latest close > latest open and 
+        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
+        latest close > latest ema( latest close , 20 ) and 
+        latest close > latest max( 20 , latest vwap ) 
+    ) )"""
+    },
+
+    {
         "name": "MULTI TIMEFRAME SCAN",
         "link": "https://chartink.com/screener/aaaaa-111468",
         "scan_clause": """( {57960} ( 
@@ -323,7 +340,7 @@ conditions = [
         "scan_clause": """( {57960} ( [0] 15 minute ema ( [0] 15 minute close , 11 ) > [0] 15 minute ema ( [0] 15 minute close , 22 ) and [ -1 ] 15 minute ema ( [0] 15 minute close , 11 )<= [ -1 ] 15 minute ema ( [0] 15 minute close , 22 ) and latest adx ( 14 ) >= 20 ) ) """
     },
     {
-        "name": "Smart Cash Flow - Chanu 🟢 ",
+        "name": "Smart Cash Flow - Chanu",
         "link": "https://chartink.com/screener/copy-85-volume-shameem",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:e93d77e49e9b94220daecb5bae1e6ff8&timeframe=daily&symbol=",
         "scan_clause": """( {cash} ( 
