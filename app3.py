@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import os
+from pathlib import Path
 import platform 
 import queue
 import re
@@ -17,7 +18,7 @@ from bs4 import BeautifulSoup as bs
 import pandas as pd
 import pygame
 import requests
-from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash
+from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort
 from flask_caching import Cache
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -505,17 +506,60 @@ thread_started = False
 scan_results = {}
 previous_scores = {}  # Initialize previous_scores globally
 
+def load_custom_conditions():
+    """
+    Load custom conditions from JSON file
+    """
+    try:
+        with open('custom_conditions.json', 'r') as f:
+            data = json.load(f)
+            return data.get('custom_conditions', [])
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.warning(f"Error loading custom conditions: {e}")
+        # Create the file with empty custom conditions if it doesn't exist
+        if isinstance(e, FileNotFoundError):
+            with open('custom_conditions.json', 'w') as f:
+                json.dump({"custom_conditions": []}, f, indent=2)
+        return []
+
+def save_custom_conditions(conditions_list):
+    """
+    Save custom conditions to JSON file
+    """
+    try:
+        with open('custom_conditions.json', 'w') as f:
+            json.dump({"custom_conditions": conditions_list}, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving custom conditions: {e}")
+        return False
+
 def load_settings():
     """
     Load settings from JSON file
     """
+    # Create default settings with built-in conditions
     default_settings = {
         "mute_status": False,
         "app_selected": 'app',
         "conditions": [c['name'] for c in conditions],
+        "refresh_interval": 120,
+        "filter_stocks": True,
+        "filter_threshold": 0.5,
         "browser": '0',
         "app": '1'
     }
+    
+    # Try to add custom conditions if they exist
+    try:
+        custom_conditions = load_custom_conditions()
+        if custom_conditions:
+            # Add custom condition names to default selected conditions
+            for custom_condition in custom_conditions:
+                if custom_condition['name'] not in default_settings['conditions']:
+                    default_settings['conditions'].append(custom_condition['name'])
+    except Exception as e:
+        logger.error(f"Error adding custom conditions to settings: {e}")
 
     try:
         if os.path.exists('db.json'):
@@ -561,11 +605,15 @@ def update_mute_status():
 def fetch_and_process_data(session, condition):
     """Fetch and process stock data using the provided session"""
     url = "https://chartink.com/screener/process"
-    # logger.info(f"Fetching data for condition: {condition['name']}")
+    logger.info(f"Fetching data for condition: {condition['name']}")
+    
+    # Validate condition has required fields
+    if 'scan_clause' not in condition or not condition['scan_clause']:
+        logger.error(f"Missing scan_clause for condition: {condition['name']}")
+        return []
     
     try:
         # Get CSRF token
-        # logger.info("Fetching CSRF token...")
         r_data = session.get(url)
         r_data.raise_for_status()
         soup = bs(r_data.content, "lxml")
@@ -575,30 +623,35 @@ def fetch_and_process_data(session, condition):
             return {"error": "Could not find CSRF token"}
         
         header = {"x-csrf-token": meta["content"]}
-        # logger.info("CSRF token obtained successfully")
 
         try:
-            # logger.info(f"Request URL: {url}")
-            # logger.info(f"Request Headers: {header}")
-            # logger.info(f"Request Data: {{'scan_clause': {condition['scan_clause']}}}")
+            # Format scan clause for API if needed
+            scan_clause = condition["scan_clause"]
             
-            response = session.post(url, headers=header, data={"scan_clause": condition["scan_clause"]})
+            # Send the request
+            response = session.post(url, headers=header, data={"scan_clause": scan_clause})
+            
+            if response.status_code != 200:
+                logger.error(f"Error response for {condition['name']}: {response.text[:200]}")
+                return []
+                
             response.raise_for_status()
             
             data = response.json()
-            # logger.debug(f"Response Status: {response.status_code}")
-            # logger.debug(f"Response Headers: {dict(response.headers)}")
-            # logger.debug(f"Response Data: {data}")
             
             if 'scan_error' in data:
                 logger.error(f"Scan error for {condition['name']}: {data['scan_error']}")
-                logger.error(f"Condition that caused error: {condition['scan_clause']}")
+                logger.error(f"Condition that caused error: {scan_clause}")
                 return []
             
             if 'data' not in data:
                 logger.error(f"Invalid response format for {condition['name']}: {data}")
                 return []
             
+            # Log success
+            logger.info(f"Successfully fetched data for {condition['name']}, found {len(data['data'])} stocks")
+            
+            # Convert to DataFrame
             stock_list = pd.DataFrame(data["data"])
 
             if not stock_list.empty:
@@ -646,10 +699,35 @@ def fetch_data():
             # Create a new dictionary to store results
             new_scan_results = {}
             with requests.Session() as session:
+                # Fetch data for built-in conditions
                 for condition in conditions:
                     stocks = fetch_and_process_data(session, condition)
                     if stocks:
                         new_scan_results[condition['name']] = stocks
+                
+                # Fetch data for custom conditions
+                custom_conditions = load_custom_conditions()
+                for condition in custom_conditions:
+                    # Make sure the scan_clause is properly formatted for the API
+                    if 'scan_clause' in condition and condition['scan_clause']:
+                        # Format the scan clause properly for the API
+                        if not condition['scan_clause'].strip().startswith('('):
+                            # Wrap the scan clause in the required format if not already wrapped
+                            formatted_scan_clause = f"( {{57960}} ( {condition['scan_clause']} ) )"
+                            condition['scan_clause'] = formatted_scan_clause
+                    
+                    # Fetch data for this condition
+                    stocks = fetch_and_process_data(session, condition)
+                    
+                    # Process results
+                    if stocks:
+                        if isinstance(stocks, list):
+                            new_scan_results[condition['name']] = stocks
+                        else:
+                            logger.error(f"Invalid stocks data for {condition['name']}")
+                    else:
+                        # Initialize with empty list to ensure the condition appears in results
+                        new_scan_results[condition['name']] = []
 
             # Update the global variables
             scan_results = new_scan_results
@@ -778,73 +856,105 @@ def categorize_stocks():
 @app.route('/get-scan-results')
 def get_scan_results():
     """Get scan results from all conditions and return as JSON"""
-    def _get_scan_results_impl():
-        global scan_results
-        
-        try:
-            # Get the selected conditions from settings
-            with open('db.json', 'r') as f:
-                settings = json.load(f)
-                selected_conditions = settings.get('conditions', [])
-            
-            logger.info(f"Selected conditions: {selected_conditions}")
-            
-            if not selected_conditions:
-                logger.warning("No conditions selected")
-                return jsonify({'error': 'No conditions selected'}), 400
-            
-            # Get scan results for selected conditions
-            all_results = {}
-            found_stocks = False
-            
-            # Create a mapping of potential name variations
-            name_variations = {
-                "STRONG STOCKS": "STRONG STOCKS POSITIVE",
-                "STRONG STOCKS POSITIVE": "STRONG STOCKS POSITIVE"
-            }
-            
-            # Ensure scan_results is not None
-            if scan_results is None:
-                logger.warning("scan_results is None, attempting to fetch data")
-                fetch_data()
-            
-            for condition in selected_conditions:
-                # Skip 'on' which is not a real condition
-                if condition == 'on':
-                    continue
-                
-                # Check for name variations
-                normalized_condition = name_variations.get(condition, condition)
-                
-                # Safely get stocks, default to empty list
-                stocks = scan_results.get(normalized_condition, [])
-                logger.info(f"Condition: {normalized_condition}, Stocks found: {len(stocks)}")
-                
-                if stocks:
-                    all_results[normalized_condition] = stocks
-                    found_stocks = True
-            
-            # If no stocks found, log a warning
-            if not all_results:
-                logger.warning("No stocks found for any selected conditions")
-            
-            # Create response with no-cache headers
-            response = make_response(jsonify(all_results))
-            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error in get_scan_results: {e}", exc_info=True)
-            return jsonify({'error': str(e)}), 500
+    global scan_results
     
-    # Ensure we're in an application context
-    if not 'current_app' in globals() or current_app is None:
-        with app.app_context():
-            return _get_scan_results_impl()
-    return _get_scan_results_impl()
+    try:
+        # Get the selected conditions from settings
+        settings = load_settings()
+        selected_conditions = settings.get('conditions', [])
+        
+        # Load custom conditions
+        custom_conditions = load_custom_conditions()
+        
+        # Combine built-in and custom conditions
+        all_scan_conditions = conditions.copy()
+        all_scan_conditions.extend(custom_conditions)
+        
+        # Process selected and custom conditions
+        
+        if not selected_conditions:
+            logger.warning("No conditions selected")
+            return jsonify({'error': 'No conditions selected'}), 400
+        
+        # Get scan results for selected conditions
+        all_results = {}
+        found_stocks = False
+        
+        # Create a mapping of potential name variations
+        name_variations = {
+            "STRONG STOCKS": "STRONG STOCKS POSITIVE",
+            "STRONG STOCKS POSITIVE": "STRONG STOCKS POSITIVE"
+        }
+        
+        # If scan_results is None, fetch data first
+        if scan_results is None:
+            logger.warning("scan_results is None, attempting to fetch data")
+            fetch_data()
+            if scan_results is None:  # Still None after fetch attempt
+                return jsonify({'error': 'Failed to fetch scan data'}), 500
+        
+        # Process custom conditions if they're not already in scan_results
+        with requests.Session() as session:
+            for custom_condition in custom_conditions:
+                try:
+                    # Always process custom conditions regardless of selection status
+                    logger.info(f"Processing custom condition: {custom_condition['name']}")
+                    
+                    # Format scan clause if needed
+                    if 'scan_clause' in custom_condition and custom_condition['scan_clause']:
+                        if not custom_condition['scan_clause'].strip().startswith('('):
+                            formatted_clause = f"( {{57960}} ( {custom_condition['scan_clause']} ) )"
+                            custom_condition['scan_clause'] = formatted_clause
+                    
+                    data = fetch_and_process_data(session, custom_condition)
+                    
+                    if isinstance(data, pd.DataFrame) and not data.empty:
+                        # Add to scan_results for future use
+                        stocks_dict = data.to_dict('records')
+                        scan_results[custom_condition['name']] = stocks_dict
+                    else:
+                        # Initialize with empty list if no data
+                        scan_results[custom_condition['name']] = []
+                except Exception as e:
+                    logger.error(f"Error processing custom condition {custom_condition['name']}: {e}")
+                    # Ensure we have at least an empty list
+                    if custom_condition['name'] not in scan_results:
+                        scan_results[custom_condition['name']] = []
+        
+        # Now collect all results from scan_results
+        for condition_name in selected_conditions:
+            # Skip 'on' which is not a real condition
+            if condition_name == 'on':
+                continue
+                
+            # Check for name variations
+            normalized_condition = name_variations.get(condition_name, condition_name)
+            
+            # Safely get stocks, default to empty list
+            stocks = scan_results.get(normalized_condition, [])
+            if not stocks:
+                # Try with the original name if normalized didn't work
+                stocks = scan_results.get(condition_name, [])
+            
+            if stocks:
+                all_results[normalized_condition] = stocks
+                found_stocks = True
+        
+        # If no stocks found, log a warning
+        if not all_results:
+            logger.warning("No stocks found for any selected conditions")
+            return jsonify({'error': 'No stocks found for selected conditions'}), 404
+        
+        # Create response with no-cache headers
+        response = make_response(jsonify(all_results))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error in get_scan_results: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 DB_FILE = 'db.json'
 
@@ -868,18 +978,12 @@ def serve_static(filename):
 
 @app.route('/')
 def index():
+    """Render the main index page"""
+    # Start the background thread if not already started
     global threads_started
-    
-    # Start background thread only after first visit to home page
     if not threads_started:
         try:
-            # Small delay to ensure server is fully up
-            import time
-            time.sleep(1)
-            
-            thread = threading.Thread(target=update_data, daemon=True)
-            thread.start()
-            threads_started = True
+            start_background_thread()
             logger.info("Background update_data thread started after first / visit.")
         except Exception as e:
             logger.error(f"Error starting background thread: {e}")
@@ -889,7 +993,7 @@ def index():
         fetch_data()
     except Exception as e:
         logger.error(f"Error in fetch_data: {e}")
-        
+    
     settings = load_settings()
     selected_conditions = settings.get('conditions', [])
 
@@ -903,17 +1007,51 @@ def index():
         }
     else:
         flash_message = None
-
+    
+    # Load custom conditions and combine with built-in conditions
+    custom_conditions = load_custom_conditions()
+    all_conditions = conditions.copy()
+    all_conditions.extend(custom_conditions)
+    
     # Categorize stocks into Buy/Sell
     buy_suggestions, sell_suggestions = categorize_stocks()
 
-    # Only include selected conditions
-    conditions_with_stocks = [
-        {**condition, "stocks": scan_results.get(condition["name"], [])}
-        for condition in conditions
-        if condition["name"] in selected_conditions
-    ]
+    # Debug log for scan results
+    logger.info(f"Scan results keys: {list(scan_results.keys() if scan_results else [])}")
+    
+    # Prepare conditions with their stocks
+    conditions_with_stocks = []
+    
+    # First, add all custom conditions regardless of selection status
+    # This ensures they're always visible in the UI
+    for condition in custom_conditions:
+        # Get stocks for this condition, default to empty list
+        stocks = scan_results.get(condition["name"], [])
+        
+        # Add condition with its stocks to the list
+        conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": True})
+    
+    # Then add selected built-in conditions
+    for condition in conditions:
+        # Check if this condition is selected
+        if condition["name"] in selected_conditions:
+            # Get stocks for this condition, default to empty list
+            stocks = scan_results.get(condition["name"], [])
+            
+            # Add condition with its stocks to the list
+            conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": False})
+    
+    # Make sure all selected conditions are included, even if they don't have stocks
+    selected_condition_names = [c['name'] for c in conditions_with_stocks]
+    for condition_name in selected_conditions:
+        if condition_name not in selected_condition_names and condition_name != 'on':
+            # Find the condition in all_conditions
+            for condition in all_conditions:
+                if condition['name'] == condition_name:
+                    conditions_with_stocks.append({**condition, "stocks": []})
+                    break
 
+    # Render the template with the settings
     return render_template(
         'index.html',
         conditions=conditions_with_stocks,
@@ -966,8 +1104,17 @@ def update_settings():
 
 @app.route('/conditions')
 def get_conditions():
-    # Simply return the predefined conditions list
-    return jsonify(conditions)
+    # Combine built-in and custom conditions
+    all_conditions = conditions.copy()
+    
+    # Add custom conditions
+    try:
+        custom_conditions = load_custom_conditions()
+        all_conditions.extend(custom_conditions)
+    except Exception as e:
+        logger.error(f"Error loading custom conditions: {e}")
+    
+    return jsonify(all_conditions)
 
 @app.route('/nifty-data')
 def fetch_nifty_data():
@@ -1180,6 +1327,8 @@ def start_background_thread():
         update_thread.start()
         thread_started = True
         logger.info("Background thread started")
+
+# load_custom_conditions and save_custom_conditions functions are defined earlier in the file
 
 def cleanup():
     """
@@ -1498,6 +1647,92 @@ def app3_output():
         error_msg = f"Error in /app3: {str(e)}"
         logger.error(error_msg)
         return jsonify({'status': 'error', 'message': error_msg}), 500, {'Content-Type': 'application/json'}
+
+@app.route('/api/custom-conditions', methods=['GET'])
+def get_custom_conditions():
+    """Get all custom conditions"""
+    try:
+        return jsonify(load_custom_conditions())
+    except Exception as e:
+        logger.error(f"Error getting custom conditions: {e}")
+        return jsonify({"error": "Failed to load custom conditions"}), 500
+
+@app.route('/api/custom-conditions', methods=['POST'])
+def add_custom_condition():
+    """Add a new custom condition"""
+    try:
+        data = request.get_json()
+        if not data or 'name' not in data or 'scan_clause' not in data:
+            return jsonify({"error": "Name and scan_clause are required"}), 400
+            
+        conditions = load_custom_conditions()
+        # Add a default link if not provided
+        if 'link' not in data:
+            data['link'] = "#"
+        
+        # Add a unique ID
+        data['id'] = f"custom_{len(conditions) + 1}"
+        conditions.append(data)
+        
+        if save_custom_conditions(conditions):
+            return jsonify({"message": "Condition added successfully", "id": data['id']}), 201
+        else:
+            return jsonify({"error": "Failed to save condition"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error adding custom condition: {e}")
+        return jsonify({"error": "Failed to add custom condition"}), 500
+
+@app.route('/api/custom-conditions/<condition_id>', methods=['PUT'])
+def update_custom_condition(condition_id):
+    """Update an existing custom condition"""
+    try:
+        data = request.get_json()
+        if not data or 'name' not in data or 'scan_clause' not in data:
+            return jsonify({"error": "Name and scan_clause are required"}), 400
+            
+        conditions = load_custom_conditions()
+        condition_found = False
+        
+        for condition in conditions:
+            if condition.get('id') == condition_id:
+                condition['name'] = data['name']
+                condition['scan_clause'] = data['scan_clause']
+                condition['link'] = data.get('link', '#')
+                condition_found = True
+                break
+                
+        if not condition_found:
+            return jsonify({"error": "Condition not found"}), 404
+            
+        if save_custom_conditions(conditions):
+            return jsonify({"message": "Condition updated successfully"})
+        else:
+            return jsonify({"error": "Failed to update condition"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating custom condition: {e}")
+        return jsonify({"error": "Failed to update custom condition"}), 500
+
+@app.route('/api/custom-conditions/<condition_id>', methods=['DELETE'])
+def delete_custom_condition(condition_id):
+    """Delete a custom condition"""
+    try:
+        conditions = load_custom_conditions()
+        initial_count = len(conditions)
+        conditions = [c for c in conditions if c.get('id') != condition_id]
+        
+        if len(conditions) == initial_count:
+            return jsonify({"error": "Condition not found"}), 404
+            
+        if save_custom_conditions(conditions):
+            return jsonify({"message": "Condition deleted successfully"})
+        else:
+            return jsonify({"error": "Failed to delete condition"}), 500
+            
+    except Exception as e:
+        logger.error(f"Error deleting custom condition: {e}")
+        return jsonify({"error": "Failed to delete custom condition"}), 500
 
 if __name__ == '__main__':
     # Register cleanup first to ensure it runs on all exit paths
