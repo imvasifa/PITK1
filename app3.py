@@ -1174,14 +1174,14 @@ def register():
                 now_iso = datetime.utcnow().isoformat() + 'Z'
                 users[user_id] = {
                     'username': username,
-                    'password': password,  # Store in plain text
+                    'password': password,  # Store in plain text for now
                     'email': email,
                     'name': '',
-                    'refresh_interval': 120,
-                    'theme': 'light',
-                    'premium': 'no',
-                    'date_joined': now_iso,
-                    'last_login': now_iso,
+                    'refresh_interval': 120,  # Default refresh interval in seconds
+                    'theme': 'light',  # Default theme
+                    'premium': 'yes',  # Set to yes for new users
+                    'date_joined': datetime.now().isoformat(),
+                    'last_login': datetime.now().isoformat(),
                     'sms': False,
                     'mobile': ''
                 }
