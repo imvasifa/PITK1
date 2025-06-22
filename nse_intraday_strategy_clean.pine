@@ -1,0 +1,126 @@
+//@version=5
+strategy("NSE Triple EMA + QQE Intraday Strategy [TradeDots]", overlay = true, max_lines_count = 500, max_boxes_count = 100, initial_capital = 100000, currency = currency.INR, commission_type = strategy.commission.percent, commission_value = 0.03, default_qty_type = strategy.percent_of_equity, default_qty_value = 80, process_orders_on_close = true)
+
+// Session time settings for NSE
+t = time("1440", session.regular)
+isInSession = not na(t)
+
+// Time-based filters
+timeFilter = input.bool(true, "Enable Time Filter", group="Time Settings")
+lastEntryHour = input.int(14, "Stop New Trades Hour (24h)", group="Time Settings", minval=9, maxval=15)
+lastEntryMinute = input.int(45, "Stop New Trades Minute", group="Time Settings", minval=0, maxval=59)
+isEntryTime = timeFilter ? (hour < lastEntryHour or (hour == lastEntryHour and minute < lastEntryMinute)) : true
+
+// Trend Strength Filters
+atr_length = input.int(14, "ATR Period", group="Trend Filters")
+atr_threshold = input.float(1.0, "ATR Threshold", minval=0.1, step=0.1, group="Trend Filters")
+rsi_threshold = input.int(40, "RSI Trend Threshold", minval=30, maxval=70, group="Trend Filters")
+min_tema_spread = input.float(0.2, "Minimum TEMA Spread %", minval=0.1, step=0.1, group="Trend Filters")
+
+// Calculate ATR and other trend indicators
+atr = ta.atr(atr_length)
+atr_filter = atr > (ta.sma(atr, atr_length) * atr_threshold)
+
+// Volume filter
+vol_ma_len = input.int(20, "Volume MA Length", group="Volume Filter")
+volume_ma = ta.sma(volume, vol_ma_len)
+volume_filter = volume > volume_ma * 1.5
+
+var ts = 0.
+var float stopLoss = na
+
+//qqe values
+rsi_period = input(10, title='RSI Length', group = "QQE")
+rsi_smoothing_period = input(3, title='RSI Smoothing Period', group = "QQE")
+factor = input(3.5, title='QQE Factor', group = "QQE")
+
+//tema
+ma_source = input(close, "TEMA Source", inline="MA1", group="TEMA")
+tema1_length = input.int(9, "TEMA #1 Length", minval=1, group="TEMA")
+tema2_length = input.int(21, "TEMA #2 Length", minval=1, group="TEMA")
+
+// Strategy Parameters
+input_stop_loss = input.float(1.0, "Stop Loss (%)", group = "Strategy", minval=0.1, maxval=5, step=0.1)
+trailing_stop = input.bool(true, "Enable Trailing Stop", group="Strategy")
+target_percent = input.float(1.5, "Target (%)", group="Strategy", minval=0.1, maxval=10, step=0.1)
+
+tema(src, length) =>
+    ema1 = ta.ema(src, length)
+    ema2 = ta.ema(ema1, length)
+    ema3 = ta.ema(ema2, length)
+    3*ema1 - 3*ema2 + ema3
+
+tema1 = tema(ma_source, tema1_length)
+tema2 = tema(ma_source, tema2_length)
+
+tema1Plot = plot(tema1, title = "TEMA #1", color = #c7f9cc, linewidth = 2)
+tema2Plot = plot(tema2, title = "TEMA #2", color = #57cc99, linewidth = 2)
+
+// Calculate TEMA spread percentage
+tema_spread_percent = math.abs((tema1 - tema2) / tema2 * 100)
+tema_spread_filter = tema_spread_percent > min_tema_spread
+
+// calculating qqe
+rsi = ta.rsi(close, rsi_period)
+rsiMa = ta.ema(rsi, rsi_smoothing_period)
+atrRsi = math.abs(rsiMa[1] - rsiMa)
+final_smooth = rsi_period * 2 - 1
+MaAtrRsi = ta.ema(atrRsi, final_smooth)
+dar = ta.ema(MaAtrRsi, final_smooth) * factor
+
+crossover = ta.crossover(rsiMa, ts)
+crossunder = ta.crossunder(rsiMa, ts)
+
+ts := nz(crossover ? rsiMa - MaAtrRsi * factor : crossunder ? rsiMa + MaAtrRsi * factor : rsiMa > ts ? math.max(rsiMa - MaAtrRsi * factor, ts) : math.min(rsiMa + MaAtrRsi * factor, ts), rsiMa)
+
+// Enhanced trend conditions
+uptrend = ta.rsi(close, 14) > rsi_threshold and tema1 > tema2 and close > tema1
+downtrend = ta.rsi(close, 14) < (100 - rsi_threshold) and tema1 < tema2 and close < tema1
+
+// Consecutive candle confirmation
+bullish_candles = close > open and close[1] > open[1]
+bearish_candles = close < open and close[1] < open[1]
+
+// Entry conditions
+long_condition = isInSession and isEntryTime and uptrend and ta.crossover(rsiMa, ts) and atr_filter and volume_filter and tema_spread_filter and bullish_candles
+short_condition = isInSession and isEntryTime and downtrend and ta.crossunder(rsiMa, ts) and atr_filter and volume_filter and tema_spread_filter and bearish_candles
+
+// Entry signals
+if long_condition and strategy.opentrades == 0
+    strategy.entry("Long", strategy.long)
+    stopLoss := close * (1 - input_stop_loss/100)
+else if short_condition and strategy.opentrades == 0
+    strategy.entry("Short", strategy.short)
+    stopLoss := close * (1 + input_stop_loss/100)
+
+// Calculate stop loss and target prices
+longStopPrice = strategy.position_avg_price * (1 - input_stop_loss/100)
+shortStopPrice = strategy.position_avg_price * (1 + input_stop_loss/100)
+longTargetPrice = strategy.position_avg_price * (1 + target_percent/100)
+shortTargetPrice = strategy.position_avg_price * (1 - target_percent/100)
+
+// Position management
+if barstate.isconfirmed and strategy.opentrades > 0
+    if strategy.position_size > 0  // Long position
+        if close <= stopLoss or close >= longTargetPrice
+            strategy.close_all()
+        else if trailing_stop
+            newStopLoss = close * (1 - input_stop_loss/100)
+            stopLoss := math.max(stopLoss, newStopLoss)
+    else  // Short position
+        if close >= stopLoss or close <= shortTargetPrice
+            strategy.close_all()
+        else if trailing_stop
+            newStopLoss = close * (1 + input_stop_loss/100)
+            stopLoss := math.min(stopLoss, newStopLoss)
+
+// Force close all positions at session end
+if (hour == 15 and minute >= 20) and strategy.opentrades > 0
+    strategy.close_all("Session End")
+
+// Visual elements
+fill(tema2Plot, tema1Plot, math.max(tema2,tema1), tema2, color.new(#9cff87, 85), color.new(#9cff87, 70))
+fill(tema2Plot, tema1Plot, tema2, math.min(tema2,tema1), color.new(#f9396a, 70), color.new(#f9396a, 85))
+plot(stopLoss, color=#f9396a, style = plot.style_cross, linewidth = 2, title = "Trail Stop")
+plot(ta.sma(close, 200), color=color.new(#ff9800, 50), linewidth=2, title="200 SMA")
+bgcolor(uptrend ? color.new(color.green, 95) : downtrend ? color.new(color.red, 95) : na)

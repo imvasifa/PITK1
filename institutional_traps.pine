@@ -1,0 +1,37 @@
+//@version=5
+indicator("Smart Money Buy/Sell Signals", overlay=true)
+
+// Input parameters
+lookbackPeriod = input.int(14, "Lookback Period", minval=1)
+volumeThreshold = input.float(1.5, "Volume Threshold Multiplier", minval=1.0, step=0.1)
+wickThreshold = input.float(0.3, "Wick to Body Ratio", minval=0.1, step=0.1)
+
+// Volume analysis
+avgVolume = ta.sma(volume, lookbackPeriod)
+isHighVolume = volume > (avgVolume * volumeThreshold)
+
+// Price action analysis
+bodySize = math.abs(close - open)
+upperWick = high - math.max(open, close)
+lowerWick = math.min(open, close) - low
+hasLongUpperWick = upperWick > (bodySize * wickThreshold)
+hasLongLowerWick = lowerWick > (bodySize * wickThreshold)
+
+// Institutional patterns analysis
+isOrderBlock = math.abs(close - open) > ta.sma(math.abs(close - open), lookbackPeriod) * 1.5 and isHighVolume and close[1] < open[1] != close < open
+fvgUp = low > high[1] and bodySize > ta.sma(bodySize, lookbackPeriod)
+fvgDown = high < low[1] and bodySize > ta.sma(bodySize, lookbackPeriod)
+
+// Combined buy signal (institutional accumulation)
+buySignal = ((low < ta.lowest(low[1], lookbackPeriod) and close > open and isHighVolume and hasLongLowerWick) or (fvgUp and isOrderBlock and close > open) or (close > open and isHighVolume and bodySize > ta.sma(bodySize, lookbackPeriod) * 1.2)) and not buySignal[1]
+
+// Combined sell signal (institutional distribution)
+sellSignal = ((high > ta.highest(high[1], lookbackPeriod) and close < open and isHighVolume and hasLongUpperWick) or (fvgDown and isOrderBlock and close < open) or (close < open and isHighVolume and bodySize > ta.sma(bodySize, lookbackPeriod) * 1.2)) and not sellSignal[1]
+
+// Plotting simplified signals
+plotshape(buySignal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal)
+plotshape(sellSignal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal)
+
+// Alert conditions
+alertcondition(buySignal, title="Buy Signal", message="Institutional Buy Signal Detected")
+alertcondition(sellSignal, title="Sell Signal", message="Institutional Sell Signal Detected")
