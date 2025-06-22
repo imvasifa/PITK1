@@ -199,6 +199,29 @@
             gap: 12px;
             align-items: center;
         }
+        
+        /* Ensure logout button text stays white on hover */
+        .navbar-buttons .btn-outline-danger {
+            color: #fff;
+            border-color: #dc3545;
+        }
+        
+        .navbar-buttons .btn-outline-danger:hover {
+            color: #fff !important;
+            background-color: #dc3545;
+        }
+
+        /* Ensure dashboard button text stays white on hover */
+        .navbar-buttons .btn-outline-light {
+            color: #fff;
+            border-color: #28a745; /* Green border for dashboard */
+        }
+
+        .navbar-buttons .btn-outline-light:hover {
+            color: #fff !important;
+            background-color: #28a745; /* Green background on hover */
+            border-color: #28a745;
+        }
 
         .navbar-brand {
             display: flex;

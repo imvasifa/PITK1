@@ -1,32 +1,35 @@
-# Use Python 3.12-slim as the base image
+# Use Python 3.12 slim image
 FROM python:3.12-slim
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    FLASK_APP=app3.py \
-    FLASK_ENV=production
 
 # Set working directory
 WORKDIR /app
 
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV FLASK_APP=app3.py
+
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy requirements first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy application code
 COPY . .
 
-# Expose the port the app runs on
+# Create necessary directories
+RUN mkdir -p cache static sounds
+
+# Expose port
 EXPOSE 5000
 
-# Command to run the application
+# Run the application
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app3:app"]
