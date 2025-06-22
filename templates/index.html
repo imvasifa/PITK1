@@ -1,11 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PITK Stock Scanner</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% extends "base.html" %}
+
+{% block title %}Stock Scanner{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Light Theme Color Scheme */
         :root {
@@ -60,8 +58,18 @@
         }
 
         .navbar {
-            background-color: var(--card-light) !important;
-            border-bottom: 1px solid var(--border-light);
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            padding: 1rem 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .navbar-brand {
@@ -186,16 +194,6 @@
             color: var(--accent-color);
         }
 
-        .navbar {
-            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
-            padding: 1rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 1000;
-        }
-
         .navbar-buttons {
             display: flex;
             gap: 12px;
@@ -301,7 +299,7 @@
 
         .scan-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
         }
 
         .card {
@@ -1263,57 +1261,14 @@
             color: var(--accent-color);
         }
     </style>
-    <style>
-        /* Circle button style for navbar */
-        .circle-btn {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-            margin: 0 10px;
-            border: none;
-            outline: none;
-            transition: box-shadow 0.2s, transform 0.2s;
-        }
-        .circle-btn:active {
-            transform: scale(0.95);
-        }
-        .refresh-btn.circle-btn {
-            background: #4caf50;
-            color: #fff;
-        }
-        .nifty-btn.circle-btn {
-            background: #e040fb;
-            color: #fff;
-        }
-        .settings-btn.circle-btn {
-            background: #2196f3;
-            color: #fff;
-        }
-        .converter-btn {
-            background: linear-gradient(135deg, #00bcd4, #2196f3);
-            color: white;
-            transition: all 0.3s ease;
-        }
-        .converter-btn:hover {
-            transform: translateY(-2px) scale(1.1);
-            box-shadow: 0 4px 15px rgba(0, 188, 212, 0.4);
-        }
-        .circle-btn i {
-            pointer-events: none;
-        }
-    </style>
     <script>
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
         });
     </script>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;"> <!-- Adjust the size as needed -->
@@ -1460,55 +1415,53 @@
 
     <!-- Navbar -->
     <nav class="navbar">
-        <div class="container">
-            <div class="navbar-brand">
-                <img src="/static/pitk-logo.svg" alt="PITK Logo" class="me-2">
-                PRICE IS THE KING
-                <span id="next-refresh">
-                    <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i> <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span> <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
-                </span>
-            </div>
-            <div class="navbar-buttons">
-                <button class="conditions-btn" onclick="showConditionsModal()">
-                    <i class="fas fa-list-check"></i> Conditions
-                </button>
-                <button class="settings-btn" onclick="showSettingsModal()">
-                    <i class="fas fa-cog"></i>
-                </button>
-                <button class="refresh-btn" onclick="refreshData()">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-                <button class="btn nifty-btn" onclick="showNiftyModal()">
-                    <i class="fas fa-chart-line me-2"></i>
-                </button>
-                <!-- Converter Button -->
-                <button class="btn converter-btn" id="converterButton" title="Open Converter" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #00bcd4, #2196f3); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem;">
-                    <i class="fas fa-exchange-alt"></i>
-                </button>
-                <!-- Custom Conditions Button -->
-                <button class="btn custom-conditions-btn" id="customConditionsButton" title="Manage Custom Conditions" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff9800, #ff5722); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem; position: relative; overflow: hidden; z-index: 1;" onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 5px rgba(0,0,0,0.2)';" onmousedown="this.style.transform='scale(0.95)';" onmouseup="this.style.transform='scale(1.1)';" onclick="showCustomConditionsModal()">
-                    <i class="fas fa-list-check"></i>
-                </button>
-                <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
-                    <i class="fas fa-moon" id="themeToggleIcon"></i>
-                </button>
-                <button class="theme-toggle-btn" id="muteButton" title="Mute Sound">
-                    <i class="fas fa-volume-mute" id="muteIcon"></i>
-                </button>
-            </div>
+        <div class="navbar-brand">
+            <img src="/static/pitk-logo.svg" alt="PITK Logo" class="me-2">
+            PRICE IS THE KING
+            <span id="next-refresh">
+                <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i> <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span> <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
+            </span>
+        </div>
+        <div class="navbar-buttons">
+            <button class="conditions-btn" onclick="showConditionsModal()">
+                <i class="fas fa-list-check"></i> Conditions
+            </button>
+            <button class="settings-btn" onclick="showSettingsModal()">
+                <i class="fas fa-cog"></i>
+            </button>
+            <button class="refresh-btn" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="btn nifty-btn" onclick="showNiftyModal()">
+                <i class="fas fa-chart-line me-2"></i>
+            </button>
+            <!-- Converter Button -->
+            <button class="btn converter-btn" id="converterButton" title="Open Converter" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #00bcd4, #2196f3); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem;">
+                <i class="fas fa-exchange-alt"></i>
+            </button>
+            <!-- Custom Conditions Button -->
+            <button class="btn custom-conditions-btn" id="customConditionsButton" title="Manage Custom Conditions" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff9800, #ff5722); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem; position: relative; overflow: hidden; z-index: 1;" onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 5px rgba(0,0,0,0.2)';" onmousedown="this.style.transform='scale(0.95)';" onmouseup="this.style.transform='scale(1.1)';" onclick="showCustomConditionsModal()">
+                <i class="fas fa-list-check"></i>
+            </button>
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
+                <i class="fas fa-moon" id="themeToggleIcon"></i>
+            </button>
+            <button class="theme-toggle-btn" id="muteButton" title="Mute Sound">
+                <i class="fas fa-volume-mute" id="muteIcon"></i>
+            </button>
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('settings') }}" class="btn btn-outline-light" style="margin-left: 10px;">
+                    <i class="fas fa-user"></i> Dashboard
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger" style="margin-left: 10px;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            {% endif %}
         </div>
     </nav>
 
     <!-- Timestamp Section -->
-    <div class="timestamp-section">
-        <div class="container">
-            <div class="timestamp-container">
-                <i class="fas fa-clock"></i>
-                Last Updated:
-                <span id="lastUpdateTime" class="ms-2"></span>
-            </div>
-        </div>
-    </div>
+    <!-- (Removed as per user request) -->
 
     <!-- Conditions Modal -->
     <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
@@ -2130,9 +2083,40 @@
             // Initial update
             updateDashboard();
             
-            // Set up new timer (2 minutes = 120000 ms)
-            refreshTimer = setInterval(updateDashboard, 120000);
-            console.log('Auto-refresh started, will refresh every 2 minutes');
+            // Set up the refresh interval from server
+            function setupRefresh() {
+                fetch('/get-refresh-interval')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.next_refresh_in) {
+                            const refreshMs = data.next_refresh_in * 1000; // Convert to milliseconds
+                            console.log(`Auto-refresh set to ${data.next_refresh_in} seconds`);
+                            
+                            // Update the UI timer
+                            refreshInterval = data.next_refresh_in;
+                            lastUpdateTime = Date.now();
+                            updateTimer();
+                            
+                            // Set up the next refresh
+                            refreshTimer = setTimeout(() => {
+                                refreshData();
+                                setupRefresh(); // Setup next refresh after this one
+                            }, refreshMs);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error getting refresh interval:', error);
+                        // Fallback to 2 minutes if there's an error
+                        refreshTimer = setTimeout(() => {
+                            refreshData();
+                            setupRefresh();
+                        }, 120000);
+                    });
+            }
+            
+            // Start the refresh cycle
+            setupRefresh();
+            console.log('Auto-refresh started with dynamic timing');
         }
 
         // Start auto-refresh when page loads
@@ -2643,9 +2627,10 @@ function populateConditions() {
         }
     </script>
     <script>
+        // This is a fallback refresh function
         function refreshData() {
             console.log("Refreshing data...");
-            location.reload();  // Reload the page
+            window.location.reload();
         }
         
         setInterval(refreshData, 120000);  // Refresh every 2 minutes
@@ -2720,23 +2705,39 @@ function populateConditions() {
         };
     </script>
     <script>
-        let refreshInterval = 120; // Refresh every 120 seconds
+        let refreshInterval = 120; // Default to 120 seconds
         let timerElement = document.getElementById('refresh-timer');
+        let lastUpdateTime = Date.now();
 
+        // Function to update the timer display
         function updateTimer() {
-            timerElement.textContent = `${refreshInterval} seconds`;
+            const now = Date.now();
+            const timeElapsed = Math.floor((now - lastUpdateTime) / 1000);
+            const timeRemaining = Math.max(0, refreshInterval - timeElapsed);
+            
+            if (timerElement) {
+                // Show total seconds remaining
+                timerElement.textContent = `${timeRemaining} seconds`;
+            }
+            
+            // Auto-refresh when time is up
+            if (timeRemaining <= 0) {
+                lastUpdateTime = now;
+                refreshData();
+            }
         }
 
-        // Call this function to initialize the timer display
-        updateTimer();
-
-        // Set an interval to update the timer display every second
-        setInterval(() => {
-            if (refreshInterval > 0) {
-                refreshInterval--;
-                timerElement.textContent = `${refreshInterval} seconds`;
+        // Update timer display every second
+        setInterval(updateTimer, 1000);
+        
+        // Update the timer when new data is received
+        function handleRefreshResponse(data) {
+            if (data && data.next_refresh_in) {
+                refreshInterval = data.next_refresh_in;
+                lastUpdateTime = Date.now();
+                updateTimer();
             }
-        }, 1000);
+        }
     </script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -3021,5 +3022,11 @@ function populateConditions() {
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Your existing JavaScript code here
+    </script>
+{% endblock %}

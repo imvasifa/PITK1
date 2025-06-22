@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import platform 
 import queue
+import random
 import re
 import sys
 import tempfile
@@ -19,8 +20,13 @@ from bs4 import BeautifulSoup as bs
 import pandas as pd
 import pygame
 import requests
-from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort
+from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session
 from flask_wtf import FlaskForm
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+import os
+import json
+from functools import wraps
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo
 
@@ -42,7 +48,6 @@ def play_alert():
     """
     global is_muted
     if is_muted:
-        logger.info("Muted: alert sound not played")
         return False
     try:
         # Play a beep sound (frequency=1000, duration=500ms)
@@ -54,7 +59,6 @@ def play_alert():
             # Fallback to pygame if winsound fails
             sound = pygame.mixer.Sound('static/alert.mp3')
             sound.play()
-            logger.info("Played alert sound using pygame")
             return True
         except Exception as e2:
             logger.error(f"Error playing alert sound: {e2}")
@@ -73,12 +77,134 @@ def beep_worker():
             time.sleep(5)  # Wait 5 seconds before retrying on error
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
+app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# User class
+class User(UserMixin):
+    def __init__(self, id, username, password_hash, email=''):
+        self.id = id
+        self.username = username
+        self.password_hash = password_hash
+        self.email = email
+
+def get_user(user_id):
+    try:
+        with open('users.json') as f:
+            users = json.load(f)
+            if user_id in users:
+                return User(id=user_id, 
+                          username=users[user_id]['username'],
+                          password_hash=users[user_id].get('password', ''),  
+                          email=users[user_id].get('email', ''))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+    return None
+
+@login_manager.user_loader
+def load_user(user_id):
+    return get_user(user_id)
+
+def authenticate_user(username, password):
+    try:
+        with open('users.json') as f:
+            users = json.load(f)
+            for user_id, user_data in users.items():
+                # Check both username and password in plain text
+                if (user_data.get('username') == username and 
+                    user_data.get('password') == password):  # Direct plain text comparison
+                    return User(id=user_id, 
+                              username=user_data['username'],
+                              password_hash=user_data.get('password', ''),  # Still store in password_hash for compatibility
+                              email=user_data.get('email', ''))
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error in authenticate_user: {e}")
+    return None
+
+def save_user(username, password, email=''):
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        users = {}
+        
+    # Check if username already exists
+    if any(user.get('username') == username for user in users.values()):
+        return None
+        
+    user_id = str(len(users) + 1)
+    users[user_id] = {
+        'username': username,
+        'password': password,  # Store password in plain text
+        'email': email
+    }
+    
+    with open('users.json', 'w') as f:
+        json.dump(users, f, indent=2)
+    
+    return user_id
+app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# User class
+class User(UserMixin):
+    def __init__(self, id, username, password_hash, email=''):
+        self.id = id
+        self.username = username
+        self.password_hash = password_hash
+        self.email = email
+
+# User loader
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        with open('users.json') as f:
+            users = json.load(f)
+        if user_id in users:
+            user_data = users[user_id]
+            return User(id=user_id, 
+                       username=user_data['username'],
+                       password_hash=user_data.get('password', ''),  # Use 'password' field
+                       email=user_data.get('email', ''))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+    return None
+
+def save_user(username, password, email=''):
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        users = {}
+        
+    # Check if username already exists
+    if any(user['username'] == username for user in users.values()):
+        return None
+        
+    user_id = str(len(users) + 1)
+    users[user_id] = {
+        'username': username,
+        'password_hash': generate_password_hash(password),
+        'email': email
+    }
+    
+    with open('users.json', 'w') as f:
+        json.dump(users, f, indent=2)
+    
+    return user_id
 
 # Initialize pygame mixer with error handling
 try:
     pygame.mixer.quit()  # Ensure clean state
     pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-    logger.info("Pygame mixer initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize pygame mixer: {e}")
 
@@ -105,21 +231,17 @@ def format_number(value, column_type='default'):
     
     try:
         num = float(value)
-        # print(f"Column: {column_type}, Raw Value: {num}")  # Debugging
         
         # Format Close with two decimal places
         if column_type == 'close':
             formatted_value = f"{num:.2f}"
-            # print(f"Formatted Close: {formatted_value}")  # Debugging
             return formatted_value  
 
         # Format Change % with two decimal places and add percentage sign
         if column_type == 'change_percent':
             formatted_value = f"{num:.2f}%"  # Ensure two decimal places
-            # print(f"Formatted Change %: {formatted_value}")  # Debugging
             return formatted_value  
 
-        # Format Volume as an integer
         # Format Volume as an integer
         if column_type == 'volume':
             return str(round(num))  # Round to nearest integer and return as string
@@ -284,7 +406,7 @@ conditions = [
     {
         "name": "HARSH SELL STOCKS",
         "link": "https://chartink.com/screener/harsh-sell-8",
-        "scan_clause": """( {57960} ( [=1] 10 minute open > [=1] 10 minute close and( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < -2 ) ) and( {166311} not( latest close > 0 ) ) and( {136699} not( latest close > 0 ) ) and( {136699} not( latest close > 0 ) ) and( {167068} not( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
+        "scan_clause": """( {57960} ( [=1] 10 minute open > [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < -2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
     },
     {
     "name": "VOLUME SHOCKER ✅",
@@ -538,13 +660,13 @@ def load_settings():
     # Create default settings with built-in conditions
     default_settings = {
         "mute_status": False,
-        "app_selected": 'app',
-        "conditions": [c['name'] for c in conditions],
-        "refresh_interval": 120,
-        "filter_stocks": True,
-        "filter_threshold": 0.5,
-        "browser": '0',
-        "app": '1'
+        'app_selected': 'app',
+        'conditions': [c['name'] for c in conditions],
+        'refresh_interval': 120,
+        'filter_stocks': True,
+        'filter_threshold': 0.5,
+        'browser': '0',
+        'app': '1'
     }
     
     # Try to add custom conditions if they exist
@@ -580,9 +702,8 @@ def save_settings(settings):
 
 # Load existing settings on startup
 # Load settings and ensure mute_status is properly set
-settings = load_settings()
-is_muted = settings.get('mute_status', False)  # Default to False if not set
-logger.info(f"Initial mute status loaded: {is_muted}")
+app_settings = load_settings()
+is_muted = app_settings.get('mute_status', False)  # Default to False if not set
 
 @app.route('/clear_cache')
 def clear_cache():
@@ -591,12 +712,12 @@ def clear_cache():
 
 @app.route('/update_mute_status', methods=['POST'])
 def update_mute_status():
-    global is_muted, settings
+    global is_muted, app_settings
     data = request.get_json()
     is_muted = bool(data.get('isMuted', False))
-    settings['mute_status'] = is_muted
-    save_settings(settings)
-    logger.info(f"Mute status set to: {is_muted}")
+    app_settings['mute_status'] = is_muted
+    save_settings(app_settings)
+    # logger.info(f"Mute status set to: {is_muted}")
     return jsonify({'status': 'success', 'isMuted': is_muted})
 
 def fetch_and_process_data(session, condition, selected_conditions=None):
@@ -604,7 +725,8 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
     url = "https://chartink.com/screener/process"
     # Only log debug info if this is a selected condition
     if selected_conditions is None or condition['name'] in selected_conditions:
-        logger.info(f"Fetching data for condition: {condition['name']}")
+        # logger.info(f"Fetching data for condition: {condition['name']}")
+        pass  # Add pass to create a valid indented block
     
     # Validate condition has required fields
     if 'scan_clause' not in condition or not condition['scan_clause']:
@@ -614,7 +736,8 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
     try:
         # Get CSRF token
         if selected_conditions is None or condition['name'] in selected_conditions:
-            logger.info("Fetching CSRF token...")
+            # logger.info("Fetching CSRF token...")
+            pass
         r_data = session.get(url)
         r_data.raise_for_status()
         soup = bs(r_data.content, "lxml")
@@ -624,7 +747,7 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
             return {"error": "Could not find CSRF token"}
         
         header = {"x-csrf-token": meta["content"]}
-        logger.info("CSRF token obtained successfully")
+        # logger.info("CSRF token obtained successfully")
 
         try:
             # Format scan clause for API if needed
@@ -632,15 +755,17 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
             
             # Log the actual request being sent
             if selected_conditions is None or condition['name'] in selected_conditions:
-                logger.info(f"Request URL: {url}")
-                logger.info(f"Request Headers: {header}")
-                logger.info(f"Request Data - scan_clause: {scan_clause[:100]}..." if len(scan_clause) > 100 else scan_clause)
+                # logger.info(f"Request URL: {url}")
+                # logger.info(f"Request Headers: {header}")
+                # logger.info(f"Request Data - scan_clause: {scan_clause[:100]}..." if len(scan_clause) > 100 else scan_clause)
+                pass
             
             response = session.post(url, headers=header, data={"scan_clause": scan_clause})
             
             # Log response status
             if selected_conditions is None or condition['name'] in selected_conditions:
-                logger.info(f"Response Status for {condition['name']}: {response.status_code}")
+                # logger.info(f"Response Status for {condition['name']}: {response.status_code}")
+                pass
             
             if response.status_code != 200:
                 logger.error(f"Error response for {condition['name']}: {response.text[:200]}")
@@ -661,7 +786,8 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
             
             # Log success
             if selected_conditions is None or condition['name'] in selected_conditions:
-                logger.info(f"Successfully fetched data for {condition['name']}, found {len(data['data'])} stocks")
+                # logger.info(f"Successfully fetched data for {condition['name']}, found {len(data['data'])} stocks")
+                pass
             
             # Convert to DataFrame
             stock_list = pd.DataFrame(data["data"])
@@ -726,24 +852,23 @@ def fetch_data():
                         if not condition['scan_clause'].strip().startswith('('):
                             # Wrap the scan clause in the required format if not already wrapped
                             formatted_scan_clause = f"( {{57960}} ( {condition['scan_clause']} ) )"
-                            condition['scan_clause'] = formatted_scan_clause
-                            logger.info(f"Formatted scan clause for {condition['name']}: {formatted_scan_clause}")
+                            # logger.info(f"Formatted scan clause for {condition['name']}: {formatted_scan_clause}")
                     
                     # Debug log before fetching
-                    logger.info(f"Fetching data for custom condition: {condition['name']}")
-                    logger.info(f"Scan clause: {condition.get('scan_clause', 'No scan clause')}")
+                    # logger.info(f"Fetching data for custom condition: {condition['name']}")
+                    # logger.info(f"Scan clause: {condition.get('scan_clause', 'No scan clause')}")
                     
                     stocks = fetch_and_process_data(session, condition)
                     
                     # Debug log after fetching
                     if stocks:
                         if isinstance(stocks, list):
-                            logger.info(f"Found {len(stocks)} stocks for custom condition: {condition['name']}")
+                            # logger.info(f"Found {len(stocks)} stocks for custom condition: {condition['name']}")
                             new_scan_results[condition['name']] = stocks
                         else:
                             logger.error(f"Invalid stocks data for {condition['name']}: {stocks}")
                     else:
-                        logger.warning(f"No stocks found for custom condition: {condition['name']}")
+                        # logger.info(f"No stocks found for custom condition: {condition['name']}")
                         # Initialize with empty list to ensure the condition appears in results
                         new_scan_results[condition['name']] = []
 
@@ -781,12 +906,36 @@ def filter_stocks(stocks, condition):
         # Filter for positive percentage change
         return [stock for stock in stocks if stock['per_chg'] > 0]
 
+# Global session with custom user agent and retry logic
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept': 'application/json, text/javascript, */*; q=0.01',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://chartink.com/screener/',
+    'X-Requested-With': 'XMLHttpRequest'
+})
+
+def get_random_interval():
+    """Return a random interval between 110 and 130 seconds"""
+    return random.uniform(110, 130)
+
+@app.route('/get-refresh-interval')
+def get_refresh_interval():
+    """Return the current refresh interval in seconds"""
+    global countdown_timer
+    return jsonify({
+        'interval': countdown_timer,
+        'next_refresh_in': countdown_timer
+    })
+
 def update_data():
     """
-    Background thread function to update stock data every 2 minutes
+    Background thread function to update stock data with random intervals between 110-130 seconds
     
     This function:
-    - Fetches fresh data
+    - Fetches fresh data with retry logic
+    - Uses random intervals to avoid detection
     - Updates the countdown timer
     - Handles errors gracefully
     - Respects the running flag for clean shutdown
@@ -795,42 +944,58 @@ def update_data():
     
     def _update_with_context():
         """Helper function to run with application context"""
-        try:
-            with app.app_context():
-                fetch_data()
-                return True
-        except Exception as e:
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                with app.app_context():
+                    # logger.info(f"Fetching data (attempt {attempt + 1}/{max_retries})")
+                    fetch_data()
+                    return True
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                if attempt == max_retries - 1:  # Last attempt
+                    logger.error("Max retries reached. Will retry after next interval.")
+                    return False
+                time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+            except Exception as e:
+                logger.error(f"Unexpected error in _update_with_context: {str(e)}", exc_info=True)
+                return False
             logger.error(f"Error in _update_with_context: {e}", exc_info=True)
             return False
     
     while running:
         try:
-            logger.info("Starting background data update...")
-            update_successful = _update_with_context()
+            # Get the target time for the next update (110-130 seconds from now)
+            next_update_time = time.time() + get_random_interval()
             
-            if update_successful:
-                logger.info("Background data update completed successfully")
-                # Play alert sound after successful update
-                play_alert()
-                # Reset the countdown timer
-                countdown_timer = 120  # 2 minutes until next update
-                
-            else:
-                logger.warning("Background data update completed with errors")
-                # Don't reset the countdown timer on error, try again sooner
-                countdown_timer = 30  # Try again in 30 seconds
+            # Run the update with application context
+            success = _update_with_context()
             
-            # Count down the timer every second
-            while countdown_timer > 0 and running:
+            # Calculate actual time remaining until next update
+            time_remaining = max(0, next_update_time - time.time())
+            countdown_timer = int(time_remaining)
+            last_alert_time = time.time()
+            
+            # logger.info(f"Update completed. Next update in {countdown_timer:.0f} seconds.")
+            
+            # Sleep in smaller intervals to allow for clean shutdown
+            while time.time() < next_update_time and running:
+                # Update remaining time
+                time_remaining = max(0, next_update_time - time.time())
+                countdown_timer = int(time_remaining)
                 time.sleep(1)
-                countdown_timer -= 1
-                
-                # Countdown logging removed
                 
         except Exception as e:
             logger.error(f"Error in update_data: {e}", exc_info=True)
-            # Wait before retrying on error, but don't get stuck in a tight loop
-            time.sleep(min(60, max(5, 60 - countdown_timer)))  # Wait at least 5 seconds
+            # On error, wait for a random time between 30-60 seconds before retrying
+            error_wait = random.uniform(30, 60)
+            # logger.info(f"Waiting {error_wait:.1f} seconds before retrying...")
+            for _ in range(int(error_wait)):
+                if not running:
+                    break
+                time.sleep(1)
 
 def categorize_stocks():
     """Categorize stocks into Buy and Sell suggestions, and detect significant score jumps."""
@@ -888,8 +1053,8 @@ def get_scan_results():
         all_scan_conditions = conditions.copy()
         all_scan_conditions.extend(custom_conditions)
         
-        logger.info(f"Selected conditions: {selected_conditions}")
-        logger.info(f"Custom conditions: {[c['name'] for c in custom_conditions]}")
+        # logger.info(f"Selected conditions: {selected_conditions}")
+        # logger.info(f"Custom conditions: {[c['name'] for c in custom_conditions]}")
         
         if not selected_conditions:
             logger.warning("No conditions selected")
@@ -918,30 +1083,34 @@ def get_scan_results():
                 try:
                     # Always process custom conditions regardless of selection status
                     if custom_condition['name'] in selected_conditions:
-                        logger.info(f"Processing custom condition: {custom_condition['name']}")
+                        # logger.info(f"Processing custom condition: {custom_condition['name']}")
+                        pass
                     
                     # Format scan clause if needed
                     if 'scan_clause' in custom_condition and custom_condition['scan_clause']:
                         if not custom_condition['scan_clause'].strip().startswith('('):
+                            # Wrap the scan clause in the required format if not already wrapped
                             formatted_clause = f"( {{57960}} ( {custom_condition['scan_clause']} ) )"
-                            if custom_condition['name'] in selected_conditions:
-                                logger.info(f"Formatted scan clause for {custom_condition['name']}: {formatted_clause}")
+                            # logger.info(f"Formatted scan clause for {custom_condition['name']}: {formatted_clause}")
                             custom_condition['scan_clause'] = formatted_clause
                     
                     if custom_condition['name'] in selected_conditions:
-                        logger.info(f"Scan clause: {custom_condition['scan_clause']}")
+                        # logger.info(f"Scan clause: {custom_condition['scan_clause']}")
+                        pass
                     data = fetch_and_process_data(session, custom_condition, selected_conditions)
                     
                     if isinstance(data, pd.DataFrame) and not data.empty:
                         # Add to scan_results for future use
                         scan_results[custom_condition['name']] = data.to_dict('records')
                         if custom_condition['name'] in selected_conditions:
-                            logger.info(f"Found {len(data)} stocks for custom condition: {custom_condition['name']}")
+                            # logger.info(f"Found {len(data)} stocks for custom condition: {custom_condition['name']}")
+                            pass
                     else:
                         # Initialize with empty list if no data
                         scan_results[custom_condition['name']] = []
                         if custom_condition['name'] in selected_conditions:
-                            logger.info(f"No stocks found for custom condition: {custom_condition['name']}")
+                            # logger.info(f"No stocks found for custom condition: {custom_condition['name']}")
+                            pass
                 except Exception as e:
                     logger.error(f"Error processing custom condition {custom_condition['name']}: {e}")
         
@@ -960,7 +1129,7 @@ def get_scan_results():
                 # Try with the original name if normalized didn't work
                 stocks = scan_results.get(condition_name, [])
                 
-            logger.info(f"Condition: {normalized_condition}, Stocks found: {len(stocks)}")
+            # logger.info(f"Condition: {normalized_condition}, Stocks found: {len(stocks)}")
             
             if stocks:
                 all_results[normalized_condition] = stocks
@@ -1002,7 +1171,139 @@ def serve_db_json():
 def serve_static(filename):
     return send_from_directory('static', filename)
 
+# Authentication Routes
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user = authenticate_user(username, password)
+        if user:
+            login_user(user)
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        else:
+            error = 'Invalid username or password'
+    
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        email = request.form.get('email', '')
+        
+        if not username or not password:
+            error = 'Username and password are required'
+        else:
+            # First check if user exists and load users
+            try:
+                with open('users.json', 'r') as f:
+                    users = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                users = {}
+                
+            if any(user.get('username') == username for user in users.values()):
+                error = 'Username already exists'
+            else:
+                user_id = str(len(users) + 1)
+                # Save user with plain text password
+                users[user_id] = {
+                    'username': username,
+                    'password': password,  # Store in plain text
+                    'email': email
+                }
+                
+                # Save to file
+                with open('users.json', 'w') as f:
+                    json.dump(users, f, indent=2)
+                
+                # Create user object and log in
+                user = User(id=user_id, 
+                          username=username, 
+                          password_hash=password,
+                          email=email)
+                login_user(user)
+                return redirect(url_for('index'))
+    
+    return render_template('register.html', error=error)
+
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    error = None
+    success = None
+    
+    if request.method == 'POST':
+        # Handle profile update
+        if 'email' in request.form:
+            new_email = request.form['email']
+            try:
+                with open('users.json', 'r') as f:
+                    users = json.load(f)
+                users[str(current_user.id)]['email'] = new_email
+                with open('users.json', 'w') as f:
+                    json.dump(users, f, indent=2)
+                success = 'Profile updated successfully!'
+            except Exception as e:
+                error = 'Error updating profile'
+                print(f"Error updating profile: {e}")
+        
+        # Handle password change
+        elif 'current_password' in request.form and 'new_password' in request.form:
+            current_password = request.form['current_password']
+            new_password = request.form['new_password']
+            try:
+                with open('users.json', 'r') as f:
+                    users = json.load(f)
+                
+                user_data = users[str(current_user.id)]
+                if user_data.get('password') == current_password:  # Direct comparison for plain text
+                    users[str(current_user.id)]['password'] = new_password  # Store new password in plain text
+                    with open('users.json', 'w') as f:
+                        json.dump(users, f, indent=2)
+                    success = 'Password updated successfully!'
+                else:
+                    error = 'Current password is incorrect'
+            except Exception as e:
+                error = 'Error changing password'
+                print(f"Error changing password: {e}")
+    
+    # Load current user data
+    try:
+        with open('users.json') as f:
+            users = json.load(f)
+            user_data = users.get(str(current_user.id), {})
+    except (FileNotFoundError, json.JSONDecodeError):
+        user_data = {}
+    
+    return render_template('settings.html', 
+                         username=current_user.username,
+                         email=user_data.get('email', ''),
+                         error=error,
+                         success=success)
+
+# Main Application Routes
+
 @app.route('/')
+@login_required
 def index():
     """Render the main index page"""
     # Start the background thread if not already started
@@ -1010,7 +1311,7 @@ def index():
     if not threads_started:
         try:
             start_background_thread()
-            logger.info("Background update_data thread started after first / visit.")
+            # logger.info("Background update_data thread started after first / visit.")
         except Exception as e:
             logger.error(f"Error starting background thread: {e}")
     
@@ -1043,7 +1344,7 @@ def index():
     buy_suggestions, sell_suggestions = categorize_stocks()
 
     # Debug log for scan results
-    logger.info(f"Scan results keys: {list(scan_results.keys() if scan_results else [])}")
+    # logger.info(f"Scan results keys: {list(scan_results.keys() if scan_results else [])}")
     
     # Prepare conditions with their stocks
     conditions_with_stocks = []
@@ -1054,7 +1355,8 @@ def index():
         # Get stocks for this condition, default to empty list
         stocks = scan_results.get(condition["name"], [])
         if condition["name"] in selected_conditions:
-            logger.info(f"Adding custom condition {condition['name']} with {len(stocks)} stocks")
+            # logger.info(f"Adding custom condition {condition['name']} with {len(stocks)} stocks")
+            pass
         # Add condition with its stocks to the list
         conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": True})
     
@@ -1064,12 +1366,12 @@ def index():
         if condition["name"] in selected_conditions:
             # Get stocks for this condition, default to empty list
             stocks = scan_results.get(condition["name"], [])
-            logger.info(f"Adding built-in condition {condition['name']} with {len(stocks)} stocks")
+            # logger.info(f"Adding built-in condition {condition['name']} with {len(stocks)} stocks")
             # Add condition with its stocks to the list
             conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": False})
     
     # Debug log for conditions being displayed
-    logger.info(f"Conditions being displayed: {[c['name'] for c in conditions_with_stocks]}")
+    # logger.info(f"Conditions being displayed: {[c['name'] for c in conditions_with_stocks]}")
     
     # Make sure all selected conditions are included, even if they don't have stocks
     selected_condition_names = [c['name'] for c in conditions_with_stocks]
@@ -1078,7 +1380,7 @@ def index():
             # Find the condition in all_conditions
             for condition in all_conditions:
                 if condition['name'] == condition_name:
-                    logger.info(f"Adding missing condition: {condition_name}")
+                    # logger.info(f"Adding missing condition: {condition_name}")
                     conditions_with_stocks.append({**condition, "stocks": []})
                     break
 
@@ -1205,16 +1507,16 @@ def get_nifty_data():
         session = requests.Session()
         
         # First, establish a session by visiting the main NSE website
-        logger.debug("Establishing session with NSE website")
+        # logger.debug("Establishing session with NSE website")
         pre_response = session.get("https://www.nseindia.com", headers=headers)
-        logger.debug(f"Pre-session response status: {pre_response.status_code}")
+        # logger.debug(f"Pre-session response status: {pre_response.status_code}")
         
         # Fetch indices data
-        logger.debug(f"Fetching data from URL: {url}")
+        # logger.debug(f"Fetching data from URL: {url}")
         response = session.get(url, headers=headers)
         
         # Log full response details for debugging
-        logger.debug(f"Response status code: {response.status_code}")
+        # logger.debug(f"Response status code: {response.status_code}")
         
         # Check if request was successful
         if response.status_code == 200:
@@ -1259,7 +1561,7 @@ def get_nifty_data():
                 except Exception as parse_error:
                     logger.error(f"Error parsing index data for {nse_index}: {parse_error}")
             
-            logger.info(f"Fetched Nifty data: {nifty_data}")
+            # logger.info(f"Fetched Nifty data: {nifty_data}")
             return nifty_data
         
         else:
@@ -1293,7 +1595,7 @@ def fetch_get_nifty_data():
 def test_alert():
     """Test endpoint to verify sound playback functionality"""
     try:
-        logger.info("\n=== TEST ALERT TRIGGERED ===")
+        # logger.info("\n=== TEST ALERT TRIGGERED ===")
         
         # Get system info for debugging
         import platform
@@ -1305,7 +1607,7 @@ def test_alert():
             'pygame_version': pg.version.ver,
             'sdl_version': ".".join(str(x) for x in pg.get_sdl_version())
         }
-        logger.info(f"System info: {system_info}")
+        # logger.info(f"System info: {system_info}")
         
         # Try to play the sound with force_play=True to bypass mute and cooldown
         success = play_alert(force_play=True)
@@ -1328,7 +1630,7 @@ def test_alert():
             'timestamp': time.time()
         }
         
-        logger.info(f"Test alert response: {response}")
+        # logger.info(f"Test alert response: {response}")
         return jsonify(response), 200
         
     except Exception as e:
@@ -1357,7 +1659,7 @@ def start_background_thread():
         update_thread.daemon = True
         update_thread.start()
         thread_started = True
-        logger.info("Background thread started")
+        # logger.info("Background thread started")
 
 # load_custom_conditions and save_custom_conditions functions are defined earlier in the file
 
@@ -1366,35 +1668,26 @@ def cleanup():
     Cleanup function to stop background threads and release resources.
     This is registered with atexit to ensure it runs when the application exits.
     """
-    global running, beep_running, update_thread, beep_thread
+    global running, update_thread
     
     try:
-        logger.info("Initiating cleanup of background threads...")
+        # logger.info("Initiating cleanup of background threads...")
         
         # Signal threads to stop
         running = False
-        beep_running = False
-        
-        # Give threads a moment to notice the stop signal
-        time.sleep(0.5)
         
         # Wait for threads to finish (with timeout)
         if update_thread and update_thread.is_alive():
-            logger.info("Waiting for update thread to finish...")
+            # logger.info("Waiting for update thread to finish...")
             update_thread.join(timeout=2.0)
             
-        if beep_thread and beep_thread.is_alive():
-            logger.info("Waiting for beep thread to finish...")
-            beep_thread.join(timeout=1.0)
-            
-        logger.info("Cleanup completed successfully")
+        # logger.info("Cleanup completed successfully")
         
     except Exception as e:
         logger.error(f"Error during cleanup: {e}", exc_info=True)
     finally:
         # Ensure these are always set to False
         running = False
-        beep_running = False
 
 def get_nse_indices():
     """
@@ -1572,14 +1865,14 @@ def get_nse_indices():
 def filter_stocks():
     score_threshold = float(request.json.get('score', 0))  # Convert to float
     filtered_stocks = [stock for stocks in scan_results.values() for stock in stocks if stock['potential_score'] > score_threshold]
-    logger.info(f"Filter button clicked")
-    logger.info(f"Filtered stocks: {filtered_stocks}")
+    # logger.info(f"Filter button clicked")
+    # logger.info(f"Filtered stocks: {filtered_stocks}")
     return jsonify(filtered_stocks)
 
 @app.route('/get-refresh-interval')
 def refresh_interval():
     interval = get_refresh_interval()
-    logger.info(f"Sending refresh interval: {interval} seconds")
+    # logger.info(f"Sending refresh interval: {interval} seconds")
     return jsonify({'refresh_interval': interval})
 
 @app.route('/get-mute-status', methods=['GET'])
@@ -1618,7 +1911,7 @@ def debug_sound():
     # Force play sound for testing
     force = request.args.get('force', 'false').lower() == 'true'
     if force:
-        logger.info("Force playing sound for testing")
+        # logger.info("Force playing sound for testing")
         temp_muted = is_muted
         temp_timer = countdown_timer
         
