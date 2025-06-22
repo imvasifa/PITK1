@@ -8,11 +8,11 @@ services:
     startCommand: gunicorn app3:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.4
+        value: 3.12.3
       - key: FLASK_APP
         value: app3.py
       - key: PYTHONUNBUFFERED
         value: 1
     plan: free
     python:
-      version: 3.13.4
+      version: 3.12.3
