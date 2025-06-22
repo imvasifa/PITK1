@@ -1,7 +1,15 @@
 {
   "1": {
-    "username": "indianplans",
-    "password": "vankai",
-    "email": ""
+    "username": "aisha",
+    "password": "ccc",
+    "email": "",
+    "name": "",
+    "refresh_interval": 120,
+    "theme": "light",
+    "premium": "yes",
+    "date_joined": "2025-06-22T17:59:59.499957Z",
+    "last_login": "2025-06-22T17:59:59.499957Z",
+    "sms": false,
+    "mobile": ""
   }
 }

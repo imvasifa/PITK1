@@ -868,59 +868,7 @@ def serve_static(filename):
 
 @app.route('/')
 def index():
-    global threads_started
-    
-    # Start background thread only after first visit to home page
-    if not threads_started:
-        try:
-            # Small delay to ensure server is fully up
-            import time
-            time.sleep(1)
-            
-            thread = threading.Thread(target=update_data, daemon=True)
-            thread.start()
-            threads_started = True
-            logger.info("Background update_data thread started after first / visit.")
-        except Exception as e:
-            logger.error(f"Error starting background thread: {e}")
-    
-    # Ensure latest data is fetched
-    try:
-        fetch_data()
-    except Exception as e:
-        logger.error(f"Error in fetch_data: {e}")
-        
-    settings = load_settings()
-    selected_conditions = settings.get('conditions', [])
-
-    # If no conditions are selected, show a message to select conditions
-    if not selected_conditions:
-        flash_message = {
-            'type': 'info',
-            'icon': 'fa-info-circle',
-            'title': 'No Conditions Selected',
-            'message': 'Please select one or more conditions from the Conditions menu to view stock data.'
-        }
-    else:
-        flash_message = None
-
-    # Categorize stocks into Buy/Sell
-    buy_suggestions, sell_suggestions = categorize_stocks()
-
-    # Only include selected conditions
-    conditions_with_stocks = [
-        {**condition, "stocks": scan_results.get(condition["name"], [])}
-        for condition in conditions
-        if condition["name"] in selected_conditions
-    ]
-
-    return render_template(
-        'index.html',
-        conditions=conditions_with_stocks,
-        flash_message=flash_message,
-        buy_suggestions=buy_suggestions,
-        sell_suggestions=sell_suggestions
-    )
+    return render_template('index2.html')
 
 @app.route('/get-settings')
 def get_settings():
@@ -1175,7 +1123,7 @@ def start_background_thread():
     global update_thread, running, thread_started
     if not thread_started:
         running = True
-        update_thread = threading.Thread(target=update_data)
+        update_thread = threading.Thread(target=update_data, daemon=True)
         update_thread.daemon = True
         update_thread.start()
         thread_started = True
@@ -1498,6 +1446,10 @@ def app3_output():
         error_msg = f"Error in /app3: {str(e)}"
         logger.error(error_msg)
         return jsonify({'status': 'error', 'message': error_msg}), 500, {'Content-Type': 'application/json'}
+
+@app.route('/index2')
+def index2():
+    return render_template('index2.html')
 
 if __name__ == '__main__':
     # Register cleanup first to ensure it runs on all exit paths

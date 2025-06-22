@@ -1,5 +1,5 @@
 {
-    "mute_status": false,
+    "mute_status": true,
     "app_selected": "app",
     "conditions": [
         "Deep Seek Volume & Range Break \u2705",

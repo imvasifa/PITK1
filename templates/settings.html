@@ -5,12 +5,19 @@
 {% block content %}
 <div class="container">
     <div class="row">
-        <div class="col-12">
-            <h1 class="mt-4">User Settings</h1>
-            <hr>
+        <div class="col-12 d-flex justify-content-between align-items-center mt-4">
+            <h1>User Settings</h1>
+            <div>
+                <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
+                    <i class="fas fa-home me-1"></i> Home
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </div>
         </div>
     </div>
-    
+    <hr>
     <div class="row">
         <div class="col-md-6">
             <div class="card mb-4">
@@ -61,5 +68,69 @@
             </div>
         </div>
     </div>
+    <!-- Refresh Timer Control Card -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Refresh Timer (Development)</h5>
+                </div>
+                <div class="card-body">
+                    <form id="refreshTimerForm" onsubmit="saveRefreshTimer(event)">
+                        <div class="mb-3">
+                            <label for="refreshTimerInput" class="form-label">Refresh Interval (seconds, 10–300):</label>
+                            <input type="number" class="form-control" id="refreshTimerInput" min="10" max="300" step="1" disabled>
+                            <span id="refreshTimerLoading" class="text-muted ms-2">Loading...</span>
+                        </div>
+                        <button type="submit" class="btn btn-success" id="refreshTimerSaveBtn" disabled>Save Timer</button>
+                        <span id="refreshTimerSavedMsg" class="text-success ms-3" style="display:none;">Saved!</span>
+                        <div class="form-text mt-2">This controls the personalized refresh interval for the main page. Default is 120s. Leave blank for random (110–130s).</div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Load timer value from backend
+        document.addEventListener('DOMContentLoaded', function() {
+            var input = document.getElementById('refreshTimerInput');
+            var loading = document.getElementById('refreshTimerLoading');
+            var saveBtn = document.getElementById('refreshTimerSaveBtn');
+            fetch('/user/refresh-interval')
+                .then(r => r.json())
+                .then(data => {
+                    let val = data.refresh_interval;
+                    if (input) input.value = (val !== undefined && val !== null) ? val : 120;
+                })
+                .catch(() => { if (input) input.value = 120; })
+                .finally(() => {
+                    if (input) input.disabled = false;
+                    if (saveBtn) saveBtn.disabled = false;
+                    if (loading) loading.style.display = 'none';
+                });
+        });
+        function saveRefreshTimer(e) {
+            e.preventDefault();
+            var input = document.getElementById('refreshTimerInput');
+            var msg = document.getElementById('refreshTimerSavedMsg');
+            var saveBtn = document.getElementById('refreshTimerSaveBtn');
+            if (input && input.value) {
+                saveBtn.disabled = true;
+                fetch('/user/refresh-interval', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh_interval: parseInt(input.value) })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && msg) {
+                        msg.style.display = 'inline';
+                        setTimeout(() => { msg.style.display = 'none'; }, 1500);
+                    }
+                })
+                .finally(() => { saveBtn.disabled = false; });
+            }
+        }
+    </script>
 </div>
 {% endblock %}

@@ -1339,54 +1339,55 @@
     </div>
 
     <!-- Custom Conditions Modal -->
-    <div class="modal fade" id="customConditionsModal" tabindex="-1" aria-labelledby="customConditionsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="customConditionsModalLabel">Custom Scan Conditions</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="customConditionsModal.hide()"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <button class="btn btn-primary" onclick="showAddConditionForm()">
-                            <i class="fas fa-plus me-2"></i>Add New Condition
-                        </button>
+    {% if is_premium %}
+        <div class="modal fade" id="customConditionsModal" tabindex="-1" aria-labelledby="customConditionsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="customConditionsModalLabel">Custom Scan Conditions</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="customConditionsModal.hide()"></button>
                     </div>
-                    <div id="customConditionsList" class="list-group">
-                        <!-- Custom conditions will be loaded here -->
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <button class="btn btn-primary" onclick="showAddConditionForm()">
+                                <i class="fas fa-plus me-2"></i>Add New Condition
+                            </button>
+                        </div>
+                        <div id="customConditionsList" class="list-group">
+                            <!-- Custom conditions will be loaded here -->
+                        </div>
+                        <!-- Add/Edit Form (initially hidden) -->
+                        <div id="conditionFormContainer" style="display: none;" class="mt-4 p-3 border rounded">
+                            <h5 id="formTitle">Add New Condition</h5>
+                            <form id="conditionForm">
+                                <input type="hidden" id="editConditionId">
+                                <div class="mb-3">
+                                    <label for="conditionName" class="form-label">Condition Name</label>
+                                    <input type="text" class="form-control" id="conditionName" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="conditionLink" class="form-label">Link (optional)</label>
+                                    <input type="url" class="form-control" id="conditionLink">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="conditionClause" class="form-label">Scan Clause</label>
+                                    <textarea class="form-control" id="conditionClause" rows="6" required></textarea>
+                                    <div class="form-text">Enter the scan clause in the required format.</div>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-secondary" onclick="hideConditionForm()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    
-                    <!-- Add/Edit Form (initially hidden) -->
-                    <div id="conditionFormContainer" style="display: none;" class="mt-4 p-3 border rounded">
-                        <h5 id="formTitle">Add New Condition</h5>
-                        <form id="conditionForm">
-                            <input type="hidden" id="editConditionId">
-                            <div class="mb-3">
-                                <label for="conditionName" class="form-label">Condition Name</label>
-                                <input type="text" class="form-control" id="conditionName" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="conditionLink" class="form-label">Link (optional)</label>
-                                <input type="url" class="form-control" id="conditionLink">
-                            </div>
-                            <div class="mb-3">
-                                <label for="conditionClause" class="form-label">Scan Clause</label>
-                                <textarea class="form-control" id="conditionClause" rows="6" required></textarea>
-                                <div class="form-text">Enter the scan clause in the required format.</div>
-                            </div>
-                            <div class="d-flex justify-content-end gap-2">
-                                <button type="button" class="btn btn-secondary" onclick="hideConditionForm()">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save</button>
-                            </div>
-                        </form>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="customConditionsModal.hide()">Close</button>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="customConditionsModal.hide()">Close</button>
                 </div>
             </div>
         </div>
-    </div>
+    {% endif %}
 
     <!-- Nifty Modal -->
     <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
@@ -1418,8 +1419,11 @@
         <div class="navbar-brand">
             <img src="/static/pitk-logo.svg" alt="PITK Logo" class="me-2">
             PRICE IS THE KING
-            <span id="next-refresh">
-                <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i> <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span> <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
+            <span id="next-refresh" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;">
+                <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 5px;"></i>
+                <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span>
+                <span id="timer-number" style="display: inline-block; width: 3ch; text-align: right; font-family: monospace; font-variant-numeric: tabular-nums; margin-right: 0.5ch; font-size: 0.9em; vertical-align: baseline;">00</span>
+                seconds
             </span>
         </div>
         <div class="navbar-buttons">
@@ -1439,8 +1443,8 @@
             <button class="btn converter-btn" id="converterButton" title="Open Converter" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #00bcd4, #2196f3); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem;">
                 <i class="fas fa-exchange-alt"></i>
             </button>
-            <!-- Custom Conditions Button -->
-            <button class="btn custom-conditions-btn" id="customConditionsButton" title="Manage Custom Conditions" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff9800, #ff5722); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem; position: relative; overflow: hidden; z-index: 1;" onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 5px rgba(0,0,0,0.2)';" onmousedown="this.style.transform='scale(0.95)';" onmouseup="this.style.transform='scale(1.1)';" onclick="showCustomConditionsModal()">
+            <!-- Custom Conditions Button (always visible) -->
+            <button class="btn custom-conditions-btn" id="customConditionsButton" title="Manage Custom Conditions" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff9800, #ff5722); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem; position: relative; overflow: hidden; z-index: 1;" onclick="handleCustomConditionsClick()">
                 <i class="fas fa-list-check"></i>
             </button>
             <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
@@ -1460,39 +1464,9 @@
         </div>
     </nav>
 
-    <!-- Timestamp Section -->
-    <!-- (Removed as per user request) -->
-
-    <!-- Conditions Modal -->
-    <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content bg-dark text-light">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title" id="conditionsModalLabel">Select Conditions</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <button type="button" class="btn btn-outline-primary me-2" onclick="checkAllConditions(true)">
-                            <i class="fas fa-check-square me-1"></i> Check All
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="checkAllConditions(false)">
-                            <i class="fas fa-square me-1"></i> Uncheck All
-                        </button>
-                    </div>
-                    <div class="mb-3">
-                        <input type="text" class="form-control" id="conditionSearchInput" placeholder="Search conditions..." oninput="filterConditions()">
-                    </div>
-                    <div id="conditionsContainer">
-                        <!-- Conditions will be populated here -->
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="applyConditions()">Apply</button>
-                </div>
-            </div>
-        </div>
+    <!-- Refresh Progress Bar -->
+    <div id="refreshProgressBarContainer" style="width: 100%; height: 5px; background: #e0e0e0; position: fixed; top: 0; left: 0; z-index: 1200;">
+        <div id="refreshProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #2196f3, #00bcd4); transition: width 1s linear;"></div>
     </div>
 
     <!-- Main Content -->
@@ -1505,9 +1479,7 @@
         </div>
         {% endif %}
         
-        
-        <!-- Added these because we need to show the first card below the nav bar -->
-        <br><br><br>
+        <!-- Removed extra <br> tags for less space below navbar -->
         
         <div class="row" id="scanResults">
             {% if conditions is defined and conditions %}
@@ -2497,7 +2469,14 @@ function populateConditions() {
             themeToggleBtn.addEventListener("click", () => {
                 // Toggle dark/light theme
                 const currentTheme = document.body.classList.contains("dark-theme") ? "dark" : "light";
-                applyTheme(currentTheme === "light" ? "dark" : "light");
+                const newTheme = currentTheme === "light" ? "dark" : "light";
+                applyTheme(newTheme);
+                // Save theme to backend
+                fetch('/user/theme', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: newTheme })
+                });
             });
         });
 
@@ -2708,6 +2687,16 @@ function populateConditions() {
         let refreshInterval = 120; // Default to 120 seconds
         let timerElement = document.getElementById('refresh-timer');
         let lastUpdateTime = Date.now();
+
+        // Fetch user-set refresh interval on page load
+        fetch('/user/refresh-interval')
+            .then(response => response.json())
+            .then(data => {
+                if (data.refresh_interval) {
+                    refreshInterval = data.refresh_interval;
+                    lastUpdateTime = Date.now();
+                }
+            });
 
         // Function to update the timer display
         function updateTimer() {
@@ -3022,6 +3011,170 @@ function populateConditions() {
             }
         });
     </script>
+    <script>
+        (function() {
+            // Personalized progress bar and data refresh logic
+            function getRandomInterval() {
+                return Math.floor(Math.random() * 21) + 110; // 110 to 130 seconds
+            }
+            var refreshInterval = getRandomInterval();
+            var progress = 0;
+            var progressBar = document.getElementById('refreshProgressBar');
+            var progressTimer;
+            var timerElement = document.getElementById('refresh-timer');
+
+            function updateTimerDisplay(timeRemaining) {
+                if (timerElement) {
+                    timerElement.textContent = `${timeRemaining} seconds`;
+                }
+            }
+
+            function refreshDataAndRestartBar() {
+                if (typeof updateDashboard === 'function') {
+                    updateDashboard();
+                } else {
+                    window.location.reload();
+                }
+                if (typeof playAlert === 'function') {
+                    playAlert();
+                }
+                // Pick a new random interval for the next cycle
+                refreshInterval = getRandomInterval();
+                startProgressBar(refreshInterval);
+            }
+
+            function startProgressBar(interval) {
+                refreshInterval = interval || getRandomInterval();
+                progress = 0;
+                if (progressBar) {
+                    progressBar.style.width = '0%';
+                }
+                if (progressTimer) clearInterval(progressTimer);
+                updateTimerDisplay(refreshInterval);
+                progressTimer = setInterval(function() {
+                    progress += 1;
+                    var percent = Math.min((progress / refreshInterval) * 100, 100);
+                    if (progressBar) progressBar.style.width = percent + '%';
+                    var timeRemaining = Math.max(0, refreshInterval - progress);
+                    updateTimerDisplay(timeRemaining);
+                    if (progress >= refreshInterval) {
+                        clearInterval(progressTimer);
+                        refreshDataAndRestartBar();
+                    }
+                }, 1000);
+            }
+
+            // Start the personalized refresh cycle on page load
+            startProgressBar(refreshInterval);
+        })();
+    </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let refreshInterval = 120; // Default to 120 seconds
+        const timerNum = document.getElementById('timer-number');
+        const progressBar = document.getElementById('refreshProgressBar');
+        let lastUpdateTime = Date.now();
+
+        // Fetch user-set refresh interval on page load
+        fetch('/user/refresh-interval')
+            .then(response => response.json())
+            .then(data => {
+                if (data.refresh_interval) {
+                    refreshInterval = data.refresh_interval;
+                }
+                lastUpdateTime = Date.now();
+                startCountdown();
+            })
+            .catch(error => {
+                console.error('Error getting refresh interval:', error);
+                lastUpdateTime = Date.now();
+                startCountdown();
+            });
+
+        function startCountdown() {
+            updateTimer(); // Initial call to set display
+            setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const now = Date.now();
+            const elapsed = Math.floor((now - lastUpdateTime) / 1000);
+            const remaining = Math.max(0, refreshInterval - elapsed);
+
+            // Update timer text
+            if (timerNum) {
+                timerNum.textContent = String(remaining).padStart(2, '0');
+            }
+
+            // Update progress bar
+            if (progressBar) {
+                const percent = ((refreshInterval - remaining) / refreshInterval) * 100;
+                progressBar.style.width = Math.min(100, Math.max(0, percent)) + '%';
+            }
+
+            // Trigger refresh and reset timer
+            if (remaining <= 0) {
+                lastUpdateTime = now;
+                if (typeof refreshData === 'function') refreshData();
+            }
+        }
+    });
+    </script>
+
+    <!-- Premium Required Modal -->
+    <div class="modal fade" id="premiumRequiredModal" tabindex="-1" aria-labelledby="premiumRequiredModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="premiumRequiredModalLabel">Premium Feature</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Custom Conditions are available only to premium users.<br>
+            <strong>Upgrade to premium</strong> to unlock this feature!
+          </div>
+          <div class="modal-footer">
+            <a href="/upgrade" class="btn btn-primary">Upgrade Now</a>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function handleCustomConditionsClick() {
+        var isPremium = "{{ 'true' if is_premium else 'false' }}" === 'true';
+        if (isPremium) {
+            if (typeof showCustomConditionsModal === 'function') {
+                showCustomConditionsModal();
+            }
+        } else {
+            var premiumModal = new bootstrap.Modal(document.getElementById('premiumRequiredModal'));
+            premiumModal.show();
+        }
+    }
+    </script>
+
+    <!-- Conditions Modal -->
+    <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header">
+            <h5 class="modal-title" id="conditionsModalLabel">Scan Conditions</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="conditionsContainer"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
 {% endblock %}
 
 {% block extra_js %}

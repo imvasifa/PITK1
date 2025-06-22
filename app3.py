@@ -13,14 +13,11 @@ import sys
 import tempfile
 import threading
 import time
-import winsound
-import os
 
 from bs4 import BeautifulSoup as bs
 import pandas as pd
-import pygame
 import requests
-from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session
+from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app
 from flask_wtf import FlaskForm
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -36,45 +33,6 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)  # Suppress urllib3 debug
 logging.getLogger("werkzeug").setLevel(logging.WARNING)  # Suppress werkzeug debug logs
 
 logger = logging.getLogger(__name__)
-is_muted = False  # Global flag to track mute status
-last_alert_time = 0  # Track last played time
-countdown_timer = 0  # Initialize countdown timer (0 means no cooldown)
-beep_interval = 30  # Beep every 30 seconds
-beep_running = True  # Control the beep thread
-
-def play_alert():
-    """
-    Play a beep sound using winsound, but only if not muted.
-    """
-    global is_muted
-    if is_muted:
-        return False
-    try:
-        # Play a beep sound (frequency=1000, duration=500ms)
-        winsound.Beep(1000, 500)
-        return True
-    except Exception as e:
-        logger.error(f"Error playing sound: {e}")
-        try:
-            # Fallback to pygame if winsound fails
-            sound = pygame.mixer.Sound('static/alert.mp3')
-            sound.play()
-            return True
-        except Exception as e2:
-            logger.error(f"Error playing alert sound: {e2}")
-            return False
-
-def beep_worker():
-    """
-    Background thread that plays a beep at the specified interval
-    """
-    while beep_running:
-        try:
-            play_alert()
-            time.sleep(beep_interval)
-        except Exception as e:
-            logger.error(f"Error in beep worker: {e}")
-            time.sleep(5)  # Wait 5 seconds before retrying on error
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
@@ -87,10 +45,13 @@ login_manager.login_view = 'login'
 # User class
 class User(UserMixin):
     def __init__(self, id, username, password_hash, email=''):
-        self.id = id
+        self.id = str(id)  # Always store as string
         self.username = username
         self.password_hash = password_hash
         self.email = email
+
+    def get_id(self):
+        return str(self.id)  # Always return string
 
 def get_user(user_id):
     try:
@@ -157,16 +118,19 @@ login_manager.login_view = 'login'
 # User class
 class User(UserMixin):
     def __init__(self, id, username, password_hash, email=''):
-        self.id = id
+        self.id = str(id)  # Always store as string
         self.username = username
         self.password_hash = password_hash
         self.email = email
+
+    def get_id(self):
+        return str(self.id)  # Always return string
 
 # User loader
 @login_manager.user_loader
 def load_user(user_id):
     try:
-        with open('users.json') as f:
+        with open('users.json', 'r') as f:
             users = json.load(f)
         if user_id in users:
             user_data = users[user_id]
@@ -200,13 +164,6 @@ def save_user(username, password, email=''):
         json.dump(users, f, indent=2)
     
     return user_id
-
-# Initialize pygame mixer with error handling
-try:
-    pygame.mixer.quit()  # Ensure clean state
-    pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-except Exception as e:
-    logger.error(f"Failed to initialize pygame mixer: {e}")
 
 # Add formatNumber as a Jinja2 filter
 @app.template_filter('formatNumber')
@@ -618,7 +575,6 @@ conditions = [
 # Global variables
 data_queue = queue.Queue()
 last_update_thread = None
-beep_thread = None
 threads_started = False
 running = True
 thread_started = False
@@ -704,11 +660,6 @@ def save_settings(settings):
 # Load settings and ensure mute_status is properly set
 app_settings = load_settings()
 is_muted = app_settings.get('mute_status', False)  # Default to False if not set
-
-@app.route('/clear_cache')
-def clear_cache():
-    cache.clear()
-    return "Cache cleared!"
 
 @app.route('/update_mute_status', methods=['POST'])
 def update_mute_status():
@@ -881,7 +832,7 @@ def fetch_data():
 
             # Play alert sound only if unmuted
             if not is_muted:
-                play_alert()
+                pass
                 
             return scan_results
             
@@ -923,10 +874,9 @@ def get_random_interval():
 @app.route('/get-refresh-interval')
 def get_refresh_interval():
     """Return the current refresh interval in seconds"""
-    global countdown_timer
     return jsonify({
-        'interval': countdown_timer,
-        'next_refresh_in': countdown_timer
+        'interval': 0,
+        'next_refresh_in': 0
     })
 
 def update_data():
@@ -940,7 +890,7 @@ def update_data():
     - Handles errors gracefully
     - Respects the running flag for clean shutdown
     """
-    global running, countdown_timer, last_alert_time
+    global running
     
     def _update_with_context():
         """Helper function to run with application context"""
@@ -975,16 +925,13 @@ def update_data():
             
             # Calculate actual time remaining until next update
             time_remaining = max(0, next_update_time - time.time())
-            countdown_timer = int(time_remaining)
-            last_alert_time = time.time()
             
-            # logger.info(f"Update completed. Next update in {countdown_timer:.0f} seconds.")
+            # logger.info(f"Update completed. Next update in {time_remaining:.0f} seconds.")
             
             # Sleep in smaller intervals to allow for clean shutdown
             while time.time() < next_update_time and running:
                 # Update remaining time
                 time_remaining = max(0, next_update_time - time.time())
-                countdown_timer = int(time_remaining)
                 time.sleep(1)
                 
         except Exception as e:
@@ -1224,11 +1171,19 @@ def register():
                 error = 'Username already exists'
             else:
                 user_id = str(len(users) + 1)
-                # Save user with plain text password
+                now_iso = datetime.utcnow().isoformat() + 'Z'
                 users[user_id] = {
                     'username': username,
                     'password': password,  # Store in plain text
-                    'email': email
+                    'email': email,
+                    'name': '',
+                    'refresh_interval': 120,
+                    'theme': 'light',
+                    'premium': 'no',
+                    'date_joined': now_iso,
+                    'last_login': now_iso,
+                    'sms': False,
+                    'mobile': ''
                 }
                 
                 # Save to file
@@ -1384,13 +1339,23 @@ def index():
                     conditions_with_stocks.append({**condition, "stocks": []})
                     break
 
+    # Get current user's premium status
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        user_data = users.get(str(current_user.id), {})
+        is_premium = user_data.get('premium', 'no') == 'yes'
+    except Exception:
+        is_premium = False
+
     # Render the template with the settings
     return render_template(
         'index.html',
         conditions=conditions_with_stocks,
         flash_message=flash_message,
         buy_suggestions=buy_suggestions,
-        sell_suggestions=sell_suggestions
+        sell_suggestions=sell_suggestions,
+        is_premium=is_premium
     )
 
 @app.route('/get-settings')
@@ -1590,58 +1555,6 @@ def fetch_get_nifty_data():
     except Exception as e:
         logger.error(f"Error in get_nifty_data route: {str(e)}")
         return jsonify({}), 500
-
-@app.route('/test_alert')
-def test_alert():
-    """Test endpoint to verify sound playback functionality"""
-    try:
-        # logger.info("\n=== TEST ALERT TRIGGERED ===")
-        
-        # Get system info for debugging
-        import platform
-        import pygame as pg
-        
-        system_info = {
-            'python_version': platform.python_version(),
-            'system': platform.system(),
-            'pygame_version': pg.version.ver,
-            'sdl_version': ".".join(str(x) for x in pg.get_sdl_version())
-        }
-        # logger.info(f"System info: {system_info}")
-        
-        # Try to play the sound with force_play=True to bypass mute and cooldown
-        success = play_alert(force_play=True)
-        
-        # Get sound device info
-        try:
-            import pygame._sdl2.audio as sdl2_audio
-            devices = [str(device) for device in sdl2_audio.get_audio_device_names()]
-            system_info['audio_devices'] = devices
-        except Exception as e:
-            system_info['audio_devices_error'] = str(e)
-        
-        response = {
-            'status': 'success' if success else 'error',
-            'message': 'Playback successful' if success else 'Playback failed',
-            'sound_file': 'alert.mp3',
-            'muted': is_muted,
-            'countdown_timer': countdown_timer,
-            'system_info': system_info,
-            'timestamp': time.time()
-        }
-        
-        # logger.info(f"Test alert response: {response}")
-        return jsonify(response), 200
-        
-    except Exception as e:
-        error_msg = f"Error in test_alert: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        return jsonify({
-            'status': 'error',
-            'message': error_msg,
-            'error_type': type(e).__name__
-        }), 500
-    return "Alert sound triggered!"  # Simple response to indicate the alert was triggered
 
 @app.before_request
 def before_request():
@@ -1879,58 +1792,6 @@ def refresh_interval():
 def get_mute_status():
     return jsonify({'isMuted': is_muted})
 
-@app.route('/debug_sound')
-def debug_sound():
-    """Debug endpoint to test sound functionality"""
-    global is_muted, countdown_timer
-    
-    # Get current state
-    state = {
-        'is_muted': is_muted,
-        'countdown_timer': countdown_timer,
-        'last_alert_time': last_alert_time,
-        'time_since_last_alert': time.time() - last_alert_time if last_alert_time > 0 else 'Never',
-        'pygame_mixer_initialized': pygame.mixer.get_init() is not None,
-        'sound_file_exists': False
-    }
-    
-    # Check sound file existence
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    possible_paths = [
-        os.path.join(base_dir, "static", "sounds", "alert.mp3"),
-        os.path.join(base_dir, "sounds", "alert.mp3"),
-        os.path.join(base_dir, "static", "alert.mp3"),
-    ]
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            state['sound_file_exists'] = True
-            state['sound_file_path'] = path
-            break
-    
-    # Force play sound for testing
-    force = request.args.get('force', 'false').lower() == 'true'
-    if force:
-        # logger.info("Force playing sound for testing")
-        temp_muted = is_muted
-        temp_timer = countdown_timer
-        
-        # Temporarily override mute and timer for testing
-        is_muted = False
-        countdown_timer = 0
-        
-        try:
-            play_alert()
-            state['test_playback'] = 'Attempted to play sound'
-        except Exception as e:
-            state['test_playback_error'] = str(e)
-        finally:
-            # Restore original values
-            is_muted = temp_muted
-            countdown_timer = temp_timer
-    
-    return jsonify(state)
-
 def app3_logic():
     """
     Main logic for App3 that will be called by the Flask API.
@@ -2057,6 +1918,70 @@ def delete_custom_condition(condition_id):
     except Exception as e:
         logger.error(f"Error deleting custom condition: {e}")
         return jsonify({"error": "Failed to delete custom condition"}), 500
+
+@app.route('/user/refresh-interval', methods=['GET'])
+@login_required
+def get_user_refresh_interval():
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        user_data = users.get(str(current_user.id), {})
+        interval = user_data.get('refresh_interval')
+        return jsonify({'refresh_interval': interval}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/user/refresh-interval', methods=['POST'])
+@login_required
+def set_user_refresh_interval():
+    try:
+        data = request.get_json()
+        interval = data.get('refresh_interval')
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        if str(current_user.id) in users:
+            users[str(current_user.id)]['refresh_interval'] = interval
+            with open('users.json', 'w') as f2:
+                json.dump(users, f2, indent=2)
+            return jsonify({'success': True}), 200
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/user/theme', methods=['GET'])
+@login_required
+def get_user_theme():
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        user_data = users.get(str(current_user.id), {})
+        theme = user_data.get('theme')
+        return jsonify({'theme': theme}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/user/theme', methods=['POST'])
+@login_required
+def set_user_theme():
+    try:
+        data = request.get_json()
+        theme = data.get('theme')
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        if str(current_user.id) in users:
+            users[str(current_user.id)]['theme'] = theme
+            with open('users.json', 'w') as f2:
+                json.dump(users, f2, indent=2)
+            return jsonify({'success': True}), 200
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/upgrade')
+def upgrade():
+    return render_template('upgrade.html')
 
 if __name__ == '__main__':
     # Register cleanup first to ensure it runs on all exit paths
