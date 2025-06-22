@@ -6,6 +6,11 @@ services:
     envVars:
       - key: FLASK_APP
         value: app3.py
+      - key: FLASK_ENV
+        value: production
       - key: PYTHONUNBUFFERED
         value: 1
     plan: free
+    buildCommand: |
+      pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:5000 app3:app
