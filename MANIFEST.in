@@ -1,0 +1,6 @@
+include requirements.txt
+include runtime.txt
+include README.md
+recursive-include templates *
+recursive-include static *
+include *.json

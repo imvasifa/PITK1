@@ -3,8 +3,9 @@ services:
     name: strong-stock-scanner
     env: python
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
+      python -m pip install --upgrade pip
+      pip install setuptools==59.8.0 wheel==0.37.1
+      pip install -e .
     startCommand: gunicorn app3:app
     envVars:
       - key: PYTHON_VERSION
