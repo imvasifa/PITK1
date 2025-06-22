@@ -13,13 +13,13 @@ import tempfile
 import threading
 import time
 import winsound
+import os
 
 from bs4 import BeautifulSoup as bs
 import pandas as pd
 import pygame
 import requests
 from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort
-from flask_caching import Cache
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo
@@ -38,45 +38,42 @@ beep_running = True  # Control the beep thread
 
 def play_alert():
     """
-    Play the alert sound from static/alert.mp3, but only if not muted.
+    Play a beep sound using winsound, but only if not muted.
     """
     global is_muted
     if is_muted:
         logger.info("Muted: alert sound not played")
         return False
     try:
-        # Initialize pygame mixer if not already initialized
-        if not pygame.mixer.get_init():
-            pygame.mixer.init()
-        # Load and play the sound
-        sound = pygame.mixer.Sound('static/alert.mp3')
-        sound.play()
-        logger.info("Played alert sound")
+        # Play a beep sound (frequency=1000, duration=500ms)
+        winsound.Beep(1000, 500)
         return True
     except Exception as e:
-        logger.error(f"Error playing alert sound: {e}")
-        return False
+        logger.error(f"Error playing sound: {e}")
+        try:
+            # Fallback to pygame if winsound fails
+            sound = pygame.mixer.Sound('static/alert.mp3')
+            sound.play()
+            logger.info("Played alert sound using pygame")
+            return True
+        except Exception as e2:
+            logger.error(f"Error playing alert sound: {e2}")
+            return False
 
 def beep_worker():
     """
-    Background thread that plays alert.mp3 every minute
+    Background thread that plays a beep at the specified interval
     """
-    last_alert_time = 0
     while beep_running:
         try:
-            current_time = time.time()
-            # Check if a minute has passed since last alert
-            if current_time - last_alert_time >= 60:  # 60 seconds = 1 minute
-                play_alert()
-                last_alert_time = current_time
-            time.sleep(1)  # Check every second
+            play_alert()
+            time.sleep(beep_interval)
         except Exception as e:
-            logger.error(f"Error in beep_worker: {e}")
+            logger.error(f"Error in beep worker: {e}")
             time.sleep(5)  # Wait 5 seconds before retrying on error
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
-#cache = Cache(app)
 # Initialize pygame mixer with error handling
 try:
     pygame.mixer.quit()  # Ensure clean state
