@@ -2001,5 +2001,7 @@ if __name__ == '__main__':
     # Start threads immediately when run directly
     start_threads_once()
     
-    # Run the Flask app in standalone mode if this file is executed directly
-    app.run(port=5000, debug=True)
+    # Run the Flask app
+    if __name__ == '__main__':
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_ENV') == 'development')
