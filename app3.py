@@ -602,10 +602,12 @@ def update_mute_status():
     logger.info(f"Mute status set to: {is_muted}")
     return jsonify({'status': 'success', 'isMuted': is_muted})
 
-def fetch_and_process_data(session, condition):
+def fetch_and_process_data(session, condition, selected_conditions=None):
     """Fetch and process stock data using the provided session"""
     url = "https://chartink.com/screener/process"
-    logger.info(f"Fetching data for condition: {condition['name']}")
+    # Only log debug info if this is a selected condition
+    if selected_conditions is None or condition['name'] in selected_conditions:
+        logger.info(f"Fetching data for condition: {condition['name']}")
     
     # Validate condition has required fields
     if 'scan_clause' not in condition or not condition['scan_clause']:
@@ -614,6 +616,8 @@ def fetch_and_process_data(session, condition):
     
     try:
         # Get CSRF token
+        if selected_conditions is None or condition['name'] in selected_conditions:
+            logger.info("Fetching CSRF token...")
         r_data = session.get(url)
         r_data.raise_for_status()
         soup = bs(r_data.content, "lxml")
@@ -623,13 +627,23 @@ def fetch_and_process_data(session, condition):
             return {"error": "Could not find CSRF token"}
         
         header = {"x-csrf-token": meta["content"]}
+        logger.info("CSRF token obtained successfully")
 
         try:
             # Format scan clause for API if needed
             scan_clause = condition["scan_clause"]
             
-            # Send the request
+            # Log the actual request being sent
+            if selected_conditions is None or condition['name'] in selected_conditions:
+                logger.info(f"Request URL: {url}")
+                logger.info(f"Request Headers: {header}")
+                logger.info(f"Request Data - scan_clause: {scan_clause[:100]}..." if len(scan_clause) > 100 else scan_clause)
+            
             response = session.post(url, headers=header, data={"scan_clause": scan_clause})
+            
+            # Log response status
+            if selected_conditions is None or condition['name'] in selected_conditions:
+                logger.info(f"Response Status for {condition['name']}: {response.status_code}")
             
             if response.status_code != 200:
                 logger.error(f"Error response for {condition['name']}: {response.text[:200]}")
@@ -649,7 +663,8 @@ def fetch_and_process_data(session, condition):
                 return []
             
             # Log success
-            logger.info(f"Successfully fetched data for {condition['name']}, found {len(data['data'])} stocks")
+            if selected_conditions is None or condition['name'] in selected_conditions:
+                logger.info(f"Successfully fetched data for {condition['name']}, found {len(data['data'])} stocks")
             
             # Convert to DataFrame
             stock_list = pd.DataFrame(data["data"])
@@ -715,17 +730,23 @@ def fetch_data():
                             # Wrap the scan clause in the required format if not already wrapped
                             formatted_scan_clause = f"( {{57960}} ( {condition['scan_clause']} ) )"
                             condition['scan_clause'] = formatted_scan_clause
+                            logger.info(f"Formatted scan clause for {condition['name']}: {formatted_scan_clause}")
                     
-                    # Fetch data for this condition
+                    # Debug log before fetching
+                    logger.info(f"Fetching data for custom condition: {condition['name']}")
+                    logger.info(f"Scan clause: {condition.get('scan_clause', 'No scan clause')}")
+                    
                     stocks = fetch_and_process_data(session, condition)
                     
-                    # Process results
+                    # Debug log after fetching
                     if stocks:
                         if isinstance(stocks, list):
+                            logger.info(f"Found {len(stocks)} stocks for custom condition: {condition['name']}")
                             new_scan_results[condition['name']] = stocks
                         else:
-                            logger.error(f"Invalid stocks data for {condition['name']}")
+                            logger.error(f"Invalid stocks data for {condition['name']}: {stocks}")
                     else:
+                        logger.warning(f"No stocks found for custom condition: {condition['name']}")
                         # Initialize with empty list to ensure the condition appears in results
                         new_scan_results[condition['name']] = []
 
@@ -870,7 +891,8 @@ def get_scan_results():
         all_scan_conditions = conditions.copy()
         all_scan_conditions.extend(custom_conditions)
         
-        # Process selected and custom conditions
+        logger.info(f"Selected conditions: {selected_conditions}")
+        logger.info(f"Custom conditions: {[c['name'] for c in custom_conditions]}")
         
         if not selected_conditions:
             logger.warning("No conditions selected")
@@ -898,28 +920,33 @@ def get_scan_results():
             for custom_condition in custom_conditions:
                 try:
                     # Always process custom conditions regardless of selection status
-                    logger.info(f"Processing custom condition: {custom_condition['name']}")
+                    if custom_condition['name'] in selected_conditions:
+                        logger.info(f"Processing custom condition: {custom_condition['name']}")
                     
                     # Format scan clause if needed
                     if 'scan_clause' in custom_condition and custom_condition['scan_clause']:
                         if not custom_condition['scan_clause'].strip().startswith('('):
                             formatted_clause = f"( {{57960}} ( {custom_condition['scan_clause']} ) )"
+                            if custom_condition['name'] in selected_conditions:
+                                logger.info(f"Formatted scan clause for {custom_condition['name']}: {formatted_clause}")
                             custom_condition['scan_clause'] = formatted_clause
                     
-                    data = fetch_and_process_data(session, custom_condition)
+                    if custom_condition['name'] in selected_conditions:
+                        logger.info(f"Scan clause: {custom_condition['scan_clause']}")
+                    data = fetch_and_process_data(session, custom_condition, selected_conditions)
                     
                     if isinstance(data, pd.DataFrame) and not data.empty:
                         # Add to scan_results for future use
-                        stocks_dict = data.to_dict('records')
-                        scan_results[custom_condition['name']] = stocks_dict
+                        scan_results[custom_condition['name']] = data.to_dict('records')
+                        if custom_condition['name'] in selected_conditions:
+                            logger.info(f"Found {len(data)} stocks for custom condition: {custom_condition['name']}")
                     else:
                         # Initialize with empty list if no data
                         scan_results[custom_condition['name']] = []
+                        if custom_condition['name'] in selected_conditions:
+                            logger.info(f"No stocks found for custom condition: {custom_condition['name']}")
                 except Exception as e:
                     logger.error(f"Error processing custom condition {custom_condition['name']}: {e}")
-                    # Ensure we have at least an empty list
-                    if custom_condition['name'] not in scan_results:
-                        scan_results[custom_condition['name']] = []
         
         # Now collect all results from scan_results
         for condition_name in selected_conditions:
@@ -935,6 +962,8 @@ def get_scan_results():
             if not stocks:
                 # Try with the original name if normalized didn't work
                 stocks = scan_results.get(condition_name, [])
+                
+            logger.info(f"Condition: {normalized_condition}, Stocks found: {len(stocks)}")
             
             if stocks:
                 all_results[normalized_condition] = stocks
@@ -1027,7 +1056,8 @@ def index():
     for condition in custom_conditions:
         # Get stocks for this condition, default to empty list
         stocks = scan_results.get(condition["name"], [])
-        
+        if condition["name"] in selected_conditions:
+            logger.info(f"Adding custom condition {condition['name']} with {len(stocks)} stocks")
         # Add condition with its stocks to the list
         conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": True})
     
@@ -1037,9 +1067,12 @@ def index():
         if condition["name"] in selected_conditions:
             # Get stocks for this condition, default to empty list
             stocks = scan_results.get(condition["name"], [])
-            
+            logger.info(f"Adding built-in condition {condition['name']} with {len(stocks)} stocks")
             # Add condition with its stocks to the list
             conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": False})
+    
+    # Debug log for conditions being displayed
+    logger.info(f"Conditions being displayed: {[c['name'] for c in conditions_with_stocks]}")
     
     # Make sure all selected conditions are included, even if they don't have stocks
     selected_condition_names = [c['name'] for c in conditions_with_stocks]
@@ -1048,6 +1081,7 @@ def index():
             # Find the condition in all_conditions
             for condition in all_conditions:
                 if condition['name'] == condition_name:
+                    logger.info(f"Adding missing condition: {condition_name}")
                     conditions_with_stocks.append({**condition, "stocks": []})
                     break
 

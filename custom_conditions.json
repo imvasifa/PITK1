@@ -1,10 +1,3 @@
 {
-  "custom_conditions": [
-    {
-      "name": "My First Scan",
-      "link": "",
-      "scan_clause": "latest volume > latest sma( latest volume , 5 ) * 2 and \nlatest close > 1 day ago close and \nlatest volume > 500000",
-      "id": "custom_2"
-    }
-  ]
+  "custom_conditions": []
 }
