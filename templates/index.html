@@ -949,6 +949,33 @@
             color: var(--accent-color, #00bcd4);
         }
 
+        /* Custom styles for the app */
+        /* Stock symbol styling - enhanced for all browsers */
+        .stock-symbol, td a, table td a, .table td a {
+            color: #00bcd4 !important; /* Bright cyan color for stock symbols */
+            font-weight: 500;
+            text-decoration: none !important;
+        }
+        
+        /* Ensure stock symbols maintain color after clicking - with higher specificity */
+        .stock-symbol:visited, .stock-symbol:active, .stock-symbol:focus, .stock-symbol:hover,
+        td a:visited, td a:active, td a:focus, td a:hover,
+        table td a:visited, table td a:active, table td a:focus, table td a:hover,
+        .table td a:visited, .table td a:active, .table td a:focus, .table td a:hover {
+            color: #00bcd4 !important;
+            text-decoration: none !important;
+            opacity: 1 !important;
+        }
+        
+        /* Fix for Brave browser specific issues with checkboxes */
+        @supports (-webkit-appearance: none) and (not (overflow: -webkit-marquee)) and (not (-ms-ime-align:auto)) {
+            .form-check-input {
+                pointer-events: auto !important;
+                opacity: 1 !important;
+                position: static !important;
+            }
+        }
+
         /* Dark theme global styles */
         body.dark-theme {
             background-color: #121212 !important;
@@ -1905,6 +1932,8 @@
                         const container = document.querySelector('.container-fluid');
                         container.innerHTML = ''; // Clear existing content
                         
+
+                        
                         // Create cards for each condition
                         Object.entries(data).forEach(([condition, stocks]) => {
                             console.log('Creating card for condition:', condition);
@@ -1959,8 +1988,8 @@
                                         <tr>
                                             <td>
                                                 <div style="display: flex; align-items: center;">
-                                                    ${stock.symbol}
-                                                    <a href="#" onclick="showPreferenceModal('${stock.symbol}')" style="margin-left: 8px;">
+                                                    <span class="stock-symbol" style="color: var(--text-light, #e0e0e0);">${stock.symbol}</span>
+                                                    <a href="#" onclick="showPreferenceModal('${stock.symbol}'); return false;" style="margin-left: 8px;">
                                                         <img src="/static/hyperlink.svg" alt="Link" style="width: 16px; height: 16px;">
                                                     </a>
                                                 </div>
@@ -2011,8 +2040,20 @@
         });
 
         function showConditionsModal() {
-            populateConditions(); // Load conditions before showing modal
-            const modal = new bootstrap.Modal(document.getElementById('conditionsModal'));
+            // First ensure any previous modal is properly disposed
+            const existingModal = bootstrap.Modal.getInstance(document.getElementById('conditionsModal'));
+            if (existingModal) {
+                existingModal.dispose();
+            }
+            
+            // Load conditions before showing modal
+            populateConditions();
+            
+            // Create a fresh modal instance
+            const modal = new bootstrap.Modal(document.getElementById('conditionsModal'), {
+                backdrop: 'static',  // Prevent closing when clicking outside
+                keyboard: true       // Allow ESC key to close
+            });
             modal.show();
         }
 
@@ -2053,42 +2094,83 @@ function populateConditions() {
                                 return;
                             }
                             
-                            // Add "Select All" checkbox
+                            // Add "Select All" checkbox - create programmatically for better event handling
                             const selectAllDiv = document.createElement('div');
                             selectAllDiv.className = 'form-check mb-3 border-bottom pb-2';
-                            selectAllDiv.innerHTML = `
-                                <input class="form-check-input" type="checkbox" id="selectAllConditions"
-                                    onclick="checkAllConditions(this.checked)">
-                                <label class="form-check-label" for="selectAllConditions">
-                                    <strong>Select All Conditions</strong>
-                                </label>
-                            `;
+                            
+                            const selectAllCheckbox = document.createElement('input');
+                            selectAllCheckbox.className = 'form-check-input';
+                            selectAllCheckbox.type = 'checkbox';
+                            selectAllCheckbox.id = 'selectAllConditions';
+                            
+                            // Add event listener directly
+                            selectAllCheckbox.addEventListener('change', function() {
+                                checkAllConditions(this.checked);
+                            });
+                            
+                            const selectAllLabel = document.createElement('label');
+                            selectAllLabel.className = 'form-check-label';
+                            selectAllLabel.setAttribute('for', 'selectAllConditions');
+                            selectAllLabel.innerHTML = '<strong>Select All Conditions</strong>';
+                            
+                            selectAllDiv.appendChild(selectAllCheckbox);
+                            selectAllDiv.appendChild(selectAllLabel);
                             container.appendChild(selectAllDiv);
                             
                             // Add individual condition checkboxes
                             conditions.forEach(condition => {
                                 const div = document.createElement('div');
                                 div.className = 'form-check mb-3 condition-item';
-                                div.innerHTML = `
-                                    <input class="form-check-input condition-checkbox" type="checkbox" 
-                                        value="${condition.name}" 
-                                        id="condition_${condition.name.replace(/\s+/g, '_')}"
-                                        ${selectedConditions.includes(condition.name) ? 'checked' : ''}>
-                                    <label class="form-check-label d-flex justify-content-between align-items-center" 
-                                        for="condition_${condition.name.replace(/\s+/g, '_')}">
-                                        ${condition.name}
-                                        <a href="${condition.link}" target="_blank" class="text-light ms-2" title="Open in Chartink">
-                                            <i class="fas fa-external-link-alt"></i>
-                                        </a>
-                                    </label>
-                                `;
+                                const conditionName = condition.name;
+                                const conditionLink = condition.link || '#';
+                                
+                                // Handle cases where condition might not have a link
+                                const linkElement = conditionLink !== '#' ? 
+                                    `<a href="${conditionLink}" target="_blank" class="text-light ms-2" title="Open in Chartink">
+                                        <i class="fas fa-external-link-alt"></i>
+                                     </a>` : '';
+                                
+                                // Create elements programmatically instead of using innerHTML for better event handling
+                                const checkbox = document.createElement('input');
+                                checkbox.className = 'form-check-input condition-checkbox';
+                                checkbox.type = 'checkbox';
+                                checkbox.value = conditionName;
+                                checkbox.id = `condition_${conditionName.replace(/\s+/g, '_')}`;
+                                checkbox.checked = selectedConditions.includes(conditionName);
+                                
+                                const label = document.createElement('label');
+                                label.className = 'form-check-label d-flex justify-content-between align-items-center';
+                                label.setAttribute('for', `condition_${conditionName.replace(/\s+/g, '_')}`);
+                                
+                                const nameSpan = document.createElement('span');
+                                nameSpan.textContent = conditionName;
+                                label.appendChild(nameSpan);
+                                
+                                if (conditionLink && conditionLink !== '#') {
+                                    const link = document.createElement('a');
+                                    link.href = conditionLink;
+                                    link.target = '_blank';
+                                    link.className = 'text-light ms-2';
+                                    link.title = 'Open in Chartink';
+                                    
+                                    const icon = document.createElement('i');
+                                    icon.className = 'fas fa-external-link-alt';
+                                    link.appendChild(icon);
+                                    
+                                    label.appendChild(link);
+                                }
+                                
+                                div.appendChild(checkbox);
+                                div.appendChild(label);
                                 container.appendChild(div);
                             });
                             
                             // Update "Select All" checkbox state
                             const allCheckboxes = container.querySelectorAll('.condition-checkbox');
-                            const selectAllCheckbox = document.getElementById('selectAllConditions');
-                            selectAllCheckbox.checked = Array.from(allCheckboxes).every(cb => cb.checked);
+                            const selectAllCheckboxElement = document.getElementById('selectAllConditions');
+                            if (selectAllCheckboxElement) {
+                                selectAllCheckboxElement.checked = Array.from(allCheckboxes).every(cb => cb.checked);
+                            }
                         })
                         .catch(error => {
                             console.error('Error loading conditions:', error);
@@ -2111,7 +2193,8 @@ function populateConditions() {
 
         function applyConditions() {
             const selectedConditions = [];
-            const checkboxes = document.querySelectorAll('#conditionsContainer input[type="checkbox"]');
+            // Only select condition checkboxes, not the selectAll checkbox
+            const checkboxes = document.querySelectorAll('#conditionsContainer input.condition-checkbox');
             checkboxes.forEach(checkbox => {
                 if (checkbox.checked) {
                     selectedConditions.push(checkbox.value);
@@ -2140,32 +2223,69 @@ function populateConditions() {
                 return;
             }
             
+            // Show loading indicator
+            const applyButton = document.querySelector('#conditionsModal .modal-footer .btn-primary');
+            const originalButtonText = applyButton.innerHTML;
+            applyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Applying...';
+            applyButton.disabled = true;
+            
             fetch('/update-settings', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
                 },
                 body: JSON.stringify({ conditions: selectedConditions })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('conditionsModal'));
-                    modal.hide();
-                    window.location.reload();
+                    // Close modal properly
+                    const modalElement = document.getElementById('conditionsModal');
+                    const modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) {
+                        modal.hide();
+                        // Wait for modal to close before reloading
+                        modalElement.addEventListener('hidden.bs.modal', function onHidden() {
+                            modalElement.removeEventListener('hidden.bs.modal', onHidden);
+                            window.location.reload();
+                        });
+                    } else {
+                        window.location.reload();
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error saving conditions:', error);
                 alert('Error saving conditions. Please try again.');
+            })
+            .finally(() => {
+                // Restore button state regardless of success/failure
+                applyButton.innerHTML = originalButtonText;
+                applyButton.disabled = false;
             });
         }
 
         function checkAllConditions(checked) {
-            const checkboxes = document.querySelectorAll('#conditionsContainer input[type="checkbox"]');
+            // Get all checkboxes except the "Select All" checkbox itself
+            const checkboxes = document.querySelectorAll('#conditionsContainer input.condition-checkbox');
+            
+            // Set each checkbox to the desired state
             checkboxes.forEach(checkbox => {
                 checkbox.checked = checked;
             });
+            
+            // Update the "Select All" checkbox state as well
+            const selectAllCheckboxElem = document.getElementById('selectAllConditions');
+            if (selectAllCheckboxElem) {
+                selectAllCheckboxElem.checked = checked;
+            }
+            
             // Remove any existing warning if user checks any condition
             if (checked) {
                 const alertDiv = document.querySelector('#conditionsContainer').previousElementSibling;
@@ -2254,10 +2374,12 @@ function populateConditions() {
         document.addEventListener('DOMContentLoaded', () => {
             startAutoRefresh();
             
-            // Also restart auto-refresh when tab becomes visible
+            // Only refresh if data is older than 30 seconds when tab becomes visible
+            let lastUpdate = Date.now();
             document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) {
-                    console.log('Tab became visible, restarting auto-refresh');
+                if (!document.hidden && (Date.now() - lastUpdate) > 30000) {
+                    console.log('Tab became visible and data is stale, refreshing...');
+                    lastUpdate = Date.now();
                     startAutoRefresh();
                 }
             });
