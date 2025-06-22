@@ -4,17 +4,15 @@ services:
     env: python
     buildCommand: |
       python -m pip install --upgrade pip
-      pip install --no-cache-dir -r requirements.txt
+      pip install --only-binary :all: --prefer-binary -r requirements.txt
     startCommand: gunicorn app3:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.13
-      - key: FLASK_ENV
-        value: production
+        value: 3.13.4
       - key: FLASK_APP
         value: app3.py
       - key: PYTHONUNBUFFERED
         value: 1
     plan: free
     python:
-      version: 3.10.13
+      version: 3.13.4
