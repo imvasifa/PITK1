@@ -1418,7 +1418,7 @@ def update_settings():
             current_settings['app_selected'] = data['selected_option']
             current_settings['browser'] = '1' if data['selected_option'] == 'browser' else '0'
             current_settings['app'] = '1' if data['selected_option'] == 'app' else '0'
-        
+        #Pushing this old code as working code
         # Save clean settings
         with open(DB_FILE, 'w') as f:
             # Lock the file for writing
