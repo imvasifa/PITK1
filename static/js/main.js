@@ -15,6 +15,7 @@ async function populateAdminConditions() {
         const selectedConditions = settings.conditions || [];
 
         container.innerHTML = '';
+        // Always show all admin conditions
         const adminConditions = conditions.filter(c => c.type === 'admin');
 
         if (adminConditions.length === 0) {

@@ -284,6 +284,7 @@ admin_conditions = [
    
     {
         "name": "ATR STOCKS",
+        "type": "admin",    
         "link": "https://chartink.com/screener/atr-stocks",
         "scan_clause": """( {57960} ( \
             latest close > ( latest close - ( 3 * latest avg true range( 5 ) ) ) and \
@@ -296,6 +297,7 @@ admin_conditions = [
     },
     {
         "name": "Deep Seek Volume & Range Break ✅",
+        "type": "admin",   
         "link": "https://chartink.com/screener/ds-2206",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:9eadb2a72344cf751b91a835fc23e4a0&timeframe=daily&symbol=",
         "scan_clause": """( {cash} ( 
@@ -314,6 +316,7 @@ admin_conditions = [
 
     {
         "name": "MULTI TIMEFRAME SCAN",
+        "type": "admin",
         "link": "https://chartink.com/screener/aaaaa-111468",
         "scan_clause": """( {57960} ( 
             [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 21 ) and
@@ -348,6 +351,7 @@ admin_conditions = [
     },
     {
     "name": "VOLUME SHOCKER ✅",
+    "type": "admin",
     "link": "https://chartink.com/screener/p45789",
     "chart_link": "https://chartink.com/stocks-new?symbol=",
     "scan_clause": """( {57960} ( 
@@ -363,6 +367,7 @@ admin_conditions = [
     },
     {
     "name": "High Volume Spike",
+    "type": "admin",
     "link": "https://chartink.com/screener/shock-19",
     "chart_link": "https://chartink.com/stocks-new?symbol=",    
     "scan_clause": """( {57960} ( 
@@ -373,6 +378,7 @@ admin_conditions = [
     },
     {
         "name": "85 VOLUME SHOCK ✅",
+        "type": "admin",
         "link": "https://chartink.com/screener/copy-volume-rahim",
         "chart_link": "https://chartink.com/stocks-new?symbol=",
         "scan_clause": """( {cash} ( 
@@ -390,6 +396,7 @@ admin_conditions = [
     },
     {
         "name": "HARSH BUY STOCKS",
+        "type": "admin",
         "link": "https://chartink.com/screener/harsh-645",
         "scan_clause": """( {57960} ( [=1] 10 minute open < [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < 2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
     },
@@ -400,6 +407,7 @@ admin_conditions = [
     },
     {
         "name": "Smart Cash Flow - Chanu",
+        "type": "admin",
         "link": "https://chartink.com/screener/copy-85-volume-shameem",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:e93d77e49e9b94220daecb5bae1e6ff8&timeframe=daily&symbol=",
         "scan_clause": """( {cash} ( 
@@ -420,6 +428,7 @@ admin_conditions = [
     },
     {
         "name": "CHANU VOLATILITY SPIKE ",
+        "type": "admin",
         "link": "https://chartink.com/screener/copy-volume-shockers-stocks-with-rising-volumes-1111145289",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c7fa7b37712fa79e1b96d4155e7d64d5&timeframe=daily&symbol=",
         "scan_clause": """( {57960} ( 
@@ -432,6 +441,7 @@ admin_conditions = [
     },
     {
         "name": "Vijay Thakkar",
+        "type": "admin",
         "link": "https://chartink.com/screener/vijay-thakkar-27107",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
         "scan_clause": """( {57960} ( 
@@ -471,6 +481,7 @@ admin_conditions = [
 },
 {
         "name": "STRONG STOCKS NEGATIVE",
+        "type": "admin",
         "link": "https://chartink.com/screener/strong-stocks",
         "scan_clause": """( {57960} ( 
             latest close > 20 and 
@@ -491,6 +502,7 @@ admin_conditions = [
     },
     {
         "name": "RA Inventor SELL",
+        "type": "admin",
         "link": "https://chartink.com/screener/ra-score-sell",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7a1d3e7c5afc5c6b1b8c4e0d6e4d1b2e&timeframe=30_minute&symbol=",
         "scan_clause": """( {57960} ( \
@@ -501,6 +513,7 @@ admin_conditions = [
     },
     {
         "name": "RA Inventor 20 Candles BUY",
+        "type": "admin",
         "link": "https://chartink.com/screener/ra-score",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c78aa5a902629463cf1605aef72c8c1c&timeframe=30_minute&symbol=",
         "scan_clause": """( {57960} ( \
@@ -512,6 +525,7 @@ admin_conditions = [
     },
     {
         "name": "DST BUY",  
+        "type": "admin",
         "link": "https://chartink.com/screener/stst-81",  
         "chart_link": "https://chartink.com/stocks-new?scan_link=scanlink:5a82d36a216278deb065b37eebc871a0&timeframe=5_minute&symbol=",
         "scan_clause": """(
@@ -525,6 +539,7 @@ admin_conditions = [
     },
     {
     "name": "DST SELL",  
+    "type": "admin",
     "link": "https://chartink.com/screener/dst-sell-4",  
     "scan_clause": """(
         [0]5 minute supertrend(10,1) < [0]5 minute supertrend(10,3) and
@@ -537,6 +552,7 @@ admin_conditions = [
 },
     {
         "name": "DEEP High Momentum ✅",
+        "type": "admin",
         "link": "https://chartink.com/screener/cash-price-volume-surge",
         "chart_link": "https://chartink.com/stocks-new?symbol=",
         "scan_clause": """( {cash} ( 
