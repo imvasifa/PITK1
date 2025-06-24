@@ -20,7 +20,7 @@ from bs4 import BeautifulSoup as bs
 import pandas as pd
 import pygame
 import requests
-from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session
+from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app
 from flask_wtf import FlaskForm
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -633,7 +633,7 @@ is_muted = app_settings.get('mute_status', False)  # Default to False if not set
 
 @app.route('/clear_cache')
 def clear_cache():
-    cache.clear()
+    # cache.clear()
     return "Cache cleared!"
 
 @app.route('/update_mute_status', methods=['POST'])
@@ -1232,8 +1232,9 @@ def index():
     global threads_started
     if not threads_started:
         try:
-            start_background_thread()
+            # start_background_thread()
             # logger.info("Background update_data thread started after first / visit.")
+            pass
         except Exception as e:
             logger.error(f"Error starting background thread: {e}")
     
