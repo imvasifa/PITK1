@@ -86,11 +86,14 @@ login_manager.login_view = 'login'
 
 # User class
 class User(UserMixin):
-    def __init__(self, id, username, password_hash, email=''):
+    def __init__(self, id, username, password, email=''):
         self.id = id
         self.username = username
-        self.password_hash = password_hash
+        self.password = password
         self.email = email
+
+    def get_id(self):
+        return str(self.id)
 
 def get_user(user_id):
     try:
@@ -99,7 +102,7 @@ def get_user(user_id):
             if user_id in users:
                 return User(id=user_id, 
                           username=users[user_id]['username'],
-                          password_hash=users[user_id].get('password', ''),  
+                          password=users[user_id].get('password', ''),  
                           email=users[user_id].get('email', ''))
     except (FileNotFoundError, json.JSONDecodeError):
         return None
@@ -107,73 +110,29 @@ def get_user(user_id):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return get_user(user_id)
+    try:
+        with open('users.json') as f:
+            users = json.load(f)
+            if user_id in users:
+                user_data = users[user_id]
+                return User(id=user_id, 
+                          username=user_data.get('username'),
+                          password=user_data.get('password'),
+                          email=user_data.get('email', ''))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+    return None
 
 def authenticate_user(username, password):
     try:
         with open('users.json') as f:
             users = json.load(f)
-            for user_id, user_data in users.items():
-                # Check both username and password in plain text
-                if (user_data.get('username') == username and 
-                    user_data.get('password') == password):  # Direct plain text comparison
-                    return User(id=user_id, 
-                              username=user_data['username'],
-                              password_hash=user_data.get('password', ''),  # Still store in password_hash for compatibility
-                              email=user_data.get('email', ''))
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error in authenticate_user: {e}")
-    return None
-
-def save_user(username, password, email=''):
-    try:
-        with open('users.json', 'r') as f:
-            users = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        users = {}
-        
-    # Check if username already exists
-    if any(user.get('username') == username for user in users.values()):
-        return None
-        
-    user_id = str(len(users) + 1)
-    users[user_id] = {
-        'username': username,
-        'password': password,  # Store password in plain text
-        'email': email
-    }
-    
-    with open('users.json', 'w') as f:
-        json.dump(users, f, indent=2)
-    
-    return user_id
-app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
-
-# Initialize Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# User class
-class User(UserMixin):
-    def __init__(self, id, username, password_hash, email=''):
-        self.id = id
-        self.username = username
-        self.password_hash = password_hash
-        self.email = email
-
-# User loader
-@login_manager.user_loader
-def load_user(user_id):
-    try:
-        with open('users.json') as f:
-            users = json.load(f)
-        if user_id in users:
-            user_data = users[user_id]
-            return User(id=user_id, 
-                       username=user_data['username'],
-                       password_hash=user_data.get('password', ''),  # Use 'password' field
-                       email=user_data.get('email', ''))
+        for user_id, user_data in users.items():
+            if user_data.get('username') == username and user_data.get('password') == password:
+                return User(id=user_id, 
+                          username=user_data.get('username'),
+                          password=user_data.get('password'),
+                          email=user_data.get('email', ''))
     except (FileNotFoundError, json.JSONDecodeError):
         return None
     return None
@@ -185,14 +144,13 @@ def save_user(username, password, email=''):
     except (FileNotFoundError, json.JSONDecodeError):
         users = {}
         
-    # Check if username already exists
-    if any(user['username'] == username for user in users.values()):
+    if any(u.get('username') == username for u in users.values()):
         return None
         
     user_id = str(len(users) + 1)
     users[user_id] = {
         'username': username,
-        'password_hash': generate_password_hash(password),
+        'password': password,
         'email': email
     }
     
@@ -1227,7 +1185,7 @@ def register():
                 # Save user with plain text password
                 users[user_id] = {
                     'username': username,
-                    'password': password,  # Store in plain text
+                    'password': password,
                     'email': email
                 }
                 
@@ -1238,16 +1196,16 @@ def register():
                 # Create user object and log in
                 user = User(id=user_id, 
                           username=username, 
-                          password_hash=password,
+                          password=password,
                           email=email)
                 login_user(user)
                 return redirect(url_for('index'))
     
     return render_template('register.html', error=error)
 
-@app.route('/settings', methods=['GET', 'POST'])
+@app.route('/dash', methods=['GET', 'POST'])
 @login_required
-def settings():
+def dash():
     error = None
     success = None
     
@@ -1294,9 +1252,10 @@ def settings():
     except (FileNotFoundError, json.JSONDecodeError):
         user_data = {}
     
-    return render_template('settings.html', 
+    return render_template('dash.html', 
                          username=current_user.username,
                          email=user_data.get('email', ''),
+                         refresh_interval=user_data.get('refresh_interval', 120),
                          error=error,
                          success=success)
 
