@@ -1338,13 +1338,13 @@
         </div>
     </div>
 
-    <!-- Custom Conditions Modal -->
-    <div class="modal fade" id="customConditionsModal" tabindex="-1" aria-labelledby="customConditionsModalLabel" aria-hidden="true">
+    <!-- User Conditions Modal -->
+    <div class="modal fade" id="userConditionsModal" tabindex="-1" aria-labelledby="userConditionsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="customConditionsModalLabel">Custom Scan Conditions</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="customConditionsModal.hide()"></button>
+                    <h5 class="modal-title" id="userConditionsModalLabel">User Scan Conditions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="userConditionsModal.hide()"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -1352,10 +1352,9 @@
                             <i class="fas fa-plus me-2"></i>Add New Condition
                         </button>
                     </div>
-                    <div id="customConditionsList" class="list-group">
-                        <!-- Custom conditions will be loaded here -->
+                    <div id="userConditionsList" class="list-group">
+                        <!-- User conditions will be loaded here -->
                     </div>
-                    
                     <!-- Add/Edit Form (initially hidden) -->
                     <div id="conditionFormContainer" style="display: none;" class="mt-4 p-3 border rounded">
                         <h5 id="formTitle">Add New Condition</h5>
@@ -1382,7 +1381,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="customConditionsModal.hide()">Close</button>
+                    <button type="button" class="btn btn-secondary" onclick="userConditionsModal.hide()">Close</button>
                 </div>
             </div>
         </div>

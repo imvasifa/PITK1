@@ -1,17 +1,31 @@
 {
-  "1": {
-    "username": "indianplans",
-    "password": "vankai",
-    "email": ""
-  },
-  "2": {
-    "username": "aisha",
-    "password": "ccc",
-    "email": ""
-  },
-  "3": {
-    "username": "rahim",
-    "password": "ccc",
-    "email": ""
-  }
+    "user_1": {
+        "account": {
+            "username": "ra",
+            "email": "",
+            "password": "ccc",
+            "profile": {
+                "name": "Rahim",
+                "phone": "",
+                "address": "",
+                "premium": "yes",
+                "dob": "1975-09-30",
+                "gender": "Prefer not to say",
+                "photo_url": "/static/user_photos/user_user_1.png",
+                "bio": "Rahim is a Good Boy",
+                "email": ""
+            },
+            "conditions": [],
+            "misc1": [],
+            "misc2": [],
+            "misc3": [],
+            "misc4": [],
+            "misc5": [],
+            "misc6": [],
+            "misc7": [],
+            "misc8": [],
+            "misc9": [],
+            "misc10": []
+        }
+    }
 }

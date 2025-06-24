@@ -1,5 +1,5 @@
 import atexit
-from datetime import datetime
+from datetime import datetime, date
 import json
 import logging
 import math
@@ -24,6 +24,7 @@ from flask import Flask, render_template, jsonify, make_response, send_from_dire
 from flask_wtf import FlaskForm
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import os
 import json
 from functools import wraps
@@ -81,12 +82,17 @@ def load_user(user_id):
     try:
         with open('users.json') as f:
             users = json.load(f)
-            if user_id in users:
-                user_data = users[user_id]
-                return User(id=user_id, 
-                          username=user_data.get('username'),
-                          password=user_data.get('password'),
-                          email=user_data.get('email', ''))
+        if user_id in users:
+            account_data = users[user_id].get('account', {})
+            profile_data = account_data.get('profile', {})
+            
+            # For backward compatibility, check for email in profile first, then account
+            email = profile_data.get('email', account_data.get('email', ''))
+
+            return User(id=user_id, 
+                      username=account_data.get('username'),
+                      password=account_data.get('password'),
+                      email=email)
     except (FileNotFoundError, json.JSONDecodeError):
         return None
     return None
@@ -96,11 +102,12 @@ def authenticate_user(username, password):
         with open('users.json') as f:
             users = json.load(f)
         for user_id, user_data in users.items():
-            if user_data.get('username') == username and user_data.get('password') == password:
+            account_data = user_data.get('account', {})
+            if account_data.get('username') == username and account_data.get('password') == password:
                 return User(id=user_id, 
-                          username=user_data.get('username'),
-                          password=user_data.get('password'),
-                          email=user_data.get('email', ''))
+                          username=account_data.get('username'),
+                          password=account_data.get('password'),
+                          email=account_data.get('email', ''))
     except (FileNotFoundError, json.JSONDecodeError):
         return None
     return None
@@ -196,7 +203,7 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Login')
 
 # Define the scan conditions
-conditions = [
+admin_conditions = [
     {
         "name": "DeepSeek",
         "link": "https://chartink.com/screener/deepseek",
@@ -551,32 +558,32 @@ thread_started = False
 scan_results = {}
 previous_scores = {}  # Initialize previous_scores globally
 
-def load_custom_conditions():
+def load_user_conditions():
     """
-    Load custom conditions from JSON file
+    Load user conditions from JSON file
     """
     try:
-        with open('custom_conditions.json', 'r') as f:
+        with open('user_conditions.json', 'r') as f:
             data = json.load(f)
-            return data.get('custom_conditions', [])
+            return data.get('user_conditions', [])
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.warning(f"Error loading custom conditions: {e}")
-        # Create the file with empty custom conditions if it doesn't exist
+        logger.warning(f"Error loading user conditions: {e}")
+        # Create the file with empty user conditions if it doesn't exist
         if isinstance(e, FileNotFoundError):
-            with open('custom_conditions.json', 'w') as f:
-                json.dump({"custom_conditions": []}, f, indent=2)
+            with open('user_conditions.json', 'w') as f:
+                json.dump({"user_conditions": []}, f, indent=2)
         return []
 
-def save_custom_conditions(conditions_list):
+def save_user_conditions(conditions_list):
     """
-    Save custom conditions to JSON file
+    Save user conditions to JSON file
     """
     try:
-        with open('custom_conditions.json', 'w') as f:
-            json.dump({"custom_conditions": conditions_list}, f, indent=2)
+        with open('user_conditions.json', 'w') as f:
+            json.dump({"user_conditions": conditions_list}, f, indent=2)
         return True
     except Exception as e:
-        logger.error(f"Error saving custom conditions: {e}")
+        logger.error(f"Error saving user conditions: {e}")
         return False
 
 def load_settings():
@@ -587,7 +594,7 @@ def load_settings():
     default_settings = {
         "mute_status": False,
         'app_selected': 'app',
-        'conditions': [c['name'] for c in conditions],
+        'conditions': [c['name'] for c in admin_conditions],
         'refresh_interval': 120,
         'filter_stocks': True,
         'filter_threshold': 0.5,
@@ -595,16 +602,16 @@ def load_settings():
         'app': '1'
     }
     
-    # Try to add custom conditions if they exist
+    # Try to add user conditions if they exist
     try:
-        custom_conditions = load_custom_conditions()
-        if custom_conditions:
-            # Add custom condition names to default selected conditions
-            for custom_condition in custom_conditions:
-                if custom_condition['name'] not in default_settings['conditions']:
-                    default_settings['conditions'].append(custom_condition['name'])
+        user_conditions = load_user_conditions()
+        if user_conditions:
+            # Add user condition names to default selected conditions
+            for user_condition in user_conditions:
+                if user_condition['name'] not in default_settings['conditions']:
+                    default_settings['conditions'].append(user_condition['name'])
     except Exception as e:
-        logger.error(f"Error adding custom conditions to settings: {e}")
+        logger.error(f"Error adding user conditions to settings: {e}")
 
     try:
         if os.path.exists('db.json'):
@@ -764,14 +771,14 @@ def fetch_data():
             new_scan_results = {}
             with requests.Session() as session:
                 # Fetch data for built-in conditions
-                for condition in conditions:
+                for condition in admin_conditions:
                     stocks = fetch_and_process_data(session, condition)
                     if stocks:
                         new_scan_results[condition['name']] = stocks
                 
-                # Fetch data for custom conditions
-                custom_conditions = load_custom_conditions()
-                for condition in custom_conditions:
+                # Fetch data for user conditions
+                user_conditions = load_user_conditions()
+                for condition in user_conditions:
                     # Make sure the scan_clause is properly formatted for the API
                     if 'scan_clause' in condition and condition['scan_clause']:
                         # Format the scan clause properly for the API
@@ -781,7 +788,7 @@ def fetch_data():
                             # logger.info(f"Formatted scan clause for {condition['name']}: {formatted_scan_clause}")
                     
                     # Debug log before fetching
-                    # logger.info(f"Fetching data for custom condition: {condition['name']}")
+                    # logger.info(f"Fetching data for user condition: {condition['name']}")
                     # logger.info(f"Scan clause: {condition.get('scan_clause', 'No scan clause')}")
                     
                     stocks = fetch_and_process_data(session, condition)
@@ -789,12 +796,12 @@ def fetch_data():
                     # Debug log after fetching
                     if stocks:
                         if isinstance(stocks, list):
-                            # logger.info(f"Found {len(stocks)} stocks for custom condition: {condition['name']}")
+                            # logger.info(f"Found {len(stocks)} stocks for user condition: {condition['name']}")
                             new_scan_results[condition['name']] = stocks
                         else:
                             logger.error(f"Invalid stocks data for {condition['name']}: {stocks}")
                     else:
-                        # logger.info(f"No stocks found for custom condition: {condition['name']}")
+                        # logger.info(f"No stocks found for user condition: {condition['name']}")
                         # Initialize with empty list to ensure the condition appears in results
                         new_scan_results[condition['name']] = []
 
@@ -967,15 +974,15 @@ def get_scan_results():
         settings = load_settings()
         selected_conditions = settings.get('conditions', [])
         
-        # Load custom conditions
-        custom_conditions = load_custom_conditions()
+        # Load user conditions
+        user_conditions = load_user_conditions()
         
-        # Combine built-in and custom conditions
-        all_scan_conditions = conditions.copy()
-        all_scan_conditions.extend(custom_conditions)
+        # Combine built-in and user conditions
+        all_scan_conditions = admin_conditions.copy()
+        all_scan_conditions.extend(user_conditions)
         
         # logger.info(f"Selected conditions: {selected_conditions}")
-        # logger.info(f"Custom conditions: {[c['name'] for c in custom_conditions]}")
+        # logger.info(f"User conditions: {[c['name'] for c in user_conditions]}")
         
         if not selected_conditions:
             logger.warning("No conditions selected")
@@ -998,42 +1005,42 @@ def get_scan_results():
             if scan_results is None:  # Still None after fetch attempt
                 return jsonify({'error': 'Failed to fetch scan data'}), 500
         
-        # Process custom conditions if they're not already in scan_results
+        # Process user conditions if they're not already in scan_results
         with requests.Session() as session:
-            for custom_condition in custom_conditions:
+            for user_condition in user_conditions:
                 try:
-                    # Always process custom conditions regardless of selection status
-                    if custom_condition['name'] in selected_conditions:
-                        # logger.info(f"Processing custom condition: {custom_condition['name']}")
+                    # Always process user conditions regardless of selection status
+                    if user_condition['name'] in selected_conditions:
+                        # logger.info(f"Processing user condition: {user_condition['name']}")
                         pass
                     
                     # Format scan clause if needed
-                    if 'scan_clause' in custom_condition and custom_condition['scan_clause']:
-                        if not custom_condition['scan_clause'].strip().startswith('('):
+                    if 'scan_clause' in user_condition and user_condition['scan_clause']:
+                        if not user_condition['scan_clause'].strip().startswith('('):
                             # Wrap the scan clause in the required format if not already wrapped
-                            formatted_clause = f"( {{57960}} ( {custom_condition['scan_clause']} ) )"
-                            # logger.info(f"Formatted scan clause for {custom_condition['name']}: {formatted_clause}")
-                            custom_condition['scan_clause'] = formatted_clause
+                            formatted_clause = f"( {{57960}} ( {user_condition['scan_clause']} ) )"
+                            # logger.info(f"Formatted scan clause for {user_condition['name']}: {formatted_clause}")
+                            user_condition['scan_clause'] = formatted_clause
                     
-                    if custom_condition['name'] in selected_conditions:
-                        # logger.info(f"Scan clause: {custom_condition['scan_clause']}")
+                    if user_condition['name'] in selected_conditions:
+                        # logger.info(f"Scan clause: {user_condition['scan_clause']}")
                         pass
-                    data = fetch_and_process_data(session, custom_condition, selected_conditions)
+                    data = fetch_and_process_data(session, user_condition, selected_conditions)
                     
                     if isinstance(data, pd.DataFrame) and not data.empty:
                         # Add to scan_results for future use
-                        scan_results[custom_condition['name']] = data.to_dict('records')
-                        if custom_condition['name'] in selected_conditions:
-                            # logger.info(f"Found {len(data)} stocks for custom condition: {custom_condition['name']}")
+                        scan_results[user_condition['name']] = data.to_dict('records')
+                        if user_condition['name'] in selected_conditions:
+                            # logger.info(f"Found {len(data)} stocks for user condition: {user_condition['name']}")
                             pass
                     else:
                         # Initialize with empty list if no data
-                        scan_results[custom_condition['name']] = []
-                        if custom_condition['name'] in selected_conditions:
-                            # logger.info(f"No stocks found for custom condition: {custom_condition['name']}")
+                        scan_results[user_condition['name']] = []
+                        if user_condition['name'] in selected_conditions:
+                            # logger.info(f"No stocks found for user condition: {user_condition['name']}")
                             pass
                 except Exception as e:
-                    logger.error(f"Error processing custom condition {custom_condition['name']}: {e}")
+                    logger.error(f"Error processing user condition {user_condition['name']}: {e}")
         
         # Now collect all results from scan_results
         for condition_name in selected_conditions:
@@ -1079,7 +1086,7 @@ def get_default_settings():
     return {
         "mute_status": False,
         'app_selected': 'app',
-        'conditions': [c['name'] for c in conditions],
+        'conditions': [c['name'] for c in admin_conditions],
         'browser': '0',
         'app': '1'
     }
@@ -1130,33 +1137,72 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         email = request.form.get('email', '')
+        name = request.form.get('name', username)
+        phone = request.form.get('phone', '')
+        address = request.form.get('address', '')
+        
+        # New profile fields
+        premium = "yes"  # Default to "yes"
+        dob = ""  # Default to empty string
+        gender = "Prefer not to say"  # Default
+        bio = "" # Default to empty string
+        
+        # You can add more fields as needed
+        conditions = []  # Start with empty or default conditions
+        misc1 = []
+        misc2 = []
+        misc3 = []
+        misc4 = []
+        misc5 = []
+        misc6 = []
+        misc7 = []
+        misc8 = []
+        misc9 = []
+        misc10 = []
         
         if not username or not password:
             error = 'Username and password are required'
         else:
-            # First check if user exists and load users
             try:
                 with open('users.json', 'r') as f:
                     users = json.load(f)
             except (FileNotFoundError, json.JSONDecodeError):
                 users = {}
                 
-            if any(user.get('username') == username for user in users.values()):
+            if any(user.get('account', {}).get('username') == username for user in users.values()):
                 error = 'Username already exists'
             else:
-                user_id = str(len(users) + 1)
-                # Save user with plain text password
+                user_id = f"user_{len(users) + 1}"
                 users[user_id] = {
-                    'username': username,
-                    'password': password,
-                    'email': email
+                    "account": {
+                        "username": username,
+                        "password": password,
+                        "profile": {
+                            "name": name,
+                            "phone": phone,
+                            "address": address,
+                            "premium": premium,
+                            "dob": dob,
+                            "gender": gender,
+                            "photo_url": "",
+                            "bio": bio,
+                            "email": email
+                        },
+                        "conditions": conditions,
+                        "misc1": misc1,
+                        "misc2": misc2,
+                        "misc3": misc3,
+                        "misc4": misc4,
+                        "misc5": misc5,
+                        "misc6": misc6,
+                        "misc7": misc7,
+                        "misc8": misc8,
+                        "misc9": misc9,
+                        "misc10": misc10
+                    }
                 }
-                
-                # Save to file
                 with open('users.json', 'w') as f:
-                    json.dump(users, f, indent=2)
-                
-                # Create user object and log in
+                    json.dump(users, f, indent=4)
                 user = User(id=user_id, 
                           username=username, 
                           password=password,
@@ -1165,6 +1211,82 @@ def register():
                 return redirect(url_for('index'))
     
     return render_template('register.html', error=error)
+
+@app.route('/upload-photo', methods=['POST'])
+@login_required
+def upload_photo():
+    if 'photo' not in request.files:
+        flash('No file part', 'danger')
+        return redirect(url_for('dash'))
+    file = request.files['photo']
+    if file.filename == '':
+        flash('No selected file', 'danger')
+        return redirect(url_for('dash'))
+    if file:
+        filename = secure_filename(file.filename)
+        # Create a unique filename to prevent overwrites
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        unique_filename = f"user_{current_user.id}.{ext}"
+        
+        # Check for existing photo and delete it
+        try:
+            with open('users.json', 'r') as f:
+                users = json.load(f)
+            
+            profile_data = users.get(str(current_user.id), {}).get('account', {}).get('profile', {})
+            if profile_data and profile_data.get('photo_url'):
+                old_photo_url = profile_data['photo_url']
+                # Don't delete default images
+                if old_photo_url and 'default' not in old_photo_url:
+                    relative_path = old_photo_url.lstrip('/static/')
+                    old_photo_abs_path = os.path.join(app.static_folder, relative_path)
+                    if os.path.exists(old_photo_abs_path):
+                        os.remove(old_photo_abs_path)
+        except Exception as e:
+            logger.error(f"Error removing old photo: {e}")
+
+        file_path = os.path.join(app.static_folder, 'user_photos', unique_filename)
+        file.save(file_path)
+        
+        # Update user's photo_url in users.json
+        try:
+            with open('users.json', 'r') as f:
+                users = json.load(f)
+            users[str(current_user.id)]['account']['profile']['photo_url'] = f"/static/user_photos/{unique_filename}"
+            with open('users.json', 'w') as f:
+                json.dump(users, f, indent=4)
+            flash('Profile picture updated successfully!', 'success')
+        except Exception as e:
+            flash('Error updating profile picture.', 'danger')
+            logger.error(f"Error updating photo url in users.json: {e}")
+
+    return redirect(url_for('dash'))
+
+@app.route('/remove-photo', methods=['POST'])
+@login_required
+def remove_photo():
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+        
+        profile_data = users.get(str(current_user.id), {}).get('account', {}).get('profile', {})
+        if profile_data and profile_data.get('photo_url'):
+            old_photo_url = profile_data['photo_url']
+            if old_photo_url and 'default' not in old_photo_url:
+                relative_path = old_photo_url.lstrip('/static/')
+                old_photo_abs_path = os.path.join(app.static_folder, relative_path)
+                if os.path.exists(old_photo_abs_path):
+                    os.remove(old_photo_abs_path)
+            
+            users[str(current_user.id)]['account']['profile']['photo_url'] = ""
+            with open('users.json', 'w') as f:
+                json.dump(users, f, indent=4)
+            flash('Profile picture removed.', 'success')
+    except Exception as e:
+        flash('Error removing profile picture.', 'danger')
+        logger.error(f"Error removing photo: {e}")
+        
+    return redirect(url_for('dash'))
 
 @app.route('/dash', methods=['GET', 'POST'])
 @login_required
@@ -1175,13 +1297,19 @@ def dash():
     if request.method == 'POST':
         # Handle profile update
         if 'email' in request.form:
-            new_email = request.form['email']
             try:
                 with open('users.json', 'r') as f:
                     users = json.load(f)
-                users[str(current_user.id)]['email'] = new_email
+                
+                profile = users[str(current_user.id)]['account']['profile']
+                profile['email'] = request.form.get('email', profile.get('email'))
+                profile['name'] = request.form.get('name', profile.get('name'))
+                profile['dob'] = request.form.get('dob', profile.get('dob'))
+                profile['gender'] = request.form.get('gender', profile.get('gender'))
+                profile['bio'] = request.form.get('bio', profile.get('bio'))
+                
                 with open('users.json', 'w') as f:
-                    json.dump(users, f, indent=2)
+                    json.dump(users, f, indent=4)
                 success = 'Profile updated successfully!'
             except Exception as e:
                 error = 'Error updating profile'
@@ -1211,16 +1339,22 @@ def dash():
     try:
         with open('users.json') as f:
             users = json.load(f)
-            user_data = users.get(str(current_user.id), {})
+            user_data = users.get(str(current_user.id), {}).get('account', {})
+            profile_data = user_data.get('profile', {})
     except (FileNotFoundError, json.JSONDecodeError):
         user_data = {}
+        profile_data = {}
+
+    today_str = date.today().strftime('%Y-%m-%d')
     
     return render_template('dash.html', 
                          username=current_user.username,
-                         email=user_data.get('email', ''),
+                         email=profile_data.get('email', ''),
                          refresh_interval=user_data.get('refresh_interval', 120),
+                         profile=profile_data,
                          error=error,
-                         success=success)
+                         success=success,
+                         today=today_str)
 
 # Main Application Routes
 
@@ -1258,10 +1392,10 @@ def index():
     else:
         flash_message = None
     
-    # Load custom conditions and combine with built-in conditions
-    custom_conditions = load_custom_conditions()
-    all_conditions = conditions.copy()
-    all_conditions.extend(custom_conditions)
+    # Load user conditions and combine with built-in conditions
+    user_conditions = load_user_conditions()
+    all_conditions = admin_conditions.copy()
+    all_conditions.extend(user_conditions)
     
     # Categorize stocks into Buy/Sell
     buy_suggestions, sell_suggestions = categorize_stocks()
@@ -1272,19 +1406,19 @@ def index():
     # Prepare conditions with their stocks
     conditions_with_stocks = []
     
-    # First, add all custom conditions regardless of selection status
+    # First, add all user conditions regardless of selection status
     # This ensures they're always visible in the UI
-    for condition in custom_conditions:
+    for condition in user_conditions:
         # Get stocks for this condition, default to empty list
         stocks = scan_results.get(condition["name"], [])
         if condition["name"] in selected_conditions:
-            # logger.info(f"Adding custom condition {condition['name']} with {len(stocks)} stocks")
+            # logger.info(f"Adding user condition {condition['name']} with {len(stocks)} stocks")
             pass
         # Add condition with its stocks to the list
         conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": True})
     
     # Then add selected built-in conditions
-    for condition in conditions:
+    for condition in admin_conditions:
         # Check if this condition is selected
         if condition["name"] in selected_conditions:
             # Get stocks for this condition, default to empty list
@@ -1360,15 +1494,15 @@ def update_settings():
 
 @app.route('/conditions')
 def get_conditions():
-    # Combine built-in and custom conditions
-    all_conditions = conditions.copy()
+    # Combine built-in and user conditions
+    all_conditions = admin_conditions.copy()
     
-    # Add custom conditions
+    # Add user conditions
     try:
-        custom_conditions = load_custom_conditions()
-        all_conditions.extend(custom_conditions)
+        user_conditions = load_user_conditions()
+        all_conditions.extend(user_conditions)
     except Exception as e:
-        logger.error(f"Error loading custom conditions: {e}")
+        logger.error(f"Error loading user conditions: {e}")
     
     return jsonify(all_conditions)
 
@@ -1555,50 +1689,50 @@ def app3_output():
         logger.error(error_msg)
         return jsonify({'status': 'error', 'message': error_msg}), 500, {'Content-Type': 'application/json'}
 
-@app.route('/api/custom-conditions', methods=['GET'])
-def get_custom_conditions():
-    """Get all custom conditions"""
+@app.route('/api/user-conditions', methods=['GET'])
+def get_user_conditions():
+    """Get all user conditions"""
     try:
-        return jsonify(load_custom_conditions())
+        return jsonify(load_user_conditions())
     except Exception as e:
-        logger.error(f"Error getting custom conditions: {e}")
-        return jsonify({"error": "Failed to load custom conditions"}), 500
+        logger.error(f"Error getting user conditions: {e}")
+        return jsonify({"error": "Failed to load user conditions"}), 500
 
-@app.route('/api/custom-conditions', methods=['POST'])
-def add_custom_condition():
-    """Add a new custom condition"""
+@app.route('/api/user-conditions', methods=['POST'])
+def add_user_condition():
+    """Add a new user condition"""
     try:
         data = request.get_json()
         if not data or 'name' not in data or 'scan_clause' not in data:
             return jsonify({"error": "Name and scan_clause are required"}), 400
             
-        conditions = load_custom_conditions()
+        conditions = load_user_conditions()
         # Add a default link if not provided
         if 'link' not in data:
             data['link'] = "#"
         
         # Add a unique ID
-        data['id'] = f"custom_{len(conditions) + 1}"
+        data['id'] = f"user_{len(conditions) + 1}"
         conditions.append(data)
         
-        if save_custom_conditions(conditions):
+        if save_user_conditions(conditions):
             return jsonify({"message": "Condition added successfully", "id": data['id']}), 201
         else:
             return jsonify({"error": "Failed to save condition"}), 500
             
     except Exception as e:
-        logger.error(f"Error adding custom condition: {e}")
-        return jsonify({"error": "Failed to add custom condition"}), 500
+        logger.error(f"Error adding user condition: {e}")
+        return jsonify({"error": "Failed to add user condition"}), 500
 
-@app.route('/api/custom-conditions/<condition_id>', methods=['PUT'])
-def update_custom_condition(condition_id):
-    """Update an existing custom condition"""
+@app.route('/api/user-conditions/<condition_id>', methods=['PUT'])
+def update_user_condition(condition_id):
+    """Update an existing user condition"""
     try:
         data = request.get_json()
         if not data or 'name' not in data or 'scan_clause' not in data:
             return jsonify({"error": "Name and scan_clause are required"}), 400
             
-        conditions = load_custom_conditions()
+        conditions = load_user_conditions()
         condition_found = False
         
         for condition in conditions:
@@ -1612,34 +1746,34 @@ def update_custom_condition(condition_id):
         if not condition_found:
             return jsonify({"error": "Condition not found"}), 404
             
-        if save_custom_conditions(conditions):
+        if save_user_conditions(conditions):
             return jsonify({"message": "Condition updated successfully"})
         else:
             return jsonify({"error": "Failed to update condition"}), 500
             
     except Exception as e:
-        logger.error(f"Error updating custom condition: {e}")
-        return jsonify({"error": "Failed to update custom condition"}), 500
+        logger.error(f"Error updating user condition: {e}")
+        return jsonify({"error": "Failed to update user condition"}), 500
 
-@app.route('/api/custom-conditions/<condition_id>', methods=['DELETE'])
-def delete_custom_condition(condition_id):
-    """Delete a custom condition"""
+@app.route('/api/user-conditions/<condition_id>', methods=['DELETE'])
+def delete_user_condition(condition_id):
+    """Delete a user condition"""
     try:
-        conditions = load_custom_conditions()
+        conditions = load_user_conditions()
         initial_count = len(conditions)
         conditions = [c for c in conditions if c.get('id') != condition_id]
         
         if len(conditions) == initial_count:
             return jsonify({"error": "Condition not found"}), 404
             
-        if save_custom_conditions(conditions):
+        if save_user_conditions(conditions):
             return jsonify({"message": "Condition deleted successfully"})
         else:
             return jsonify({"error": "Failed to delete condition"}), 500
             
     except Exception as e:
-        logger.error(f"Error deleting custom condition: {e}")
-        return jsonify({"error": "Failed to delete custom condition"}), 500
+        logger.error(f"Error deleting user condition: {e}")
+        return jsonify({"error": "Failed to delete user condition"}), 500
 
 if __name__ == '__main__':
     def start_threads_once():
