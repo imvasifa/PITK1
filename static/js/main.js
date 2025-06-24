@@ -308,4 +308,10 @@ window.deleteUserCondition = async function(id) {
 };
 
 document.getElementById('userConditionsModal').addEventListener('shown.bs.modal', loadUserConditions);
-// --- End User Conditions Modal CRUD logic --- 
+// --- End User Conditions Modal CRUD logic ---
+
+// Show Admin Conditions Modal
+window.showConditionsModal = function() {
+    const modal = new bootstrap.Modal(document.getElementById('conditionsModal'));
+    modal.show();
+}; 

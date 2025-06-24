@@ -206,6 +206,7 @@ class LoginForm(FlaskForm):
 admin_conditions = [
     {
         "name": "DeepSeek",
+        "type": "admin",
         "link": "https://chartink.com/screener/deepseek",
         "scan_clause": """( {57960} ( 
             latest close > latest ema( latest close , 9 ) and 
@@ -220,6 +221,7 @@ admin_conditions = [
     },
     {
         "name": "KHAIZER",
+        "type": "admin",
         "link": "https://chartink.com/screener/copy-khizir",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:78d1fc5151e3a3d90e6ae7786f63cca8&timeframe=daily&symbol=", 
         "scan_clause": """( {57960} ( 
@@ -243,6 +245,7 @@ admin_conditions = [
     },
     {
         "name": "CROSSED",
+        "type": "admin",
         "link": "https://chartink.com/screener/crossed-92141",
         "scan_clause": """( {57960} ( 
             latest open > latest ema( latest close , 21 ) and 
@@ -255,6 +258,7 @@ admin_conditions = [
     },
     {
         "name": "15 MIN Breakout",
+        "type": "admin",
         "link": "https://chartink.com/screener/copy-15-minute-stock-breakouts-34515559",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:d54b5e1d428ff9fd372e94622da24fa7&timeframe=15_minute&symbol=", 
         "scan_clause": """( {57960} ( 
@@ -269,6 +273,7 @@ admin_conditions = [
     },
     {
         "name": "STRONG STOCKS POSITIVE",
+        "type": "admin",
         "link": "https://chartink.com/screener/copy-strong-stocks-22395",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7302638654ee1d6e47747b50291acf65&timeframe=daily&symbol=", 
         "scan_clause": """( {57960} ( 

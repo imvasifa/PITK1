@@ -2,11 +2,7 @@
     "mute_status": false,
     "app_selected": "app",
     "conditions": [
-        "Deep Seek Volume & Range Break \u2705",
-        "VOLUME SHOCKER \u2705",
-        "85 VOLUME SHOCK \u2705",
-        "Only Cash \u2705",
-        "DEEP High Momentum \u2705"
+        "STRONG STOCKS POSITIVE"
     ],
     "condition_urls": {
         "KHAIZER": {
