@@ -1338,36 +1338,7 @@
         </div>
     </div>
 
-    <!-- User Conditions Modal -->
-    <div class="modal fade" id="userConditionsModal" tabindex="-1" aria-labelledby="userConditionsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="userConditionsModalLabel">Manage Your Custom Conditions</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="user-conditions-list-view">
-                        <button class="btn btn-success mb-3" id="show-add-condition-form-btn">
-                            <i class="fas fa-plus"></i> Add New Condition
-                        </button>
-                        <div id="user-conditions-list-container" class="list-group"></div>
-                    </div>
-                    <div id="user-condition-form-view" style="display: none;">
-                        <h5 id="user-condition-form-title">Add New Condition</h5>
-                        <form id="user-condition-form">
-                            <input type="hidden" id="edit-condition-id">
-                            <div class="mb-3"><label for="user-condition-name" class="form-label">Condition Name</label><input type="text" class="form-control" id="user-condition-name" required></div>
-                            <div class="mb-3"><label for="user-condition-link" class="form-label">Chartink Link (Optional)</label><input type="url" class="form-control" id="user-condition-link"></div>
-                            <div class="mb-3"><label for="user-condition-clause" class="form-label">Scan Clause</label><textarea class="form-control" id="user-condition-clause" rows="8" required></textarea></div>
-                            <button type="submit" class="btn btn-primary">Save Condition</button>
-                            <button type="button" class="btn btn-secondary" id="cancel-edit-condition-btn">Cancel</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Nifty Indices Modal -->
     <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
@@ -1406,8 +1377,9 @@
             </span>
         </div>
         <div class="navbar-buttons">
-            <button class="conditions-btn" onclick="showConditionsModal()">
-                <i class="fas fa-list-check"></i> Conditions
+            <!-- Admin Conditions Button -->
+            <button class="btn admin-conditions-btn" id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()">
+                <i class="fas fa-list-check"></i>
             </button>
             <button class="settings-btn" onclick="showSettingsModal()">
                 <i class="fas fa-cog"></i>
@@ -1418,12 +1390,8 @@
             <button class="nifty-btn" onclick="showNiftyModal()">
                 <i class="fas fa-chart-bar"></i>
             </button>
-            <!-- Converter Button -->
-            <button class="btn converter-btn" id="converterButton" title="Open Converter" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #00bcd4, #2196f3); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem;">
-                <i class="fas fa-exchange-alt"></i>
-            </button>
-            <!-- Custom Conditions Button -->
-            <button class="btn custom-conditions-btn" id="customConditionsButton" title="Manage Custom Conditions" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff9800, #ff5722); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem; position: relative; overflow: hidden; z-index: 1;" onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 5px rgba(0,0,0,0.2)';" onmousedown="this.style.transform='scale(0.95)';" onmouseup="this.style.transform='scale(1.1)';" onclick="showCustomConditionsModal()">
+            <!-- User Conditions Button -->
+            <button class="btn user-conditions-btn" id="userConditionsButton" title="User Conditions" onclick="showUserConditionsModal()">
                 <i class="fas fa-list-check"></i>
             </button>
             <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme" style="background: none; border: none; color: var(--text-dark); font-size: 1.2rem; cursor: pointer; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='rgba(0,0,0,0.1)'" onmouseout="this.style.backgroundColor='transparent'">
@@ -1479,7 +1447,7 @@
             <div class="user-menu" style="display: inline-block; margin-left: 15px; position: relative;">
                 <div style="position: relative; display: inline-block;">
                     <!-- Status indicator circle -->
-                    <div style="position: absolute; top: -2px; right: -2px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; z-index: 1; background-color: {% if user_data and user_data.account.profile.premium == 'yes' %}#4CAF50{% else %}#FF9800{% endif %};"></div>
+                    <div style="position: absolute; top: -2px; right: -2px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; z-index: 1; background-color: {% if user_data and user_data.account.profile.premium == 'yes' %}#4CAF50{% else %}#FF9800{% endif %}"></div>
                     <!-- Profile picture button -->
                     <button id="userMenuButton" style="background: #1a73e8; border: none; border-radius: 50%; width: 40px; height: 40px; color: white; cursor: pointer; font-weight: bold; font-size: 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0; position: relative;" title="{{ current_user.username }}">
                         {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
@@ -1490,7 +1458,7 @@
                             <img src="{{ url_for('static', filename='user_photos/' ~ default_image) }}" 
                                  alt="{{ 'Premium' if is_premium else 'Free' }} User" 
                                  style="width: 100%; height: 100%; object-fit: cover;"
-                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'"
+                                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';"
                             >
                         {% endif %}
                     </button>
@@ -1956,28 +1924,44 @@
 
 <!-- User Conditions Modal -->
 <div class="modal fade" id="userConditionsModal" tabindex="-1" aria-labelledby="userConditionsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="userConditionsModalLabel">Manage Your Custom Conditions</h5>
+                <h5 class="modal-title">My Custom Conditions</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
+            </div>
             <div class="modal-body">
+                <!-- List View -->
                 <div id="user-conditions-list-view">
-                    <button class="btn btn-success mb-3" id="show-add-condition-form-btn">
+                    <button class="btn btn-primary mb-3" id="show-add-condition-form-btn">
                         <i class="fas fa-plus"></i> Add New Condition
-                            </button>
-                    <div id="user-conditions-list-container" class="list-group"></div>
-                        </div>
+                    </button>
+                    <div id="user-conditions-list-container" class="list-group">
+                        <!-- Conditions will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Form View (initially hidden) -->
                 <div id="user-condition-form-view" style="display: none;">
-                    <h5 id="user-condition-form-title">Add New Condition</h5>
+                    <h5>Add New Condition</h5>
                     <form id="user-condition-form">
                         <input type="hidden" id="edit-condition-id">
-                        <div class="mb-3"><label for="user-condition-name" class="form-label">Condition Name</label><input type="text" class="form-control" id="user-condition-name" required></div>
-                        <div class="mb-3"><label for="user-condition-link" class="form-label">Chartink Link (Optional)</label><input type="url" class="form-control" id="user-condition-link"></div>
-                        <div class="mb-3"><label for="user-condition-clause" class="form-label">Scan Clause</label><textarea class="form-control" id="user-condition-clause" rows="8" required></textarea></div>
-                        <button type="submit" class="btn btn-primary">Save Condition</button>
-                        <button type="button" class="btn btn-secondary" id="cancel-edit-condition-btn">Cancel</button>
+                        <div class="mb-3">
+                            <label for="user-condition-name" class="form-label">Condition Name</label>
+                            <input type="text" class="form-control" id="user-condition-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="user-condition-link" class="form-label">Chartink Link (Optional)</label>
+                            <input type="url" class="form-control" id="user-condition-link">
+                        </div>
+                        <div class="mb-3">
+                            <label for="user-condition-clause" class="form-label">Scan Clause</label>
+                            <textarea class="form-control" id="user-condition-clause" rows="5" required></textarea>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">Save Condition</button>
+                            <button type="button" class="btn btn-secondary" id="cancel-edit-condition-btn">Cancel</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -2042,4 +2026,9 @@
         </div>
     </div>
 </div>
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/user-conditions.js') }}"></script>
+{% endblock %}
+
 {% endblock %}
