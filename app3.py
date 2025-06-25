@@ -53,6 +53,22 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+def get_user_data(user_id):
+    """Get user data by user_id"""
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+            return users.get(str(user_id))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+# Add get_user_data to template context
+@app.context_processor
+def utility_processor():
+    def get_user_data_processor(user_id):
+        return get_user_data(user_id)
+    return dict(get_user_data=get_user_data_processor)
+
 # User class
 class User(UserMixin):
     def __init__(self, id, username, password, email=''):
