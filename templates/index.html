@@ -1474,9 +1474,6 @@
                     });
                 });
             </script>
-            <button class="theme-toggle-btn" id="muteButton" title="Mute Sound">
-                <i class="fas fa-volume-mute" id="muteIcon"></i>
-            </button>
             {% if current_user.is_authenticated %}
             {% set user_data = get_user_data(current_user.id) %}
             <div class="user-menu" style="display: inline-block; margin-left: 15px; position: relative;">
