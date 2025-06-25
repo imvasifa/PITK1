@@ -1426,9 +1426,54 @@
             <button class="btn custom-conditions-btn" id="customConditionsButton" title="Manage Custom Conditions" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff9800, #ff5722); color: white; border: none; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s ease; font-size: 1.2rem; position: relative; overflow: hidden; z-index: 1;" onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 5px rgba(0,0,0,0.2)';" onmousedown="this.style.transform='scale(0.95)';" onmouseup="this.style.transform='scale(1.1)';" onclick="showCustomConditionsModal()">
                 <i class="fas fa-list-check"></i>
             </button>
-            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme" style="background: none; border: none; color: var(--text-dark); font-size: 1.2rem; cursor: pointer; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='rgba(0,0,0,0.1)'" onmouseout="this.style.backgroundColor='transparent'">
                 <i class="fas fa-moon" id="themeToggleIcon"></i>
             </button>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const themeToggleBtn = document.getElementById('themeToggleBtn');
+                    const themeIcon = document.getElementById('themeToggleIcon');
+                    
+                    // Check for saved theme preference or use preferred color scheme
+                    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+                    const currentTheme = localStorage.getItem('theme');
+                    
+                    // Set theme based on saved preference or system preference
+                    if (currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches)) {
+                        document.body.classList.add('dark-theme');
+                        themeIcon.classList.remove('fa-moon');
+                        themeIcon.classList.add('fa-sun');
+                    }
+                    
+                    // Toggle theme on button click
+                    themeToggleBtn.addEventListener('click', function() {
+                        document.body.classList.toggle('dark-theme');
+                        
+                        // Toggle icon
+                        themeIcon.classList.toggle('fa-moon');
+                        themeIcon.classList.toggle('fa-sun');
+                        
+                        // Save theme preference
+                        const isDark = document.body.classList.contains('dark-theme');
+                        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                    });
+                    
+                    // Listen for system theme changes
+                    prefersDarkScheme.addListener((e) => {
+                        if (!localStorage.getItem('theme')) {  // Only auto-update if no manual preference set
+                            if (e.matches) {
+                                document.body.classList.add('dark-theme');
+                                themeIcon.classList.remove('fa-moon');
+                                themeIcon.classList.add('fa-sun');
+                            } else {
+                                document.body.classList.remove('dark-theme');
+                                themeIcon.classList.remove('fa-sun');
+                                themeIcon.classList.add('fa-moon');
+                            }
+                        }
+                    });
+                });
+            </script>
             <button class="theme-toggle-btn" id="muteButton" title="Mute Sound">
                 <i class="fas fa-volume-mute" id="muteIcon"></i>
             </button>
