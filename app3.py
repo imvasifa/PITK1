@@ -594,7 +594,7 @@ def load_user_conditions():
             with open('user_conditions.json', 'w') as f:
                 json.dump({"user_conditions": []}, f, indent=2)
         return []
-
+#
 def save_user_conditions(conditions_list):
     """
     Save user conditions to JSON file
@@ -1714,10 +1714,14 @@ def app3_output():
 def get_user_conditions():
     """Get all user conditions"""
     try:
-        return jsonify(load_user_conditions())
+        # Load user conditions and ensure we return them in a consistent format
+        conditions = load_user_conditions()
+        logger.info(f"Loaded {len(conditions) if conditions else 0} user conditions")
+        # Return as a list of conditions directly (frontend handles both array and {user_conditions: [...]} formats)
+        return jsonify(conditions)
     except Exception as e:
-        logger.error(f"Error getting user conditions: {e}")
-        return jsonify({"error": "Failed to load user conditions"}), 500
+        logger.error(f"Error getting user conditions: {str(e)}", exc_info=True)
+        return jsonify({"error": "Failed to load user conditions", "details": str(e)}), 500
 
 @app.route('/api/user-conditions', methods=['POST'])
 def add_user_condition():

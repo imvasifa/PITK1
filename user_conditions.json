@@ -5,6 +5,12 @@
       "link": "",
       "scan_clause": "( {cash} ( latest close >= 50 and latest close < 2250 and latest volume > latest sma ( latest volume , 5 ) * 2.5 and latest volume > 1 day ago volume * 1.2 and latest volume > latest sma ( latest volume , 20 ) * 2 and latest close > latest open and latest high - latest low > latest sma ( latest high - latest low , 5 ) * 1.5 and latest close > latest ema ( latest close , 20 ) and latest close > latest max ( 20 , latest vwap ) and [=1] 5 minute close < [=1] 5 minute open * 1.03 ) ) ",
       "id": "user_1"
+    },
+    {
+      "name": "Rahim DS modified",
+      "link": "",
+      "scan_clause": "( {cash} ( latest close >= 50 and latest close < 2250 and latest volume > latest sma ( latest volume , 5 ) * 2.5 and latest volume > 1 day ago volume * 1.2 and latest volume > latest sma ( latest volume , 20 ) * 2 and latest close > latest open and latest high - latest low > latest sma ( latest high - latest low , 5 ) * 1.5 and latest close > latest ema ( latest close , 20 ) and latest close > latest max ( 20 , latest vwap ) and [=1] 5 minute close < [=1] 5 minute open * 1.03 ) ) ",
+      "id": "user_2"
     }
   ]
 }
