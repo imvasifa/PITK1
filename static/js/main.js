@@ -223,7 +223,22 @@ function createCard(condition, stocks) {
 
 // Initial load
 console.log("main.js loaded. Setting up DOMContentLoaded listener.");
-document.addEventListener('DOMContentLoaded', updateDashboard);
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial dashboard load
+    updateDashboard();
+    
+    // Setup refresh button with cache-busting
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            console.log('Manual refresh triggered');
+            // Add timestamp to bypass cache
+            const timestamp = new Date().getTime();
+            // Force reload the page with cache-busting
+            window.location.href = window.location.pathname + '?t=' + timestamp;
+        });
+    }
+});
 
 // User Conditions Modal logic (restored)
 const userConditionsModal = new bootstrap.Modal(document.getElementById('userConditionsModal'));

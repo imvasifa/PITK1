@@ -1,6 +1,8 @@
 import atexit
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import json
+import base64
+from postgres_db import db
 import logging
 import math
 import os
@@ -20,8 +22,10 @@ from bs4 import BeautifulSoup as bs
 import pandas as pd
 import pygame
 import requests
+import psycopg2
 from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app
 from flask_wtf import FlaskForm
+from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -46,7 +50,24 @@ beep_running = True  # Control the beep thread
 
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
-app.secret_key = 'your-secret-key-here'  # Change this to a secure secret key
+
+# Generate a secure secret key if not exists, or use environment variable
+import os
+app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
+
+# Configure session to be permanent and set timeout
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour in seconds
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Configure Flask-Login
+app.config['REMEMBER_COOKIE_DURATION'] = 3600  # 1 hour in seconds
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+
+# Initialize Bcrypt
+bcrypt = Bcrypt(app)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -54,12 +75,17 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 def get_user_data(user_id):
-    """Get user data by user_id"""
+    """Get user data by user_id from PostgreSQL"""
     try:
-        with open('users.json', 'r') as f:
-            users = json.load(f)
-            return users.get(str(user_id))
-    except (FileNotFoundError, json.JSONDecodeError):
+        cur = db.get_cursor()
+        cur.execute("""
+            SELECT user_data FROM users 
+            WHERE id = %s
+        """, (user_id,))
+        result = cur.fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error getting user data: {e}")
         return None
 
 # Add get_user_data to template context
@@ -76,79 +102,185 @@ class User(UserMixin):
         self.username = username
         self.password = password
         self.email = email
+        self._user_data = None
 
     def get_id(self):
         return str(self.id)
+        
+    @property
+    def user_data(self):
+        if self._user_data is None:
+            self._user_data = get_user_data(self.id)
+        return self._user_data
 
 def get_user(user_id):
     try:
-        with open('users.json') as f:
-            users = json.load(f)
-            if user_id in users:
-                return User(id=user_id, 
-                          username=users[user_id]['username'],
-                          password=users[user_id].get('password', ''),  
-                          email=users[user_id].get('email', ''))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+        cur = db.get_cursor()
+        cur.execute("""
+            SELECT id, user_data->'account'->>'username' as username,
+                   user_data->'account'->>'password' as password,
+                   COALESCE(user_data->'account'->'profile'->>'email', 
+                           user_data->'account'->>'email', '') as email
+            FROM users 
+            WHERE id = %s
+        """, (user_id,))
+        user_data = cur.fetchone()
+        if user_data:
+            return User(id=user_data[0], 
+                      username=user_data[1],
+                      password=user_data[2],
+                      email=user_data[3])
+    except Exception as e:
+        print(f"Error getting user: {e}")
     return None
 
 @login_manager.user_loader
 def load_user(user_id):
     try:
-        with open('users.json') as f:
-            users = json.load(f)
-        if user_id in users:
-            account_data = users[user_id].get('account', {})
-            profile_data = account_data.get('profile', {})
+        # Convert user_id to integer if it's a string and numeric
+        try:
+            user_id_int = int(user_id) if isinstance(user_id, str) and user_id.isdigit() else user_id
+        except (ValueError, AttributeError):
+            user_id_int = user_id
             
-            # For backward compatibility, check for email in profile first, then account
-            email = profile_data.get('email', account_data.get('email', ''))
-
-            return User(id=user_id, 
-                      username=account_data.get('username'),
-                      password=account_data.get('password'),
-                      email=email)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+        cur = db.get_cursor()
+        # Execute query
+        cur.execute("""
+            SELECT id, 
+                   user_data->'account'->>'username' as username,
+                   user_data->'account'->>'password' as password,
+                   COALESCE(user_data->'account'->'profile'->>'email', 
+                           user_data->'account'->>'email', '') as email
+            FROM users 
+            WHERE id = %s
+        """, (user_id_int,))
+        
+        # Convert to dictionary
+        columns = [desc[0] for desc in cur.description] if cur.description else []
+        user_data = dict(zip(columns, cur.fetchone())) if cur.rowcount > 0 else None
+        
+        if user_data:
+            print(f"🔍 Loaded user data: {user_data}")
+            return User(id=user_data['id'],
+                      username=user_data['username'],
+                      password=user_data['password'],
+                      email=user_data['email'])
+    except Exception as e:
+        print(f"Error loading user: {e}")
     return None
 
 def authenticate_user(username, password):
     try:
-        with open('users.json') as f:
-            users = json.load(f)
-        for user_id, user_data in users.items():
-            account_data = user_data.get('account', {})
-            if account_data.get('username') == username and account_data.get('password') == password:
-                return User(id=user_id, 
-                          username=account_data.get('username'),
-                          password=account_data.get('password'),
-                          email=account_data.get('email', ''))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+        print(f"🔍 Attempting to authenticate user: {username}")
+        cur = db.get_cursor()
+        
+        # First, let's check if the user exists
+        cur.execute("""
+            SELECT id, 
+                   user_data->'account'->>'username' as username,
+                   user_data->'account'->>'password' as password_hash,
+                   COALESCE(user_data->'account'->'profile'->>'email', 
+                           user_data->'account'->>'email', '') as email
+            FROM users 
+            WHERE user_data->'account'->>'username' = %s
+        """, (username,))
+        user_data = cur.fetchone()
+        
+        if not user_data:
+            print(f"❌ User '{username}' not found in database")
+            return None
+            
+        # Convert to dictionary if it's not already
+        if not isinstance(user_data, dict):
+            columns = [desc[0] for desc in cur.description]
+            user_data = dict(zip(columns, user_data))
+            
+        print(f"✅ Found user: {user_data['username']} (ID: {user_data['id']})")
+        print(f"🔑 Password hash: {user_data['password_hash'][:20]}...")
+        
+        # Check if this is an admin user (IDs 1, 2, 3) with plain text password
+        is_admin_user = user_data['id'] in [1, 2, 3]
+        
+        if is_admin_user:
+            # For admin users, check plain text password
+            print(f"🔑 Admin user ID: {user_data['id']}, Username: {user_data['username']}")
+            print(f"🔑 Expected password: {password}")
+            print(f"🔑 Stored password: {user_data['password_hash']}")
+            password_matches = (user_data['password_hash'] == password)
+            print(f"🔑 Admin user - Plain text password check: {password_matches}")
+        else:
+            # For regular users, check bcrypt hash
+            if not user_data['password_hash']:
+                print("❌ No password hash found for user")
+                return None
+            password_matches = bcrypt.check_password_hash(user_data['password_hash'], password)
+            print(f"🔑 Password check result: {password_matches}")
+        
+        if password_matches:
+            print(f"✅ Authentication successful for user: {username}")
+            return User(id=user_data['id'],
+                      username=user_data['username'],
+                      password=user_data['password_hash'],
+                      email=user_data['email'])
+        else:
+            print("❌ Password does not match")
+            return None
+            
+    except Exception as e:
+        import traceback
+        print(f"❌ Error authenticating user: {str(e)}")
+        print("Stack trace:")
+        traceback.print_exc()
     return None
 
 def save_user(username, password, email=''):
     try:
-        with open('users.json', 'r') as f:
-            users = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        users = {}
+        # Check if username already exists
+        cur = db.get_cursor()
+        cur.execute("""
+            SELECT id FROM users 
+            WHERE user_data->'account'->>'username' = %s
+        """, (username,))
+        if cur.fetchone():
+            print(f"❌ Username '{username}' already exists")
+            return None
+            
+        # Hash the password
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        print(f"🔑 Generated password hash for new user: {hashed_password[:20]}...")
         
-    if any(u.get('username') == username for u in users.values()):
+        # Create new user data structure
+        user_data = {
+            'account': {
+                'username': username,
+                'password': hashed_password,
+                'email': email,
+                'profile': {
+                    'name': username,
+                    'email': email,
+                    'premium': 'no',
+                    'gender': 'Prefer not to say'
+                },
+                'conditions': []
+            }
+        }
+        
+        # Insert new user
+        cur.execute("""
+            INSERT INTO users (username, user_data)
+            VALUES (%s, %s)
+            RETURNING id
+        """, (username, json.dumps(user_data)))
+        
+        user_id = cur.fetchone()[0]
+        db.conn.commit()
+        return str(user_id)
+        
+    except Exception as e:
+        print(f"Error saving user: {e}")
+        if 'db' in locals() and hasattr(db, 'conn'):
+            db.conn.rollback()
         return None
-        
-    user_id = str(len(users) + 1)
-    users[user_id] = {
-        'username': username,
-        'password': password,
-        'email': email
-    }
-    
-    with open('users.json', 'w') as f:
-        json.dump(users, f, indent=2)
-    
-    return user_id
 
 # Initialize pygame mixer with error handling
 try:
@@ -1217,21 +1349,51 @@ def serve_static(filename):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    print("\n=== Login Attempt ===")
+    print(f"Current user authenticated: {current_user.is_authenticated}")
+    
     if current_user.is_authenticated:
+        print("User already authenticated, redirecting to index")
         return redirect(url_for('index'))
     
     error = None
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        remember = True if request.form.get('remember') else False
+        
+        print(f"Login attempt for user: {username}")
+        print(f"Remember me: {remember}")
         
         user = authenticate_user(username, password)
         if user:
-            login_user(user)
+            print(f"Authentication successful for user: {username}")
+            # Set session as permanent
+            session.permanent = True
+            # Login the user
+            login_user(user, remember=remember)
+            print(f"User logged in. User ID: {user.id}, Username: {user.username}")
+            
+            # Get the next page or default to index
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+            if not next_page or not next_page.startswith('/'):
+                next_page = url_for('index')
+                
+            print(f"Redirecting to: {next_page}")
+            response = redirect(next_page)
+            
+            # Set secure cookie flags if using HTTPS
+            if app.config['SESSION_COOKIE_SECURE']:
+                response.set_cookie(
+                    'session',
+                    secure=True,
+                    httponly=True,
+                    samesite='Lax'
+                )
+            return response
         else:
             error = 'Invalid username or password'
+            print(f"Login failed for user: {username}")
     
     return render_template('login.html', error=error)
 
@@ -1277,52 +1439,94 @@ def register():
         if not username or not password:
             error = 'Username and password are required'
         else:
-            try:
-                with open('users.json', 'r') as f:
-                    users = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
-                users = {}
-                
-            if any(user.get('account', {}).get('username') == username for user in users.values()):
-                error = 'Username already exists'
-            else:
-                user_id = f"user_{len(users) + 1}"
-                users[user_id] = {
-                    "account": {
-                        "username": username,
-                        "password": password,
-                        "profile": {
-                            "name": name,
-                            "phone": phone,
-                            "address": address,
-                            "premium": premium,
-                            "dob": dob,
-                            "gender": gender,
-                            "photo_url": "",
-                            "bio": bio,
-                            "email": email
-                        },
-                        "conditions": conditions,
-                        "misc1": misc1,
-                        "misc2": misc2,
-                        "misc3": misc3,
-                        "misc4": misc4,
-                        "misc5": misc5,
-                        "misc6": misc6,
-                        "misc7": misc7,
-                        "misc8": misc8,
-                        "misc9": misc9,
-                        "misc10": misc10
-                    }
+            # Create user data structure
+            user_data = {
+                'account': {
+                    'username': username,
+                    'password': password,
+                    'email': email,
+                    'profile': {
+                        'name': name or username,
+                        'phone': phone,
+                        'address': address,
+                        'premium': premium,
+                        'dob': dob,
+                        'gender': gender,
+                        'bio': bio,
+                        'photo_url': ''
+                    },
+                    'conditions': [],
+                    'misc1': [],
+                    'misc2': [],
+                    'misc3': [],
+                    'misc4': [],
+                    'misc5': [],
+                    'misc6': [],
+                    'misc7': [],
+                    'misc8': [],
+                    'misc9': [],
+                    'misc10': []
                 }
-                with open('users.json', 'w') as f:
-                    json.dump(users, f, indent=4)
-                user = User(id=user_id, 
-                          username=username, 
-                          password=password,
-                          email=email)
-                login_user(user)
-                return redirect(url_for('index'))
+            }
+            
+            # Get a new cursor for this transaction
+            conn = db.conn
+            cur = None
+            try:
+                # Start a new transaction
+                conn = psycopg2.connect(
+                    dbname="pitk",
+                    user="pitk_user",
+                    password="N63uWAQkpdSDg8SFvoggKxCDw5OY1aPx",
+                    host="dpg-d1efmamuk2gs73allkt0-a.singapore-postgres.render.com",
+                    port="5432"
+                )
+                conn.autocommit = False
+                cur = conn.cursor()
+                
+                # Check if username already exists
+                cur.execute("""
+                    SELECT id FROM users 
+                    WHERE user_data->'account'->>'username' = %s
+                """, (username,))
+                
+                if cur.fetchone():
+                    error = 'Username already exists'
+                else:
+                    # Hash the password before storing
+                    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+                    
+                    # Update user_data with hashed password
+                    user_data['account']['password'] = hashed_password
+                    
+                    # Insert new user into PostgreSQL with hashed password
+                    cur.execute("""
+                        INSERT INTO users (username, password_hash, user_data)
+                        VALUES (%s, %s, %s)
+                        RETURNING id
+                    """, (username, hashed_password, json.dumps(user_data)))
+                    
+                    # Get the user ID and commit the transaction
+                    user_id = cur.fetchone()[0]
+                    conn.commit()
+                    
+                    # Log the user in with the hashed password
+                    user = User(id=str(user_id), username=username, password=hashed_password, email=email)
+                    login_user(user)
+                    return redirect(url_for('index'))
+                
+            except Exception as e:
+                if 'conn' in locals() and conn is not None:
+                    conn.rollback()
+                error = 'Error creating user. Please try again.'
+                print(f"Registration error: {str(e)}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                if 'cur' in locals() and cur is not None:
+                    cur.close()
+                if 'conn' in locals() and conn is not None and conn.closed == 0:
+                    conn.close()
     
     return render_template('register.html', error=error)
 
@@ -1344,12 +1548,17 @@ def upload_photo():
         
         # Check for existing photo and delete it
         try:
-            with open('users.json', 'r') as f:
-                users = json.load(f)
+            # Get current user's photo URL
+            cur = db.get_cursor()
+            cur.execute("""
+                SELECT user_data->'account'->'profile'->>'photo_url' 
+                FROM users 
+                WHERE id = %s
+            """, (current_user.id,))
+            result = cur.fetchone()
             
-            profile_data = users.get(str(current_user.id), {}).get('account', {}).get('profile', {})
-            if profile_data and profile_data.get('photo_url'):
-                old_photo_url = profile_data['photo_url']
+            if result and result[0]:
+                old_photo_url = result[0]
                 # Don't delete default images
                 if old_photo_url and 'default' not in old_photo_url:
                     relative_path = old_photo_url.lstrip('/static/')
@@ -1469,6 +1678,16 @@ def dash():
                          error=error,
                          success=success,
                          today=today_str)
+
+# Test Endpoint
+@app.route('/test')
+def test():
+    """Simple test endpoint to verify the server is working"""
+    return jsonify({
+        'status': 'success',
+        'message': 'Server is running!',
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }), 200
 
 # Main Application Routes
 

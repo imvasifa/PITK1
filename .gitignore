@@ -3,30 +3,101 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-env/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Virtual Environment
 venv/
 ENV/
-.Python
-cards.json
+env/
+.venv/
+
+# MongoDB
+data/
+*.ns
+*.0
+*.1
+*.2
+*.3
+*.4
+*.5
+*.6
+*.7
+*.8
+*.9
+*.lock
+*.log
+*.sock
+*.pid
+
+# Database files
+*.db
+*.sqlite3
+*.sqlite
 
 # Flask
 instance/
 .webassets-cache
 
 # React/Node
+node_modules/
 frontend/node_modules/
 frontend/build/
 frontend/.env
 
-# OS
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# VSCode/IDE
+# IDE
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
-node_modules/
-frontend/node_modules/
-frontend/build/
+# Project specific
+cards.json
+users.json
+db.json
+mongo.txt
+
+# Local development
+local_settings.py

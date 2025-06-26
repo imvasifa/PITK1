@@ -1,0 +1,8 @@
+external
+
+postgresql://pitk_user:N63uWAQkpdSDg8SFvoggKxCDw5OY1aPx@dpg-d1efmamuk2gs73allkt0-a.singapore-postgres.render.com/pitk
+
+render psql dpg-d1efmamuk2gs73allkt0-a
+
+internal
+postgresql://pitk_user:N63uWAQkpdSDg8SFvoggKxCDw5OY1aPx@dpg-d1efmamuk2gs73allkt0-a/pitk
