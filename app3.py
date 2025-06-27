@@ -1002,13 +1002,84 @@ def load_user_conditions(user_id=None):
 
 def save_user_conditions(user_id, conditions_list):
     """
-    Save user conditions to the user's account in users.json
-    Uses the UserManager for safe, atomic operations
+    Save user conditions to the database for the specified user.
+    
+    Args:
+        user_id: The ID of the user
+        conditions_list: List of conditions to save
+        
+    Returns:
+        bool: True if save was successful, False otherwise
     """
+    logger.info(f"Starting save_user_conditions for user_id: {user_id}")
+    
+    if not user_id:
+        logger.error("No user_id provided to save_user_conditions")
+        return False
+        
+    if not isinstance(conditions_list, list):
+        logger.error(f"Invalid conditions_list type: {type(conditions_list)}")
+        return False
+    
     try:
-        return user_manager.save_user_conditions(user_id, conditions_list)
+        # Convert user_id to integer
+        try:
+            user_id_int = int(user_id)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid user_id format: {user_id}", exc_info=True)
+            return False
+            
+        # Get database connection
+        conn = db.get_connection()
+        if not conn:
+            logger.error("Failed to get database connection")
+            return False
+            
+        try:
+            # Start a new transaction
+            with conn.cursor() as cur:
+                # Update user's conditions in the database
+                query = """
+                    UPDATE users 
+                    SET user_data = jsonb_set(
+                        COALESCE(user_data, '{}'::jsonb),
+                        '{account,conditions}'::text[],
+                        %s::jsonb,
+                        true
+                    )
+                    WHERE id = %s
+                    RETURNING id;
+                """
+                
+                # Convert conditions to JSON string
+                try:
+                    conditions_json = json.dumps(conditions_list, ensure_ascii=False)
+                except (TypeError, ValueError) as e:
+                    logger.error(f"Error encoding conditions to JSON: {e}", exc_info=True)
+                    return False
+                
+                # Execute the update
+                cur.execute(query, (conditions_json, user_id_int))
+                
+                # Check if update was successful
+                if cur.rowcount == 0:
+                    logger.error(f"No user found with ID: {user_id_int}")
+                    return False
+                    
+                # Commit the transaction
+                conn.commit()
+                logger.info(f"Successfully saved {len(conditions_list)} conditions for user {user_id_int}")
+                return True
+                
+        except Exception as e:
+            # Rollback on error
+            if conn:
+                conn.rollback()
+            logger.error(f"Database error in save_user_conditions: {e}", exc_info=True)
+            return False
+            
     except Exception as e:
-        logger.error(f"Error saving user conditions: {e}", exc_info=True)
+        logger.error(f"Unexpected error in save_user_conditions: {e}", exc_info=True)
         return False
 
 def clean_duplicate_users():
