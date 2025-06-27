@@ -894,8 +894,6 @@ thread_started = False
 scan_results = {}
 previous_scores = {}  # Initialize previous_scores globally
 
-from user_manager import user_manager
-
 # Global variable to store conditions cache
 _conditions_cache = {
     'all_users': None,
@@ -908,6 +906,41 @@ def load_user_conditions(user_id=None):
     Returns list of conditions for the specified user
     """
     global _conditions_cache
+    
+    # If no user_id provided, return admin conditions
+    if user_id is None:
+        return admin_conditions
+        
+    try:
+        # Try to get from cache first
+        if user_id in _conditions_cache['users']:
+            return _conditions_cache['users'][user_id]
+            
+        # Query the database for user's conditions
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return []
+            
+        query = """
+            SELECT user_data->'conditions' as conditions 
+            FROM users 
+            WHERE id = %s
+        """
+        
+        cur.execute(query, (user_id,))
+        result = cur.fetchone()
+        
+        if not result or not result[0]:
+            return []
+            
+        # Cache the result
+        _conditions_cache['users'][user_id] = result[0]
+        return result[0]
+        
+    except Exception as e:
+        logger.error(f"Error loading conditions for user {user_id}: {e}")
+        return []
     
     # Skip loading during app initialization (before first request)
     from flask import has_request_context
@@ -1083,91 +1116,88 @@ def save_user_conditions(user_id, conditions_list):
         return False
 
 def clean_duplicate_users():
-    """Clean up any duplicate user entries in users.json"""
-    try:
-        if not os.path.exists('users.json'):
-            return
-            
-        with open('users.json', 'r', encoding='utf-8') as f:
-            users_data = json.load(f)
-        
-        # Find and remove any duplicate user entries (keeping the one with the most data)
-        clean_data = {}
-        for key, value in users_data.items():
-            if not key.startswith('user_'):
-                continue
-                
-            user_num = key.replace('user_', '')
-            if user_num.isdigit():
-                clean_key = f'user_{user_num}'
-                if clean_key not in clean_data:
-                    clean_data[clean_key] = value
-                else:
-                    # Keep the one with more data (simple heuristic: more keys in account)
-                    if isinstance(clean_data[clean_key], dict) and isinstance(clean_data[clean_key].get('account', {}), dict):
-                        if len(str(value.get('account', {}))) > len(str(clean_data[clean_key].get('account', {}))):
-                            clean_data[clean_key] = value
-        
-        # Only write back if we made changes
-        if clean_data != users_data:
-            with open('users.json', 'w', encoding='utf-8') as f:
-                json.dump(clean_data, f, indent=2, ensure_ascii=False, sort_keys=True)
-                
-    except Exception as e:
-        logger.error(f"Error cleaning duplicate users: {e}", exc_info=True)
+    """
+    Clean up any duplicate user entries in the database.
+    This function is kept for backward compatibility but is now a no-op
+    since duplicate handling is now managed by database constraints.
+    """
+    logger.info("clean_duplicate_users() is a no-op in PostgreSQL version")
         
         return True
         
     except Exception as e:
-        logger.error(f"Error saving user conditions: {e}", exc_info=True)
-        return False
 
 def load_settings():
     """
-    Load settings from JSON file
+    Load settings from the database
     """
-    # Create default settings with built-in conditions
     default_settings = {
-        "mute_status": False,
-        'app_selected': 'app',
-        'conditions': [c['name'] for c in admin_conditions],
-        'refresh_interval': 120,
-        'filter_stocks': True,
-        'filter_threshold': 0.5,
-        'browser': '0',
-        'app': '1'
+        'refresh_interval': 20,  # Default to 20 seconds
+        'mute_status': False,
+        'selected_conditions': [],
+        'user_conditions': [],
+        'auto_refresh': True,
+        'theme': 'light',
+        'notifications': True,
+        'sound_alert': True,
+        'volume': 0.5,
+        'last_update': None,
+        'version': '1.0.0'
     }
     
-    # Try to add user conditions if they exist
     try:
-        user_conditions = load_user_conditions()
-        if user_conditions:
-            # Add user condition names to default selected conditions
-            for user_condition in user_conditions:
-                if user_condition['name'] not in default_settings['conditions']:
-                    default_settings['conditions'].append(user_condition['name'])
-    except Exception as e:
-        logger.error(f"Error adding user conditions to settings: {e}")
-
-    try:
-        if os.path.exists('db.json'):
-            with open('db.json', 'r') as f:
-                settings = json.load(f)
-                return settings
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return default_settings
+            
+        # Try to get settings from the database
+        cur.execute("""
+            SELECT settings FROM app_settings 
+            WHERE id = 1  -- Using a single row for settings
+        """)
+        
+        result = cur.fetchone()
+        if result and result[0]:
+            settings = result[0]
+            # Ensure all default settings are present
+            for key, value in default_settings.items():
+                if key not in settings:
+                    settings[key] = value
+            return settings
+            
+        return default_settings
+        
     except Exception as e:
         logger.error(f"Error loading settings: {e}")
-    
-    return default_settings
+        return default_settings
 
 def save_settings(settings):
     """
-    Save settings to JSON file
+    Save settings to the database
     """
     try:
-        with open('db.json', 'w') as f:
-            json.dump(settings, f, indent=4)
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return False
+            
+        # Upsert settings into the database
+        cur.execute("""
+            INSERT INTO app_settings (id, settings)
+            VALUES (1, %s)
+            ON CONFLICT (id) 
+            DO UPDATE SET settings = EXCLUDED.settings
+        """, (json.dumps(settings),))
+        
+        db.conn.commit()
+        return True
+        
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
+        if db.conn:
+            db.conn.rollback()
+        return False
 
 # Load existing settings on startup
 # Load settings and ensure mute_status is properly set
@@ -1828,48 +1858,59 @@ def upload_photo():
     if file.filename == '':
         flash('No selected file', 'danger')
         return redirect(url_for('dash'))
+    
     if file:
-        filename = secure_filename(file.filename)
-        # Create a unique filename to prevent overwrites
-        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
-        unique_filename = f"user_{current_user.id}.{ext}"
-        
-        # Check for existing photo and delete it
         try:
-            # Get current user's photo URL
-            cur = db.get_cursor()
-            cur.execute("""
-                SELECT user_data->'account'->'profile'->>'photo_url' 
-                FROM users 
-                WHERE id = %s
-            """, (current_user.id,))
-            result = cur.fetchone()
+            # Create uploads directory if it doesn't exist
+            upload_folder = os.path.join(app.static_folder, 'uploads')
+            os.makedirs(upload_folder, exist_ok=True)
             
-            if result and result[0]:
-                old_photo_url = result[0]
-                # Don't delete default images
-                if old_photo_url and 'default' not in old_photo_url:
-                    relative_path = old_photo_url.lstrip('/static/')
-                    old_photo_abs_path = os.path.join(app.static_folder, relative_path)
-                    if os.path.exists(old_photo_abs_path):
-                        os.remove(old_photo_abs_path)
+            # Generate a secure filename
+            filename = secure_filename(file.filename)
+            unique_filename = f"{uuid.uuid4()}_{filename}"
+            filepath = os.path.join(upload_folder, unique_filename)
+            
+            # Save the file
+            file.save(filepath)
+            
+            # Update the database with the relative path
+            relative_path = f"/static/uploads/{unique_filename}"
+            cur = db.get_cursor()
+            if not cur:
+                flash('Database connection error', 'danger')
+                return redirect(url_for('dash'))
+            
+            # Update the user's photo path in the database
+            query = """
+                UPDATE users 
+                SET user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,profile,photo_path}',
+                    %s::jsonb
+                )
+                WHERE id = %s
+                RETURNING id
+            """
+            
+            cur.execute(query, (json.dumps(relative_path), current_user.id))
+            
+            if cur.rowcount == 0:
+                flash('User not found', 'danger')
+            else:
+                db.conn.commit()
+                flash('Profile picture updated successfully!', 'success')
+                
         except Exception as e:
-            logger.error(f"Error removing old photo: {e}")
-
-        file_path = os.path.join(app.static_folder, 'user_photos', unique_filename)
-        file.save(file_path)
-        
-        # Update user's photo_url in users.json
-        try:
-            with open('users.json', 'r') as f:
-                users = json.load(f)
-            users[str(current_user.id)]['account']['profile']['photo_url'] = f"/static/user_photos/{unique_filename}"
-            with open('users.json', 'w') as f:
-                json.dump(users, f, indent=4)
-            flash('Profile picture updated successfully!', 'success')
-        except Exception as e:
+            if db.conn:
+                db.conn.rollback()
+            # Clean up the file if there was an error
+            if 'filepath' in locals() and os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up file after error: {cleanup_error}")
             flash('Error updating profile picture.', 'danger')
-            logger.error(f"Error updating photo url in users.json: {e}")
+            logger.error(f"Error updating photo: {e}")
 
     return redirect(url_for('dash'))
 
@@ -1877,26 +1918,59 @@ def upload_photo():
 @login_required
 def remove_photo():
     try:
-        with open('users.json', 'r') as f:
-            users = json.load(f)
+        cur = db.get_cursor()
+        if not cur:
+            flash('Database connection error', 'danger')
+            return redirect(url_for('dash'))
         
-        profile_data = users.get(str(current_user.id), {}).get('account', {}).get('profile', {})
-        if profile_data and profile_data.get('photo_url'):
-            old_photo_url = profile_data['photo_url']
-            if old_photo_url and 'default' not in old_photo_url:
-                relative_path = old_photo_url.lstrip('/static/')
-                old_photo_abs_path = os.path.join(app.static_folder, relative_path)
-                if os.path.exists(old_photo_abs_path):
-                    os.remove(old_photo_abs_path)
+        # First, get the current photo path to delete the file
+        get_photo_query = """
+            SELECT user_data->'account'->'profile'->>'photo_path' as photo_path
+            FROM users 
+            WHERE id = %s
+        """
+        
+        cur.execute(get_photo_query, (current_user.id,))
+        result = cur.fetchone()
+        
+        if result and result[0]:
+            photo_path = result[0].lstrip('/')  # Remove leading slash for os.path
             
-            users[str(current_user.id)]['account']['profile']['photo_url'] = ""
-            with open('users.json', 'w') as f:
-                json.dump(users, f, indent=4)
-            flash('Profile picture removed.', 'success')
-    except Exception as e:
-        flash('Error removing profile picture.', 'danger')
-        logger.error(f"Error removing photo: {e}")
+            # Delete the photo file if it exists
+            if os.path.exists(photo_path):
+                try:
+                    os.remove(photo_path)
+                except Exception as e:
+                    logger.error(f"Error removing photo file: {e}")
         
+        # Remove the photo data from the database
+        update_query = """
+            WITH updated AS (
+                SELECT id, user_data #- '{account,profile,photo_path}'::text[] as new_data
+                FROM users
+                WHERE id = %s
+            )
+            UPDATE users u
+            SET user_data = updated.new_data
+            FROM updated
+            WHERE u.id = updated.id
+            RETURNING u.id
+        """
+        
+        cur.execute(update_query, (current_user.id,))
+        
+        if cur.rowcount > 0:
+            db.conn.commit()
+            flash('Profile picture removed successfully!', 'success')
+        else:
+            flash('No profile picture found to remove.', 'info')
+            
+    except Exception as e:
+        if db.conn:
+            db.conn.rollback()
+        flash('Error removing profile picture.', 'danger')
+        logger.error(f"Error in remove_photo: {e}")
+    
     return redirect(url_for('dash'))
 
 @app.route('/dash', methods=['GET', 'POST'])
@@ -1916,43 +1990,83 @@ def dash():
                 profile['email'] = request.form.get('email', profile.get('email'))
                 profile['name'] = request.form.get('name', profile.get('name'))
                 profile['dob'] = request.form.get('dob', profile.get('dob'))
-                profile['gender'] = request.form.get('gender', profile.get('gender'))
-                profile['bio'] = request.form.get('bio', profile.get('bio'))
-                
-                with open('users.json', 'w') as f:
-                    json.dump(users, f, indent=4)
-                success = 'Profile updated successfully!'
             except Exception as e:
-                error = 'Error updating profile'
-                print(f"Error updating profile: {e}")
+                logger.error(f"Error updating profile: {e}")
         
         # Handle password change
         elif 'current_password' in request.form and 'new_password' in request.form:
             current_password = request.form['current_password']
             new_password = request.form['new_password']
             try:
-                with open('users.json', 'r') as f:
-                    users = json.load(f)
+                # Get the current user ID
+                user_id = current_user.id
                 
-                user_data = users[str(current_user.id)]
-                if user_data.get('password') == current_password:  # Direct comparison for plain text
-                    users[str(current_user.id)]['password'] = new_password  # Store new password in plain text
-                    with open('users.json', 'w') as f:
-                        json.dump(users, f, indent=2)
+                # Update the user's password in the database
+                try:
+                    cur = db.get_cursor()
+                    if not cur:
+                        return jsonify({'error': 'Database connection error'}), 500
+                    
+                    # Hash the new password before storing
+                    hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+                    
+                    # Update the user's password in the database
+                    query = """
+                        UPDATE users 
+                        SET password_hash = %s
+                        WHERE id = %s
+                        RETURNING id
+                    """
+                    
+                    cur.execute(query, (hashed_password, user_id))
+                    
+                    if cur.rowcount == 0:
+                        return jsonify({'error': 'User not found'}), 404
+                    
+                    db.conn.commit()
                     success = 'Password updated successfully!'
-                else:
-                    error = 'Current password is incorrect'
+                except Exception as e:
+                    logger.error(f"Database error updating user password: {e}")
+                    if db.conn:
+                        db.conn.rollback()
+                    error = 'Error changing password'
             except Exception as e:
-                error = 'Error changing password'
-                print(f"Error changing password: {e}")
+                logger.error(f"Error changing password: {e}")
     
     # Load current user data
     try:
-        with open('users.json') as f:
-            users = json.load(f)
-            user_data = users.get(str(current_user.id), {}).get('account', {})
-            profile_data = user_data.get('profile', {})
-    except (FileNotFoundError, json.JSONDecodeError):
+        # Get the current user ID
+        user_id = current_user.id
+        
+        # Get the user's data from the database
+        try:
+            cur = db.get_cursor()
+            if not cur:
+                return jsonify({'error': 'Database connection error'}), 500
+            
+            # Get the user's data from the database
+            query = """
+                SELECT user_data 
+                FROM users 
+                WHERE id = %s
+            """
+            
+            cur.execute(query, (user_id,))
+            
+            user_data = cur.fetchone()
+            
+            if not user_data:
+                return jsonify({'error': 'User not found'}), 404
+            
+            user_data = user_data[0]
+            profile_data = user_data.get('account', {}).get('profile', {})
+        except Exception as e:
+            logger.error(f"Database error getting user data: {e}")
+            user_data = {}
+            profile_data = {}
+    
+    except Exception as e:
+        logger.error(f"Error getting user data: {e}")
         user_data = {}
         profile_data = {}
 
