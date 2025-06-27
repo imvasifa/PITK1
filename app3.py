@@ -896,15 +896,32 @@ previous_scores = {}  # Initialize previous_scores globally
 
 from user_manager import user_manager
 
+# Global variable to store conditions cache
+_conditions_cache = {
+    'all_users': None,
+    'users': {}
+}
+
 def load_user_conditions(user_id=None):
     """
     Load user conditions from the PostgreSQL database
     Returns list of conditions for the specified user
     """
+    global _conditions_cache
+    
+    # Skip loading during app initialization (before first request)
+    from flask import has_request_context
+    if not has_request_context() and not _conditions_cache['all_users']:
+        return []
+        
     try:
         print(f"🔍 [DEBUG] load_user_conditions called with user_id: {user_id}")
         
         if user_id is None:
+            # Check cache first
+            if _conditions_cache['all_users'] is not None:
+                return _conditions_cache['all_users']
+                
             # This is a special case - get all conditions from all users
             print("⚠️ [DEBUG] No user_id provided, fetching all conditions from all users")
             all_conditions = []
@@ -920,6 +937,8 @@ def load_user_conditions(user_id=None):
                     if row['conditions']:
                         all_conditions.extend(row['conditions'])
                 
+                # Update cache
+                _conditions_cache['all_users'] = all_conditions
                 print(f"🔍 [DEBUG] Total conditions found across all users: {len(all_conditions)}")
                 return all_conditions
                 

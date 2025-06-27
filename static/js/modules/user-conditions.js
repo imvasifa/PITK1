@@ -245,8 +245,13 @@ export class UserConditions {
         const link = document.getElementById('user-condition-link').value.trim();
         const scanClause = document.getElementById('user-condition-clause').value.trim();
         
-        if (!name || !scanClause) {
-            alert('Condition name and scan clause are required');
+        if (!name) {
+            alert('Condition name is required');
+            return;
+        }
+        
+        if (!scanClause) {
+            alert('Scan clause is required');
             return;
         }
         
