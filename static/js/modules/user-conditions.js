@@ -68,8 +68,12 @@ export class UserConditions {
     }
 
     async loadConditions() {
-        if (!this.container) return;
+        if (!this.container) {
+            console.warn('Container not found, cannot load conditions');
+            return;
+        }
 
+        console.log('🔍 Loading user conditions...');
         const timestamp = new Date().toLocaleTimeString();
         this.showLoading(timestamp);
 
@@ -83,18 +87,35 @@ export class UserConditions {
         document.addEventListener('keydown', handleEscKey);
 
         try {
+            console.log('🔍 Fetching user conditions from /api/user-conditions');
             const response = await fetch('/api/user-conditions');
             document.removeEventListener('keydown', handleEscKey);
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('❌ Server error response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
             }
 
             const data = await response.json();
-            const conditions = Array.isArray(data) ? data : (data.user_conditions || []);
+            console.log('📦 Received data:', data);
+            
+            // Handle both array and object with user_conditions property
+            let conditions = [];
+            if (Array.isArray(data)) {
+                conditions = data;
+            } else if (data && data.user_conditions) {
+                conditions = data.user_conditions;
+            } else if (data && data.status === 'success' && data.user_conditions) {
+                conditions = data.user_conditions;
+            } else if (data && data.status === 'success' && Array.isArray(data)) {
+                conditions = data;
+            }
+            
+            console.log(`✅ Loaded ${conditions.length} conditions`);
             this.renderConditions(conditions);
         } catch (error) {
-            console.error('Error loading conditions:', error);
+            console.error('❌ Error loading conditions:', error);
             this.showError(`Failed to load conditions: ${error.message}`);
         }
     }

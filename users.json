@@ -1,1 +1,17 @@
-{}
+{
+  "user_1": {
+    "account": {
+      "conditions": [
+        {
+          "id": "user_condition_1",
+          "name": "Test Condition",
+          "link": "",
+          "scan_clause": "( {cash} ( [0] 5 minute high = latest high and [0] 5 minute close > 20 and [0] 5 minute close < 2250 ) )"
+        }
+      ],
+      "username": "1",
+      "password": "",
+      "profile": {}
+    }
+  }
+}

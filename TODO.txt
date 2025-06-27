@@ -46,3 +46,26 @@
    - Implement proper transaction error recovery
    - Add proper error logging for failed queries
    - Test with different user roles
+
+8. add chnage password functionality   
+9.Logging Cleanup for Production
+Replace all print(...) debug statements with logging.debug(...) for clean logs.
+
+Use Python’s logging module:
+
+python
+Copy
+Edit
+import logging
+
+logging.basicConfig(level=logging.INFO)  # or DEBUG during development
+logging.debug("Your debug message here")
+Use logging.info(...) for important but non-critical flow points.
+
+Use logging.error(...) for errors instead of print("Error: ...").
+
+Helps keep logs clean, structured, and easier to turn off in production.
+
+Retain traceability without flooding logs unnecessarily.
+
+10.

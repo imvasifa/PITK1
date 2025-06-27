@@ -1,3 +1,12 @@
+// Import UserConditions module
+import { UserConditions } from './modules/user-conditions.js';
+
+// Initialize UserConditions
+let userConditions = null;
+document.addEventListener('DOMContentLoaded', () => {
+    userConditions = new UserConditions();
+});
+
 // Functions to manage the Conditions Modal
 async function populateAdminConditions() {
     const container = document.getElementById('admin-conditions-list');
@@ -39,41 +48,16 @@ async function populateAdminConditions() {
     }
 }
 
+// Keep the populateUserConditions function for backward compatibility
 async function populateUserConditions() {
-    const container = document.getElementById('user-conditions-list-container');
-    if (!container) return;
-    container.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-    try {
-        const response = await fetch('/api/user-conditions');
-        let data = await response.json();
-        // Support both array and {user_conditions: [...]} formats
-        const conditions = Array.isArray(data) ? data : (data.user_conditions || []);
-        container.innerHTML = '';
-        if (!conditions.length) {
-            container.innerHTML = '<div class="text-muted text-center p-3">No custom conditions yet. Add one to get started!</div>';
-            return;
+    if (userConditions) {
+        userConditions.loadConditions();
+    } else {
+        console.warn('UserConditions module not initialized yet');
+        const container = document.getElementById('user-conditions-list-container');
+        if (container) {
+            container.innerHTML = '<div class="alert alert-warning">Loading user conditions...</div>';
         }
-        conditions.forEach(condition => {
-            const div = document.createElement('div');
-            div.className = 'list-group-item d-flex justify-content-between align-items-center';
-            div.innerHTML = `
-                <div>
-                    <h6 class="mb-1">${condition.name}</h6>
-                    <small class="text-muted">${condition.scan_clause.substring(0, 100)}${condition.scan_clause.length > 100 ? '...' : ''}</small>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-primary" onclick='editUserCondition(${JSON.stringify(condition).replace(/"/g, "&quot;")})'>
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick='deleteUserCondition("${condition.id}")'>
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-    } catch (err) {
-        container.innerHTML = '<div class="text-danger">Failed to load conditions.</div>';
     }
 }
 
@@ -367,7 +351,15 @@ window.showConditionsModal = function() {
     modal.show();
 };
 
-document.getElementById('user-conditions-tab').addEventListener('click', populateUserConditions);
+// Initialize UserConditions when the tab is clicked
+document.getElementById('user-conditions-tab').addEventListener('click', function() {
+    if (window.userConditions) {
+        window.userConditions.loadConditions();
+    } else {
+        console.warn('UserConditions module not initialized');
+        populateUserConditions(); // Fallback to old method
+    }
+});
 
 // Attach event listeners for user conditions form actions
 

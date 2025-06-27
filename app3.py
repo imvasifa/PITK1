@@ -206,11 +206,6 @@ def load_user(user_id):
         return None
     
     print(f"🔍 [load_user] Loading user with ID: {user_id} (type: {type(user_id)})")
-    
-    # For hardcoded admin users, return a mock user
-    if user_id == '1':
-        print("✅ [load_user] Loading hardcoded admin user")
-        return User(id=1, username='admin', password='', email='admin@example.com')
         
     try:
         # Try to convert to integer for database query
@@ -268,12 +263,15 @@ def load_user(user_id):
             
         except Exception as query_error:
             print(f"❌ [load_user] Database query failed: {query_error}")
+            import traceback
+            traceback.print_exc()
             return None
             
     except Exception as e:
         print(f"❌ [load_user] Unexpected error: {e}")
         import traceback
         traceback.print_exc()
+        return None
         return None
 
 # Hardcoded admin credentials for development (REMOVE IN PRODUCTION)
@@ -900,28 +898,87 @@ from user_manager import user_manager
 
 def load_user_conditions(user_id=None):
     """
-    Load user conditions from the user's account in users.json
+    Load user conditions from the PostgreSQL database
     Returns list of conditions for the specified user
     """
     try:
+        print(f"🔍 [DEBUG] load_user_conditions called with user_id: {user_id}")
+        
         if user_id is None:
             # This is a special case - get all conditions from all users
-            # Note: This might not be what you want in production
+            print("⚠️ [DEBUG] No user_id provided, fetching all conditions from all users")
             all_conditions = []
-            # We'll need to load the data directly since user_manager doesn't support this
-            if os.path.exists('users.json'):
-                with open('users.json', 'r', encoding='utf-8') as f:
-                    users_data = json.load(f)
-                for user_data in users_data.values():
-                    if 'account' in user_data and 'conditions' in user_data['account']:
-                        all_conditions.extend(user_data['account']['conditions'])
-            return all_conditions
-            
-        # Get conditions for specific user using UserManager
-        return user_manager.get_user_conditions(user_id)
+            try:
+                cur = db.get_cursor()
+                cur.execute("""
+                    SELECT user_data->'account'->'conditions' as conditions 
+                    FROM users 
+                    WHERE user_data->'account'->'conditions' IS NOT NULL
+                """)
+                
+                for row in cur.fetchall():
+                    if row['conditions']:
+                        all_conditions.extend(row['conditions'])
+                
+                print(f"🔍 [DEBUG] Total conditions found across all users: {len(all_conditions)}")
+                return all_conditions
+                
+            except Exception as e:
+                error_msg = f"Error fetching all user conditions: {e}"
+                logger.error(error_msg, exc_info=True)
+                print(f"❌ [DEBUG] {error_msg}")
+                return []
         
+        # Get conditions for specific user
+        print(f"🔍 [DEBUG] Getting conditions for user_id: {user_id} from PostgreSQL")
+        try:
+            cur = db.get_cursor()
+            
+            # First, let's see what the user data actually looks like
+            cur.execute("""
+                SELECT user_data, id, username 
+                FROM users 
+                WHERE id = %s
+            """, (user_id,))
+            
+            result = cur.fetchone()
+            if not result:
+                print(f"🔍 [DEBUG] No user found with id {user_id}")
+                return []
+                
+            print(f"🔍 [DEBUG] Raw user data for {result['username']} (ID: {result['id']}): {result['user_data']}")
+            
+            # Now try to get conditions from the expected path
+            cur.execute("""
+                SELECT user_data->'account'->'conditions' as conditions 
+                FROM users 
+                WHERE id = %s
+            """, (user_id,))
+            
+            result = cur.fetchone()
+            if not result or not result['conditions']:
+                print(f"🔍 [DEBUG] No conditions found in the expected path for user {user_id}")
+                return []
+                
+            conditions = result['conditions']
+            print(f"🔍 [DEBUG] Found {len(conditions)} conditions for user {user_id}")
+            if conditions:
+                print(f"🔍 [DEBUG] First condition: {conditions[0]}")
+            return conditions
+            
+        except Exception as e:
+            error_msg = f"Error fetching conditions for user {user_id}: {e}"
+            logger.error(error_msg, exc_info=True)
+            print(f"❌ [DEBUG] {error_msg}")
+            return []
+            
     except Exception as e:
-        logger.error(f"Error loading user conditions: {e}", exc_info=True)
+        error_msg = f"Unexpected error in load_user_conditions: {e}"
+        logger.error(error_msg, exc_info=True)
+        print(f"❌ [DEBUG] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return []
         return []
 
 def save_user_conditions(user_id, conditions_list):
@@ -2168,11 +2225,29 @@ def app3_output():
 def get_user_conditions():
     """Get all user conditions for the current user"""
     try:
+        print(f"🔍 [DEBUG] Getting conditions for user: {current_user.id} ({current_user.username})")
         # Load conditions for the current user
         conditions = load_user_conditions(current_user.id)
-        return jsonify(conditions)
+        print(f"🔍 [DEBUG] Found {len(conditions)} conditions for user {current_user.id}")
+        if conditions:
+            print("🔍 [DEBUG] First condition:", conditions[0])
+        else:
+            print("ℹ️ [DEBUG] No conditions found for user")
+        return jsonify({
+            'status': 'success',
+            'user_conditions': conditions,
+            'count': len(conditions)
+        })
     except Exception as e:
-        logger.error(f"Error getting user conditions: {e}")
+        error_msg = f"Error getting user conditions: {str(e)}"
+        logger.error(error_msg)
+        print(f"❌ [ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': error_msg
+        }), 500
         return jsonify({"error": "Failed to load user conditions"}), 500
 
 @app.route('/api/user-conditions', methods=['POST'])

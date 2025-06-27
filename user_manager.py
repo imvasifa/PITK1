@@ -69,12 +69,33 @@ class UserManager:
     
     def get_user_conditions(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all conditions for a user."""
-        user_key = self._get_canonical_user_key(user_id)
-        data = self._load_data()
-        
-        user_data = data.get(user_key, {})
-        account = user_data.get('account', {})
-        return account.get('conditions', [])
+        try:
+            print(f"🔍 [DEBUG][UserManager] Getting conditions for user_id: {user_id}")
+            user_key = self._get_canonical_user_key(user_id)
+            print(f"🔍 [DEBUG][UserManager] Canonical user key: {user_key}")
+            
+            data = self._load_data()
+            print(f"🔍 [DEBUG][UserManager] Loaded data. Keys in data: {list(data.keys())}")
+            
+            user_data = data.get(user_key, {})
+            print(f"🔍 [DEBUG][UserManager] User data: {user_data}")
+            
+            account = user_data.get('account', {})
+            print(f"🔍 [DEBUG][UserManager] Account data: {account}")
+            
+            conditions = account.get('conditions', [])
+            print(f"🔍 [DEBUG][UserManager] Found {len(conditions)} conditions for user {user_id}")
+            if conditions:
+                print(f"🔍 [DEBUG][UserManager] First condition: {conditions[0]}")
+                
+            return conditions
+            
+        except Exception as e:
+            error_msg = f"[UserManager] Error in get_user_conditions: {str(e)}"
+            print(f"❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return []
     
     def save_user_conditions(self, user_id: str, conditions: List[Dict[str, Any]]) -> bool:
         """Save conditions for a user."""
