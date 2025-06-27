@@ -75,17 +75,63 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 def get_user_data(user_id):
-    """Get user data by user_id from PostgreSQL"""
+    """
+    Fetch user data from the database by user ID.
+    
+    Args:
+        user_id: The ID of the user to fetch data for
+        
+    Returns:
+        dict: User data if found, None otherwise
+    """
+    if not user_id:
+        print("❌ [get_user_data] No user_id provided")
+        return None
+        
     try:
+        # Convert user_id to integer
+        try:
+            user_id_int = int(user_id)
+            print(f"🔍 [get_user_data] Fetching data for user ID: {user_id_int} (type: {type(user_id_int)})")
+        except (ValueError, TypeError) as e:
+            print(f"❌ [get_user_data] Invalid user_id format: {user_id} (type: {type(user_id)})")
+            return None
+            
+        # Get database cursor
         cur = db.get_cursor()
-        cur.execute("""
-            SELECT user_data FROM users 
-            WHERE id = %s
-        """, (user_id,))
-        result = cur.fetchone()
-        return result[0] if result else None
+        if not cur:
+            print("❌ [get_user_data] Failed to get database cursor")
+            return None
+            
+        try:
+            # Execute query to get user data
+            cur.execute("""
+                SELECT user_data 
+                FROM users 
+                WHERE id = %s
+            """, (user_id_int,))
+            
+            # Fetch the result (using RealDictCursor)
+            result = cur.fetchone()
+            
+            # Check if we got a result and it has the user_data field
+            if result and 'user_data' in result and result['user_data']:
+                print(f"✅ [get_user_data] Successfully fetched data for user ID: {user_id_int}")
+                return result['user_data']
+            else:
+                print(f"❌ [get_user_data] No data found for user ID: {user_id_int}")
+                return None
+                
+        except Exception as query_error:
+            print(f"❌ [get_user_data] Database query failed: {query_error}")
+            import traceback
+            traceback.print_exc()
+            return None
+            
     except Exception as e:
-        print(f"Error getting user data: {e}")
+        print(f"❌ [get_user_data] Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 # Add get_user_data to template context
@@ -95,23 +141,37 @@ def utility_processor():
         return get_user_data(user_id)
     return dict(get_user_data=get_user_data_processor)
 
-# User class
+# User class with proper type handling
 class User(UserMixin):
     def __init__(self, id, username, password, email=''):
-        self.id = id
+        # Store ID as string to avoid conversion issues
+        try:
+            self.id = int(id) if id is not None and str(id).strip() not in ['', 'id'] else None
+        except (ValueError, TypeError, AttributeError):
+            print(f"⚠️ Warning: Invalid ID format: {id} (type: {type(id)}), using None")
+            self.id = None
+            
         self.username = username
         self.password = password
         self.email = email
         self._user_data = None
+        
+        # Debug logging
+        print(f"🔍 Created User - ID: {self.id} (type: {type(self.id)}), Username: {self.username}")
 
     def get_id(self):
-        return str(self.id)
+        # Return string representation as required by Flask-Login
+        return str(self.id) if self.id is not None else None
         
     @property
     def user_data(self):
-        if self._user_data is None:
-            self._user_data = get_user_data(self.id)
-        return self._user_data
+        if self._user_data is None and self.id is not None:
+            try:
+                self._user_data = get_user_data(self.id)
+            except Exception as e:
+                print(f"❌ Error loading user data: {e}")
+                self._user_data = {}
+        return self._user_data or {}
 
 def get_user(user_id):
     try:
@@ -136,42 +196,104 @@ def get_user(user_id):
 
 @login_manager.user_loader
 def load_user(user_id):
+    """Load user by ID. This is called by Flask-Login to get the user object.
+    
+    Args:
+        user_id: The user ID from the session (should be a string as per Flask-Login)
+    """
+    if not user_id:
+        print("❌ [load_user] No user_id provided")
+        return None
+    
+    print(f"🔍 [load_user] Loading user with ID: {user_id} (type: {type(user_id)})")
+    
+    # For hardcoded admin users, return a mock user
+    if user_id == '1':
+        print("✅ [load_user] Loading hardcoded admin user")
+        return User(id=1, username='admin', password='', email='admin@example.com')
+        
     try:
-        # Convert user_id to integer if it's a string and numeric
+        # Try to convert to integer for database query
         try:
-            user_id_int = int(user_id) if isinstance(user_id, str) and user_id.isdigit() else user_id
-        except (ValueError, AttributeError):
-            user_id_int = user_id
+            user_id_int = int(user_id)
+        except (ValueError, TypeError):
+            print(f"❌ [load_user] Invalid user_id format: {user_id}")
+            return None
             
+        # Get database cursor
         cur = db.get_cursor()
-        # Execute query
-        cur.execute("""
-            SELECT id, 
-                   user_data->'account'->>'username' as username,
-                   user_data->'account'->>'password' as password,
-                   COALESCE(user_data->'account'->'profile'->>'email', 
-                           user_data->'account'->>'email', '') as email
-            FROM users 
-            WHERE id = %s
-        """, (user_id_int,))
-        
-        # Convert to dictionary
-        columns = [desc[0] for desc in cur.description] if cur.description else []
-        user_data = dict(zip(columns, cur.fetchone())) if cur.rowcount > 0 else None
-        
-        if user_data:
-            print(f"🔍 Loaded user data: {user_data}")
-            return User(id=user_data['id'],
-                      username=user_data['username'],
-                      password=user_data['password'],
-                      email=user_data['email'])
+        if not cur:
+            print("❌ [load_user] Failed to get database cursor")
+            return None
+            
+        try:
+            # Query user data with explicit column selection
+            cur.execute("""
+                SELECT 
+                    id::text as id,
+                    user_data->'account'->>'username' as username,
+                    user_data->'account'->>'password' as password,
+                    COALESCE(
+                        user_data->'account'->'profile'->>'email', 
+                        user_data->'account'->>'email', 
+                        ''
+                    ) as email
+                FROM users 
+                WHERE id = %s
+            """, (user_id_int,))
+            
+            # Get column names and convert to dictionary
+            columns = [desc[0] for desc in cur.description] if cur.description else []
+            row = cur.fetchone()
+            
+            if not row:
+                print(f"❌ [load_user] No user found with ID: {user_id_int}")
+                return None
+                
+            user_data = dict(zip(columns, row))
+            print(f"✅ [load_user] Successfully loaded user: {user_data.get('username')} (ID: {user_data.get('id')})")
+            
+            # Ensure all required fields exist
+            if not all(k in user_data for k in ['id', 'username', 'password']):
+                print(f"❌ [load_user] Missing required user data fields: {user_data}")
+                return None
+                
+            # Create and return user object
+            return User(
+                id=user_data['id'],
+                username=user_data['username'],
+                password=user_data['password'],
+                email=user_data.get('email', '')
+            )
+            
+        except Exception as query_error:
+            print(f"❌ [load_user] Database query failed: {query_error}")
+            return None
+            
     except Exception as e:
-        print(f"Error loading user: {e}")
-    return None
+        print(f"❌ [load_user] Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+# Hardcoded admin credentials for development (REMOVE IN PRODUCTION)
+HARDCODED_ADMINS = {
+    'imjjrobo': 'ccc',
+    'indianplans': 'ccc',
+    'rahi': 'ccc'
+}
 
 def authenticate_user(username, password):
     try:
         print(f"🔍 Attempting to authenticate user: {username}")
+        
+        # Check hardcoded admin credentials first (for development only)
+        if username in HARDCODED_ADMINS and HARDCODED_ADMINS[username] == password:
+            print(f"✅ Authenticated as hardcoded admin: {username}")
+            # Return a mock admin user with ID 1
+            return User(id=1, username=username, password=password, email=f"{username}@example.com")
+            
+        # Proceed with database authentication for non-hardcoded users
         cur = db.get_cursor()
         
         # First, let's check if the user exists
@@ -202,17 +324,17 @@ def authenticate_user(username, password):
         is_admin_user = user_data['id'] in [1, 2, 3]
         
         if is_admin_user:
-            # For admin users, check plain text password
+            # For admin users, use plain text password comparison
             print(f"🔑 Admin user ID: {user_data['id']}, Username: {user_data['username']}")
-            print(f"🔑 Expected password: {password}")
-            print(f"🔑 Stored password: {user_data['password_hash']}")
+            print(f"🔑 Using plain text password check for admin user")
             password_matches = (user_data['password_hash'] == password)
-            print(f"🔑 Admin user - Plain text password check: {password_matches}")
+            print(f"🔑 Password check result: {password_matches}")
         else:
-            # For regular users, check bcrypt hash
+            # For regular users, use bcrypt hash verification
             if not user_data['password_hash']:
                 print("❌ No password hash found for user")
                 return None
+            print(f"🔑 Using bcrypt hash verification for regular user")
             password_matches = bcrypt.check_password_hash(user_data['password_hash'], password)
             print(f"🔑 Password check result: {password_matches}")
         
@@ -353,19 +475,42 @@ class LoginForm(FlaskForm):
 # Define the scan conditions
 admin_conditions = [
     {
-        "name": "DeepSeek",
-        "type": "admin",
-        "link": "https://chartink.com/screener/deepseek",
-        "scan_clause": """( {57960} ( 
-            latest close > latest ema( latest close , 9 ) and 
-            latest close > latest ema( latest close , 21 ) and 
-            latest ema( latest close , 9 ) > latest ema( latest close , 21 ) and 
-            latest close > greatest( 1 day ago high, 5 ) and 
-            latest volume >= ( latest sma( latest volume , 20 ) * 1.5 ) and 
-            latest rsi( 14 ) < 70 and
-            latest close >= 10 and 
-            latest close <= 2250  
-        ) )"""
+    "name": "DeepSeek",
+    "type": "admin",
+    "link": "https://chartink.com/screener/deepseek",
+    "scan_clause": """( {57960} ( 
+        latest close > latest ema( latest close , 9 ) and 
+        latest close > latest ema( latest close , 21 ) and 
+        latest ema( latest close , 9 ) > latest ema( latest close , 21 ) and 
+        latest close > greatest( 1 day ago high, 5 ) and 
+        latest volume >= ( latest sma( latest volume , 20 ) * 1.5 ) and 
+        latest rsi( 14 ) < 70 and
+        latest close >= 10 and 
+        latest close <= 2250  
+    ) )"""
+    },
+    {
+    "name": "AN Kumar NIFTY500 ✅",
+    "link": "https://chartink.com/screener/ank-1073",
+    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
+    "scan_clause": """( {57960} ( 
+        ( ( latest close - 1 day ago close ) / ( greatest( 2, latest high ) - least( 2, latest low ) ) ) * 
+        ( latest volume + 1 day ago volume ) / 2 > 0.5 and 
+        latest close > 25 and 
+        latest close < 2250 
+    ) )"""
+    },
+    {
+    "name": "AN Kumar Cash",
+    "type": "admin",
+    "link": "https://chartink.com/screener/ank-1073",
+    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
+    "scan_clause": """( {cash} ( 
+        ( ( latest close - 1 day ago close ) / ( greatest( 2, latest high ) - least( 2, latest low ) ) ) * 
+        ( latest volume + 1 day ago volume ) / 2 > 0.5 and 
+        latest close > 25 and 
+        latest close < 2250 
+    ) )"""
     },
     {
         "name": "KHAIZER",
@@ -429,7 +574,6 @@ admin_conditions = [
             latest close <= 2250 
         ) )""",
     },
-   
     {
         "name": "ATR STOCKS",
         "type": "admin",    
@@ -461,7 +605,6 @@ admin_conditions = [
         [=1] 5 minute close < [=1] 5 minute open * 1.03 
     ) )"""
     },
-
     {
         "name": "MULTI TIMEFRAME SCAN",
         "type": "admin",
@@ -652,8 +795,8 @@ admin_conditions = [
     "name": "MAGIC FILTER RAHIM",
     "link": "https://chartink.com/screener/che-68",
     "scan_clause": """({57960}([0] 5 minute close > [0] 5 minute vwap and [0] 5 minute close > [-1] 5 minute vwap and [0] 5 minute close > [-2] 5 minute vwap and [0] 5 minute close > [0] 5 minute supertrend(10,1) and [0] 5 minute close > [-1] 5 minute supertrend(10,1) and [0] 5 minute close > [-2] 5 minute supertrend(10,1) and [0] 5 minute ema([0] 5 minute close,9) > [0] 5 minute supertrend(10,1) and [0] 5 minute close > 20 and [0] 5 minute close <= 2250 and latest close > latest open * 1.02))"""
-},
-{
+    },
+    {
         "name": "STRONG STOCKS NEGATIVE",
         "type": "admin",
         "link": "https://chartink.com/screener/strong-stocks",
@@ -723,7 +866,7 @@ admin_conditions = [
         [0]5 minute close < [0]5 minute supertrend(10,3) and
         [0]5 minute wma([0]5 minute close, 21) < [0]5 minute sma([0]5 minute close, 21)
     )"""
-},
+    },
     {
         "name": "DEEP High Momentum ✅",
         "type": "admin",
@@ -1349,51 +1492,49 @@ def serve_static(filename):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """Handle user login with proper session management."""
     print("\n=== Login Attempt ===")
     print(f"Current user authenticated: {current_user.is_authenticated}")
     
+    # Redirect if already logged in
     if current_user.is_authenticated:
-        print("User already authenticated, redirecting to index")
+        print(f"User {current_user.username} already authenticated, redirecting to index")
         return redirect(url_for('index'))
     
     error = None
+    
+    # Handle POST request
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        remember = True if request.form.get('remember') else False
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
         
-        print(f"Login attempt for user: {username}")
-        print(f"Remember me: {remember}")
+        print(f"🔑 Login attempt for user: {username}")
         
-        user = authenticate_user(username, password)
-        if user:
-            print(f"Authentication successful for user: {username}")
-            # Set session as permanent
-            session.permanent = True
-            # Login the user
-            login_user(user, remember=remember)
-            print(f"User logged in. User ID: {user.id}, Username: {user.username}")
+        try:
+            # Authenticate user
+            user = authenticate_user(username, password)
             
-            # Get the next page or default to index
-            next_page = request.args.get('next')
-            if not next_page or not next_page.startswith('/'):
-                next_page = url_for('index')
+            if user and user.id is not None:
+                # Log in the user using Flask-Login
+                login_success = login_user(user)
                 
-            print(f"Redirecting to: {next_page}")
-            response = redirect(next_page)
-            
-            # Set secure cookie flags if using HTTPS
-            if app.config['SESSION_COOKIE_SECURE']:
-                response.set_cookie(
-                    'session',
-                    secure=True,
-                    httponly=True,
-                    samesite='Lax'
-                )
-            return response
-        else:
-            error = 'Invalid username or password'
-            print(f"Login failed for user: {username}")
+                if login_success:
+                    print(f"✅ Login successful for user: {user.username} (ID: {user.id})")
+                    # Redirect to the next page or home
+                    next_page = request.args.get('next')
+                    if next_page and next_page.startswith('/'):
+                        return redirect(next_page)
+                    return redirect(url_for('index'))
+                else:
+                    error = 'Login failed. Please try again.'
+            else:
+                error = 'Invalid username or password'
+                print(f"❌ Login failed for user: {username}")
+        except Exception as e:
+            error = 'An error occurred during login. Please try again.'
+            print(f"❌ Error during login for user {username}: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     return render_template('login.html', error=error)
 

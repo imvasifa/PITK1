@@ -1,0 +1,48 @@
+# Security Recommendations
+
+1. Database Credentials
+   - Move database credentials (host, password) from hardcoded values to environment variables
+   - Create a .env file to store sensitive information
+   - Use python-dotenv to load environment variables
+   - Add .env to .gitignore to prevent accidental commits
+
+2. Password Handling
+   - Admin users (IDs 1, 2, 3) currently use plain text passwords
+   - Consider implementing bcrypt hashing for admin passwords for better security
+   - Add password strength requirements for admin users
+
+3. Database Connection
+   - Implement proper error handling for database connections
+   - Add connection pooling for better performance
+   - Implement proper transaction management
+
+4. Code Organization
+   - Move database connection logic to a separate module
+   - Create proper error logging system
+   - Add input validation for user data
+
+5. Security Features
+   - Implement rate limiting for login attempts
+   - Add session timeout
+   - Implement password reset functionality
+   - Add two-factor authentication option for admin users
+
+# Priority Tasks
+1. Move database credentials to environment variables
+2. Implement proper error handling for database operations
+3. Add proper logging for security events
+4. Review and update password handling for admin users
+
+6. Dashboard Loading Issues (Partially Working)
+   - ✅ Login and index page loading is working
+   - ❌ Database transaction errors after login:
+     - Error: "invalid input syntax for type integer: 'id'"
+     - Transaction aborts after login
+   - ❌ User data not loading correctly (showing placeholder values)
+   - ❌ Session management needs improvement
+
+7. Next Steps for Dashboard:
+   - Fix user ID handling in database queries
+   - Implement proper transaction error recovery
+   - Add proper error logging for failed queries
+   - Test with different user roles
