@@ -1,5 +1,5 @@
 import atexit
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 import json
 import base64
 from postgres_db import db
@@ -180,6 +180,13 @@ class User(UserMixin):
                 print(f"❌ Error loading user data: {e}")
                 self._user_data = {}
         return self._user_data or {}
+        
+    def get_auth_token(self):
+        """
+        Generate a secure token for 'remember me' functionality
+        """
+        data = [str(self.id), self.password]
+        return base64.b64encode(":".join(data).encode('utf-8')).decode('utf-8')
 
 def get_user(user_id):
     try:
@@ -1844,7 +1851,7 @@ def login():
                 if login_success:
                     # Configure session
                     session.permanent = True  # Make the session permanent
-                    app.permanent_session_lifetime = datetime.timedelta(minutes=7)
+                    app.permanent_session_lifetime = timedelta(minutes=7)
                     
                     logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
                     
