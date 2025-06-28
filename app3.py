@@ -10,6 +10,7 @@ from pathlib import Path
 import platform 
 import queue
 import random
+import bcrypt
 import re
 import sys
 import tempfile
@@ -17,6 +18,11 @@ import threading
 import time
 import winsound
 import os
+from werkzeug.exceptions import HTTPException
+
+class AppTemporarilyUnavailable(HTTPException):
+    code = 503
+    description = 'The application is currently unavailable. Please try again in a few minutes. If the problem persists, please contact our service team for assistance.'
 
 from bs4 import BeautifulSoup as bs
 import pandas as pd
@@ -206,104 +212,72 @@ def load_user(user_id):
         return None
     
     print(f"🔍 [load_user] Loading user with ID: {user_id} (type: {type(user_id)})")
-        
+    
     try:
-        # Try to convert to integer for database query
-        try:
-            user_id_int = int(user_id)
-        except (ValueError, TypeError):
-            print(f"❌ [load_user] Invalid user_id format: {user_id}")
+        # First, try to get the user data from the database
+        user_data = get_user_data(user_id)
+        if not user_data:
+            print(f"❌ [load_user] No user data found for ID: {user_id}")
             return None
             
-        # Get database cursor
-        cur = db.get_cursor()
-        if not cur:
-            print("❌ [load_user] Failed to get database cursor")
+        # Extract account information
+        account = user_data.get('account', {})
+        profile = account.get('profile', {})
+        
+        # Get required fields
+        user_id = str(user_id)  # Ensure user_id is a string for Flask-Login
+        username = account.get('username')
+        password = account.get('password')
+        email = profile.get('email', account.get('email', ''))
+        
+        # Validate required fields
+        if not all([user_id, username, password]):
+            print(f"❌ [load_user] Missing required user data fields. ID: {user_id}, Username: {username}")
             return None
             
-        try:
-            # Query user data with explicit column selection
-            cur.execute("""
-                SELECT 
-                    id::text as id,
-                    user_data->'account'->>'username' as username,
-                    user_data->'account'->>'password' as password,
-                    COALESCE(
-                        user_data->'account'->'profile'->>'email', 
-                        user_data->'account'->>'email', 
-                        ''
-                    ) as email
-                FROM users 
-                WHERE id = %s
-            """, (user_id_int,))
-            
-            # Get column names and convert to dictionary
-            columns = [desc[0] for desc in cur.description] if cur.description else []
-            row = cur.fetchone()
-            
-            if not row:
-                print(f"❌ [load_user] No user found with ID: {user_id_int}")
-                return None
-                
-            user_data = dict(zip(columns, row))
-            print(f"✅ [load_user] Successfully loaded user: {user_data.get('username')} (ID: {user_data.get('id')})")
-            
-            # Ensure all required fields exist
-            if not all(k in user_data for k in ['id', 'username', 'password']):
-                print(f"❌ [load_user] Missing required user data fields: {user_data}")
-                return None
-                
-            # Create and return user object
-            return User(
-                id=user_data['id'],
-                username=user_data['username'],
-                password=user_data['password'],
-                email=user_data.get('email', '')
-            )
-            
-        except Exception as query_error:
-            print(f"❌ [load_user] Database query failed: {query_error}")
-            import traceback
-            traceback.print_exc()
-            return None
-            
+        print(f"✅ [load_user] Successfully loaded user: {username} (ID: {user_id})")
+        
+        # Create and return user object
+        return User(
+            id=user_id,
+            username=username,
+            password=password,
+            email=email
+        )
+        
     except Exception as e:
-        print(f"❌ [load_user] Unexpected error: {e}")
+        print(f"❌ [load_user] Error loading user: {e}")
         import traceback
         traceback.print_exc()
         return None
         return None
 
-# Hardcoded admin credentials for development (REMOVE IN PRODUCTION)
-HARDCODED_ADMINS = {
-    'imjjrobo': 'ccc',
-    'indianplans': 'ccc',
-    'rahi': 'ccc'
-}
-
 def authenticate_user(username, password):
     try:
         print(f"🔍 Attempting to authenticate user: {username}")
         
-        # Check hardcoded admin credentials first (for development only)
-        if username in HARDCODED_ADMINS and HARDCODED_ADMINS[username] == password:
-            print(f"✅ Authenticated as hardcoded admin: {username}")
-            # Return a mock admin user with ID 1
-            return User(id=1, username=username, password=password, email=f"{username}@example.com")
-            
         # Proceed with database authentication for non-hardcoded users
         cur = db.get_cursor()
+        if not cur:
+            print("❌ Database connection error")
+            return None
         
-        # First, let's check if the user exists
+        # First, let's check if the user exists and get their data
         cur.execute("""
-            SELECT id, 
-                   user_data->'account'->>'username' as username,
-                   user_data->'account'->>'password' as password_hash,
-                   COALESCE(user_data->'account'->'profile'->>'email', 
-                           user_data->'account'->>'email', '') as email
+            SELECT 
+                id, 
+                user_data->'account'->>'username' as username,
+                user_data->'account'->>'password' as password_hash,
+                COALESCE(
+                    user_data->'account'->'profile'->>'email', 
+                    user_data->'account'->>'email', 
+                    ''
+                ) as email,
+                user_data->'account' as account_data
             FROM users 
             WHERE user_data->'account'->>'username' = %s
         """, (username,))
+        
         user_data = cur.fetchone()
         
         if not user_data:
@@ -314,40 +288,53 @@ def authenticate_user(username, password):
         if not isinstance(user_data, dict):
             columns = [desc[0] for desc in cur.description]
             user_data = dict(zip(columns, user_data))
+        
+        # Debug print user data (without password hash for security)
+        print(f"✅ Found user: {user_data.get('username')} (ID: {user_data.get('id')})")
+        
+        # Get password hash
+        password_hash = user_data.get('password_hash')
+        if not password_hash:
+            print("❌ No password found for user")
+            return None
             
-        print(f"✅ Found user: {user_data['username']} (ID: {user_data['id']})")
-        print(f"🔑 Password hash: {user_data['password_hash'][:20]}...")
-        
-        # Check if this is an admin user (IDs 1, 2, 3) with plain text password
-        is_admin_user = user_data['id'] in [1, 2, 3]
-        
-        if is_admin_user:
-            # For admin users, use plain text password comparison
-            print(f"🔑 Admin user ID: {user_data['id']}, Username: {user_data['username']}")
-            print(f"🔑 Using plain text password check for admin user")
-            password_matches = (user_data['password_hash'] == password)
+        # For all users, check bcrypt hash
+        print(f"🔑 User ID: {user_data.get('id')}, Username: {user_data.get('username')}")
+        try:
+            # Verify the password using the existing bcrypt instance
+            password_matches = bcrypt.check_password_hash(password_hash, password)
             print(f"🔑 Password check result: {password_matches}")
-        else:
-            # For regular users, use bcrypt hash verification
-            if not user_data['password_hash']:
-                print("❌ No password hash found for user")
+            
+            if not password_matches:
+                print("❌ Incorrect password")
                 return None
-            print(f"🔑 Using bcrypt hash verification for regular user")
-            password_matches = bcrypt.check_password_hash(user_data['password_hash'], password)
-            print(f"🔑 Password check result: {password_matches}")
-        
+                
+            # If we get here, password is correct
+            print(f"✅ Password verified for user: {username}")
+                
+        except Exception as e:
+            print(f"❌ Error verifying password: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+                
         if password_matches:
             print(f"✅ Authentication successful for user: {username}")
-            return User(id=user_data['id'],
-                      username=user_data['username'],
-                      password=user_data['password_hash'],
-                      email=user_data['email'])
+            return User(
+                id=user_data.get('id'),
+                username=user_data.get('username'),
+                password=password_hash,
+                email=user_data.get('email', '')
+            )
         else:
             print("❌ Password does not match")
             return None
             
     except Exception as e:
+        print(f"❌ Error authenticating user: {e}")
         import traceback
+        traceback.print_exc()
+        return None
         print(f"❌ Error authenticating user: {str(e)}")
         print("Stack trace:")
         traceback.print_exc()
@@ -385,12 +372,12 @@ def save_user(username, password, email=''):
             }
         }
         
-        # Insert new user
+        # Insert new user with password_hash
         cur.execute("""
-            INSERT INTO users (username, user_data)
-            VALUES (%s, %s)
+            INSERT INTO users (username, password_hash, user_data)
+            VALUES (%s, %s, %s)
             RETURNING id
-        """, (username, json.dumps(user_data)))
+        """, (username, hashed_password, json.dumps(user_data)))
         
         user_id = cur.fetchone()[0]
         db.conn.commit()
@@ -903,14 +890,41 @@ _conditions_cache = {
 def load_user_conditions(user_id=None):
     """
     Load user conditions from the PostgreSQL database
-    Returns list of conditions for the specified user
+    Returns list of conditions for the specified user, or empty list if none found
     """
     global _conditions_cache
     
+    # Skip loading during app initialization (before first request)
+    from flask import has_request_context
+    if not has_request_context() and not _conditions_cache['all_users']:
+        return []
+    
     # If no user_id provided, return admin conditions
     if user_id is None:
-        return admin_conditions
-        
+        if _conditions_cache['all_users'] is not None:
+            return _conditions_cache['all_users']
+            
+        try:
+            cur = db.get_cursor()
+            cur.execute("""
+                SELECT user_data->'account'->'conditions' as conditions 
+                FROM users 
+                WHERE user_data->'account'->'conditions' IS NOT NULL
+                  AND jsonb_array_length(user_data->'account'->'conditions') > 0
+            """)
+            
+            all_conditions = []
+            for row in cur.fetchall():
+                if row['conditions']:
+                    all_conditions.extend(row['conditions'])
+            
+            _conditions_cache['all_users'] = all_conditions
+            return all_conditions
+            
+        except Exception:
+            return []
+    
+    # For specific user
     try:
         # Try to get from cache first
         if user_id in _conditions_cache['users']:
@@ -919,118 +933,25 @@ def load_user_conditions(user_id=None):
         # Query the database for user's conditions
         cur = db.get_cursor()
         if not cur:
-            logger.error("Failed to get database cursor")
             return []
             
-        query = """
-            SELECT user_data->'conditions' as conditions 
+        cur.execute("""
+            SELECT user_data->'account'->'conditions' as conditions 
             FROM users 
             WHERE id = %s
-        """
+              AND user_data->'account'->'conditions' IS NOT NULL
+              AND jsonb_array_length(user_data->'account'->'conditions') > 0
+        """, (user_id,))
         
-        cur.execute(query, (user_id,))
         result = cur.fetchone()
-        
-        if not result or not result[0]:
+        if not result or not result['conditions']:
             return []
             
         # Cache the result
-        _conditions_cache['users'][user_id] = result[0]
-        return result[0]
+        _conditions_cache['users'][user_id] = result['conditions']
+        return result['conditions']
         
-    except Exception as e:
-        logger.error(f"Error loading conditions for user {user_id}: {e}")
-        return []
-    
-    # Skip loading during app initialization (before first request)
-    from flask import has_request_context
-    if not has_request_context() and not _conditions_cache['all_users']:
-        return []
-        
-    try:
-        print(f"🔍 [DEBUG] load_user_conditions called with user_id: {user_id}")
-        
-        if user_id is None:
-            # Check cache first
-            if _conditions_cache['all_users'] is not None:
-                return _conditions_cache['all_users']
-                
-            # This is a special case - get all conditions from all users
-            print("⚠️ [DEBUG] No user_id provided, fetching all conditions from all users")
-            all_conditions = []
-            try:
-                cur = db.get_cursor()
-                cur.execute("""
-                    SELECT user_data->'account'->'conditions' as conditions 
-                    FROM users 
-                    WHERE user_data->'account'->'conditions' IS NOT NULL
-                """)
-                
-                for row in cur.fetchall():
-                    if row['conditions']:
-                        all_conditions.extend(row['conditions'])
-                
-                # Update cache
-                _conditions_cache['all_users'] = all_conditions
-                print(f"🔍 [DEBUG] Total conditions found across all users: {len(all_conditions)}")
-                return all_conditions
-                
-            except Exception as e:
-                error_msg = f"Error fetching all user conditions: {e}"
-                logger.error(error_msg, exc_info=True)
-                print(f"❌ [DEBUG] {error_msg}")
-                return []
-        
-        # Get conditions for specific user
-        print(f"🔍 [DEBUG] Getting conditions for user_id: {user_id} from PostgreSQL")
-        try:
-            cur = db.get_cursor()
-            
-            # First, let's see what the user data actually looks like
-            cur.execute("""
-                SELECT user_data, id, username 
-                FROM users 
-                WHERE id = %s
-            """, (user_id,))
-            
-            result = cur.fetchone()
-            if not result:
-                print(f"🔍 [DEBUG] No user found with id {user_id}")
-                return []
-                
-            print(f"🔍 [DEBUG] Raw user data for {result['username']} (ID: {result['id']}): {result['user_data']}")
-            
-            # Now try to get conditions from the expected path
-            cur.execute("""
-                SELECT user_data->'account'->'conditions' as conditions 
-                FROM users 
-                WHERE id = %s
-            """, (user_id,))
-            
-            result = cur.fetchone()
-            if not result or not result['conditions']:
-                print(f"🔍 [DEBUG] No conditions found in the expected path for user {user_id}")
-                return []
-                
-            conditions = result['conditions']
-            print(f"🔍 [DEBUG] Found {len(conditions)} conditions for user {user_id}")
-            if conditions:
-                print(f"🔍 [DEBUG] First condition: {conditions[0]}")
-            return conditions
-            
-        except Exception as e:
-            error_msg = f"Error fetching conditions for user {user_id}: {e}"
-            logger.error(error_msg, exc_info=True)
-            print(f"❌ [DEBUG] {error_msg}")
-            return []
-            
-    except Exception as e:
-        error_msg = f"Unexpected error in load_user_conditions: {e}"
-        logger.error(error_msg, exc_info=True)
-        print(f"❌ [DEBUG] {error_msg}")
-        import traceback
-        traceback.print_exc()
-        return []
+    except Exception:
         return []
 
 def save_user_conditions(user_id, conditions_list):
@@ -1115,25 +1036,121 @@ def save_user_conditions(user_id, conditions_list):
         logger.error(f"Unexpected error in save_user_conditions: {e}", exc_info=True)
         return False
 
-def clean_duplicate_users():
+def ensure_app_settings_table():
     """
-    Clean up any duplicate user entries in the database.
-    This function is kept for backward compatibility but is now a no-op
-    since duplicate handling is now managed by database constraints.
+    Ensure the app_settings table exists in the database
     """
-    logger.info("clean_duplicate_users() is a no-op in PostgreSQL version")
-        
-        return True
-        
+    logger.info("Checking if app_settings table exists...")
+    try:
+        # Get a new cursor
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return False
+            
+        try:
+            # First, try to query the table directly
+            cur.execute("""
+                SELECT to_regclass('public.app_settings') IS NOT NULL;
+            """)
+            
+            # Handle the result safely
+            result = cur.fetchone()
+            table_exists = False
+            
+            if result:
+                # Handle both dictionary and tuple results
+                if hasattr(result, 'keys') and result:  # It's a dictionary
+                    # Get the first value from the dictionary
+                    table_exists = list(result.values())[0]
+                elif isinstance(result, (tuple, list)) and len(result) > 0:  # It's a tuple or list
+                    table_exists = result[0]
+                
+                # Ensure boolean value
+                table_exists = bool(table_exists)
+            
+            if not table_exists:
+                logger.info("app_settings table does not exist, creating...")
+                # Create the table
+                cur.execute("""
+                    CREATE TABLE app_settings (
+                        id SERIAL PRIMARY KEY,
+                        settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # Create the function and trigger in a separate transaction
+                cur.execute("""
+                    CREATE OR REPLACE FUNCTION update_modified_column()
+                    RETURNS TRIGGER AS $$
+                    BEGIN
+                        NEW.updated_at = CURRENT_TIMESTAMP;
+                        RETURN NEW;
+                    END;
+                    $$ LANGUAGE plpgsql;
+                """)
+                
+                cur.execute("""
+                    CREATE TRIGGER update_app_settings_modtime
+                    BEFORE UPDATE ON app_settings
+                    FOR EACH ROW
+                    EXECUTE FUNCTION update_modified_column();
+                """)
+                
+                # Insert default settings
+                default_settings = {
+                    'refresh_interval': 20,
+                    'mute_status': False,
+                    'auto_refresh': True,
+                    'theme': 'light',
+                    'conditions': [],
+                    'selected_conditions': [],
+                    'user_conditions': [],
+                    'notifications': True,
+                    'sound_alert': True,
+                    'volume': 0.5,
+                    'last_update': None,
+                    'version': '1.0.0'
+                }
+                
+                cur.execute("""
+                    INSERT INTO app_settings (id, settings) 
+                    VALUES (1, %s)
+                """, (json.dumps(default_settings),))
+                
+                logger.info("Created app_settings table and inserted default settings")
+                
+                # Commit the transaction
+                db.conn.commit()
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in ensure_app_settings_table: {e}", exc_info=True)
+            if 'db' in locals() and hasattr(db, 'conn'):
+                db.conn.rollback()
+            return False
+            
     except Exception as e:
+        logger.error(f"Error getting database connection: {e}", exc_info=True)
+        return False
+    finally:
+        if 'cur' in locals() and cur:
+            try:
+                cur.close()
+            except:
+                pass
 
 def load_settings():
     """
     Load settings from the database
     """
     default_settings = {
-        'refresh_interval': 20,  # Default to 20 seconds
+        'refresh_interval': 20,
         'mute_status': False,
+        'conditions': [],
         'selected_conditions': [],
         'user_conditions': [],
         'auto_refresh': True,
@@ -1144,32 +1161,78 @@ def load_settings():
         'last_update': None,
         'version': '1.0.0'
     }
-    
     try:
+        if not ensure_app_settings_table():
+            logger.error("Failed to ensure app_settings table exists")
+            return default_settings
+            
+        logger.info("Loading settings from database...")
         cur = db.get_cursor()
         if not cur:
             logger.error("Failed to get database cursor")
             return default_settings
-            
-        # Try to get settings from the database
-        cur.execute("""
-            SELECT settings FROM app_settings 
-            WHERE id = 1  -- Using a single row for settings
-        """)
         
-        result = cur.fetchone()
-        if result and result[0]:
-            settings = result[0]
+        try:
+            # Try to get settings from the database
+            cur.execute("""
+                SELECT settings FROM app_settings 
+                WHERE id = 1  -- Using a single row for settings
+            """)
+            
+            result = cur.fetchone()
+            
+            # Handle both dictionary and tuple results
+            if not result:
+                logger.warning("No settings found in database, using default settings")
+                return default_settings
+                
+            # Get the settings from the result (handling both dict and tuple)
+            if isinstance(result, dict):
+                settings = result.get('settings')
+            else:  # tuple
+                settings = result[0] if len(result) > 0 else None
+                
+            if not settings:
+                logger.warning("Empty settings in database, using default settings")
+                return default_settings
+                
+            # Ensure settings is a dictionary
+            if not isinstance(settings, dict):
+                logger.warning("Invalid settings format in database, using default settings")
+                return default_settings
+            
+            if not isinstance(settings, dict):
+                logger.warning("Invalid settings format in database, using default settings")
+                return default_settings
+                
+            logger.info("Successfully loaded settings from database")
+            
             # Ensure all default settings are present
             for key, value in default_settings.items():
                 if key not in settings:
                     settings[key] = value
+                    logger.info(f"Added missing setting {key} with default value {value}")
+            
+            # Ensure 'conditions' exists for backward compatibility
+            if 'conditions' not in settings and 'selected_conditions' in settings:
+                settings['conditions'] = settings['selected_conditions']
+                logger.info("Migrated 'selected_conditions' to 'conditions'")
+            
             return settings
             
-        return default_settings
-        
+        except Exception as e:
+            logger.error(f"Error loading settings: {e}", exc_info=True)
+            return default_settings
+            
+        finally:
+            if 'cur' in locals() and cur:
+                try:
+                    cur.close()
+                except:
+                    pass
+                    
     except Exception as e:
-        logger.error(f"Error loading settings: {e}")
+        logger.error(f"Unexpected error in load_settings: {e}", exc_info=True)
         return default_settings
 
 def save_settings(settings):
@@ -1177,10 +1240,24 @@ def save_settings(settings):
     Save settings to the database
     """
     try:
+        logger.info("Getting database cursor...")
         cur = db.get_cursor()
         if not cur:
             logger.error("Failed to get database cursor")
             return False
+        
+        # Ensure settings is a dictionary
+        if not isinstance(settings, dict):
+            logger.error(f"Invalid settings type: {type(settings)}, expected dict")
+            return False
+            
+        # Ensure required fields exist
+        if 'conditions' not in settings:
+            settings['conditions'] = []
+        if 'selected_conditions' not in settings:
+            settings['selected_conditions'] = settings.get('conditions', [])
+            
+        logger.info(f"Saving settings to database: {settings}")
             
         # Upsert settings into the database
         cur.execute("""
@@ -1188,13 +1265,22 @@ def save_settings(settings):
             VALUES (1, %s)
             ON CONFLICT (id) 
             DO UPDATE SET settings = EXCLUDED.settings
+            RETURNING id
         """, (json.dumps(settings),))
         
+        # Verify the update
+        result = cur.fetchone()
+        if not result:
+            logger.error("Failed to verify settings update")
+            db.conn.rollback()
+            return False
+            
         db.conn.commit()
+        logger.info("Successfully saved settings to database")
         return True
         
     except Exception as e:
-        logger.error(f"Error saving settings: {e}")
+        logger.error(f"Error saving settings: {e}", exc_info=True)
         if db.conn:
             db.conn.rollback()
         return False
@@ -1983,15 +2069,57 @@ def dash():
         # Handle profile update
         if 'email' in request.form:
             try:
-                with open('users.json', 'r') as f:
-                    users = json.load(f)
+                # Get the current user ID
+                user_id = current_user.id
                 
-                profile = users[str(current_user.id)]['account']['profile']
-                profile['email'] = request.form.get('email', profile.get('email'))
-                profile['name'] = request.form.get('name', profile.get('name'))
-                profile['dob'] = request.form.get('dob', profile.get('dob'))
+                # Get the user's current data from PostgreSQL
+                cur = db.get_cursor()
+                if not cur:
+                    logger.error("Failed to get database cursor")
+                    return jsonify({'error': 'Database connection error'}), 500
+                
+                # Get current user data
+                cur.execute("""
+                    SELECT user_data FROM users WHERE id = %s
+                """, (user_id,))
+                
+                result = cur.fetchone()
+                if not result:
+                    logger.error(f"User {user_id} not found in database")
+                    return jsonify({'error': 'User not found'}), 404
+                
+                # Update the profile data
+                user_data = result[0]
+                if 'account' not in user_data:
+                    user_data['account'] = {}
+                if 'profile' not in user_data['account']:
+                    user_data['account']['profile'] = {}
+                
+                profile = user_data['account']['profile']
+                profile['email'] = request.form.get('email', profile.get('email', ''))
+                profile['name'] = request.form.get('name', profile.get('name', ''))
+                profile['dob'] = request.form.get('dob', profile.get('dob', ''))
+                
+                # Save the updated data back to PostgreSQL
+                cur.execute("""
+                    UPDATE users 
+                    SET user_data = %s
+                    WHERE id = %s
+                    RETURNING id
+                """, (json.dumps(user_data), user_id))
+                
+                if cur.rowcount == 0:
+                    logger.error(f"Failed to update user {user_id} profile")
+                    return jsonify({'error': 'Failed to update profile'}), 500
+                
+                db.conn.commit()
+                success = 'Profile updated successfully!'
+                
             except Exception as e:
-                logger.error(f"Error updating profile: {e}")
+                logger.error(f"Error updating profile: {e}", exc_info=True)
+                if db.conn:
+                    db.conn.rollback()
+                error = 'Error updating profile'
         
         # Handle password change
         elif 'current_password' in request.form and 'new_password' in request.form:
@@ -2091,6 +2219,13 @@ def test():
         'timestamp': datetime.now(timezone.utc).isoformat()
     }), 200
 
+# Error Handlers
+
+@app.errorhandler(AppTemporarilyUnavailable)
+def handle_app_unavailable(error):
+    """Handle application unavailability by showing the error page"""
+    return render_template('error.html', error_message=error.description), error.code
+
 # Main Application Routes
 
 @app.route('/')
@@ -2119,10 +2254,11 @@ def index():
     # If no conditions are selected, show a message to select conditions
     if not selected_conditions:
         flash_message = {
-            'type': 'info',
-            'icon': 'fa-info-circle',
+            'type': 'danger',
+            'icon': 'fa-exclamation-triangle',
             'title': 'No Conditions Selected',
-            'message': 'Please select one or more conditions from the Conditions menu to view stock data.'
+            'message': 'Please select conditions from Admin Conditions or create your own user conditions to view stock data.',
+            'style': 'background-color: rgba(220, 53, 69, 0.2); border-left: 4px solid #dc3545; padding: 10px; border-radius: 4px;'
         }
     else:
         flash_message = None
@@ -2200,32 +2336,42 @@ def update_settings():
     """Update application settings"""
     try:
         data = request.get_json()
+        logger.info(f"Received update settings request: {data}")
+        
+        # Load current settings
         current_settings = load_settings()
         
         # Update only allowed fields
         if 'conditions' in data:
+            logger.info(f"Updating conditions: {data['conditions']}")
             current_settings['conditions'] = data['conditions']
+            current_settings['selected_conditions'] = data['conditions']  # Keep both for backward compatibility
         
         if 'selected_option' in data:
+            logger.info(f"Updating selected option: {data['selected_option']}")
             current_settings['app_selected'] = data['selected_option']
             current_settings['browser'] = '1' if data['selected_option'] == 'browser' else '0'
             current_settings['app'] = '1' if data['selected_option'] == 'app' else '0'
-        #Pushing this old code as working code
-        # Save clean settings
-        with open(DB_FILE, 'w') as f:
-            # Lock the file for writing
-            # msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-            try:
-                json.dump(current_settings, f, indent=4)
-            finally:
-                # Always unlock the file
-                # msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-                pass
         
-        return jsonify({'success': True, 'message': 'Settings updated successfully'}), 200
+        # Save settings to database
+        logger.info("Saving settings to database...")
+        if not save_settings(current_settings):
+            logger.error("Failed to save settings to database")
+            return jsonify({'success': False, 'error': 'Failed to save settings to database'}), 500
+        
+        logger.info("Settings saved successfully")
+        return jsonify({
+            'success': True, 
+            'message': 'Settings updated successfully',
+            'settings': current_settings
+        }), 200
+        
     except Exception as e:
-        logger.error(f"Error updating settings: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error updating settings: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False, 
+            'error': f'Failed to update settings: {str(e)}'
+        }), 500
 
 @app.route('/conditions')
 def get_conditions():
@@ -2545,23 +2691,123 @@ def delete_user_condition(condition_id):
         logger.error(f"Error deleting user condition: {e}")
         return jsonify({"error": "Failed to delete user condition"}), 500
 
-if __name__ == '__main__':
-    def start_threads_once():
-        """Start all background threads if they're not already running"""
-        global update_thread
-        try:
-            if not hasattr(start_threads_once, '_has_run'):
-                update_thread = threading.Thread(target=update_data, daemon=True)
-                update_thread.start()
-                start_threads_once._has_run = True
-        except Exception as e:
-            logger.error(f"Error starting threads: {e}")
+def ensure_app_settings_table():
+    """Ensure the app_settings table exists in the database"""
+    try:
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return False
+            
+        logger.info("Checking if app_settings table exists...")
+        
+        # Check if table exists using a more reliable method
+        cur.execute("""
+            SELECT to_regclass('public.app_settings') IS NOT NULL;
+        """)
+        
+        # Handle the result safely
+        result = cur.fetchone()
+        table_exists = False
+        
+        if result:
+            # Handle both dictionary and tuple results
+            if hasattr(result, 'keys') and result:  # It's a dictionary
+                # Get the first value from the dictionary
+                table_exists = list(result.values())[0]
+            elif isinstance(result, (tuple, list)) and len(result) > 0:  # It's a tuple or list
+                table_exists = result[0]
+            
+            # Ensure boolean value
+            table_exists = bool(table_exists)
+        
+        if not table_exists:
+            logger.info("Creating app_settings table...")
+            # Create the app_settings table if it doesn't exist
+            cur.execute("""
+                CREATE TABLE app_settings (
+                    id INTEGER PRIMARY KEY,
+                    settings JSONB NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Add a trigger to update the updated_at timestamp
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION update_updated_at_column()
+                RETURNS TRIGGER AS $$
+                BEGIN
+                    NEW.updated_at = NOW();
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+            """)
+            
+            cur.execute("""
+                DROP TRIGGER IF EXISTS update_app_settings_updated_at ON app_settings;
+                CREATE TRIGGER update_app_settings_updated_at
+                BEFORE UPDATE ON app_settings
+                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+            """)
+            
+            # Insert default settings
+            default_settings = {
+                'refresh_interval': 20,
+                'mute_status': False,
+                'conditions': [],
+                'selected_conditions': [],
+                'user_conditions': [],
+                'auto_refresh': True,
+                'theme': 'light',
+                'notifications': True,
+                'sound_alert': True,
+                'volume': 0.5,
+                'last_update': None,
+                'version': '1.0.0'
+            }
+            
+            cur.execute("""
+                INSERT INTO app_settings (id, settings)
+                VALUES (1, %s)
+                ON CONFLICT (id) DO NOTHING;
+            """, (json.dumps(default_settings),))
+            
+            db.conn.commit()
+            logger.info("Created app_settings table and initialized with default settings")
+        else:
+            logger.info("app_settings table already exists")
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error ensuring app_settings table exists: {e}", exc_info=True)
+        if db.conn:
+            db.conn.rollback()
+        return False
 
+def start_threads_once():
+    """Start all background threads if they're not already running"""
+    global update_thread
+    try:
+        if not hasattr(start_threads_once, '_has_run'):
+            update_thread = threading.Thread(target=update_data, daemon=True)
+            update_thread.start()
+            start_threads_once._has_run = True
+    except Exception as e:
+        logger.error(f"Error starting threads: {e}")
+
+def cleanup():
+    pass
+
+# Main execution
+if __name__ == '__main__':
+    # Ensure database tables exist
+    if not ensure_app_settings_table():
+        print("❌ Failed to verify/create app_settings table")
+    
     # Start threads immediately when run directly
     start_threads_once()
     
     # Run the Flask app in standalone mode if this file is executed directly
     app.run(host='0.0.0.0', port=5000, debug=True)
-
-def cleanup():
-    pass

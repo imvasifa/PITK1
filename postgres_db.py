@@ -2,8 +2,13 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
+from werkzeug.exceptions import HTTPException
 
 load_dotenv()
+
+class AppTemporarilyUnavailable(HTTPException):
+    code = 503
+    description = 'The application is currently unavailable. Please try again in a few minutes. If the problem persists, please contact our service team for assistance.'
 
 class Database:
     _instance = None
@@ -40,8 +45,9 @@ class Database:
                     print("❌ PostgreSQL connection test failed")
                     
         except Exception as e:
-            print(f"❌ Could not connect to PostgreSQL: {e}")
-            raise
+            error_msg = f"❌ Application service unavailable: {e}"
+            print(error_msg)
+            raise AppTemporarilyUnavailable(description=error_msg)
     
     def get_cursor(self):
         if not self.conn or self.conn.closed != 0:
