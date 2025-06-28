@@ -70,6 +70,22 @@
     {% endif %}
     {% block scripts %}{% endblock %}
     
+    <!-- Toast Container for Notifications -->
+    <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+        <!-- Toasts will be inserted here by JavaScript -->
+    </div>
+    
+    <style>
+        .toast {
+            margin-bottom: 0.5rem;
+            opacity: 1;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .toast.hide {
+            opacity: 0;
+        }
+    </style>
+    
     <script>
         // Enable Bootstrap tooltips
         document.addEventListener('DOMContentLoaded', function() {
