@@ -53,6 +53,20 @@
         }
 
         /* User Conditions Styling */
+        /* Unified navbar round button effect */
+        .navbar-round-btn {
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .navbar-round-btn:hover, .navbar-round-btn:focus {
+            transform: scale(1.13);
+            box-shadow: 0 0 0 0.2rem rgba(61,139,253,0.25);
+            z-index: 1;
+            filter: brightness(0.94);
+        }
+        .navbar-round-btn i {
+            color: #fff;
+        }
+        /* Remove redundant admin button rules */
         .condition-row {
             display: flex;
             justify-content: space-between;
@@ -1482,27 +1496,24 @@
 
             <!-- Dark Mode Toggle with Sun/Moon Icons -->
             <div class="d-inline-block align-middle ms-3" id="themeToggleContainer">
-                <button id="themeSwitchBtn" class="btn btn-outline-secondary" style="font-size: 1.3rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-                    <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
-                </button>
+                <button id="themeSwitchBtn" class="btn btn-outline-secondary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+    <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+</button>
             </div>
             <!-- Admin Conditions Button -->
-            <button class="btn admin-conditions-btn" id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()">
-                <i class="fas fa-list-check"></i>
-            </button>
-            <button class="settings-btn" data-bs-toggle="modal" data-bs-target="#settingsModal">
-                <i class="fas fa-cog"></i>
-            </button>
-            <button class="refresh-btn" onclick="refreshData()">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <button class="nifty-btn" data-bs-toggle="modal" data-bs-target="#niftyModal">
-                <i class="fas fa-chart-bar"></i>
-            </button>
+            <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn btn-primary ms-2 navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+    <i class="fas fa-list-check"></i>
+</button>
+            <button class="refresh-btn navbar-round-btn" onclick="refreshData()" style="border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+    <i class="fas fa-sync-alt"></i>
+</button>
+<button class="nifty-btn navbar-round-btn" data-bs-toggle="modal" data-bs-target="#niftyModal" style="border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+    <i class="fas fa-chart-bar"></i>
+</button>
 
-            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme" style="background: none; border: none; color: var(--text-dark); font-size: 1.2rem; cursor: pointer; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='rgba(0,0,0,0.1)'" onmouseout="this.style.backgroundColor='transparent'">
-                <i class="fas fa-moon" id="themeToggleIcon"></i>
-            </button>
+<button class="theme-toggle-btn navbar-round-btn" id="themeToggleBtn" title="Toggle Theme" style="background: none; border: none; color: var(--text-dark); font-size: 1.2rem; cursor: pointer; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;">
+    <i class="fas fa-moon" id="themeToggleIcon"></i>
+</button>
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     const themeToggleBtn = document.getElementById('themeToggleBtn');
