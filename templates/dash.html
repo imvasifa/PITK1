@@ -27,7 +27,7 @@
                     {% endif %}
                     <form action="{{ url_for('upload_photo') }}" method="post" enctype="multipart/form-data" id="photo-upload-form">
                         <label for="photo_upload" style="cursor: pointer;" title="Click to upload a new photo">
-                            <img src="{{ user_photo }}" class="rounded-circle" width="100" height="100" alt="User Photo">
+                            <img src="{{ user_photo }}" class="profile-pic" width="100" height="100" alt="User Photo">
                         </label>
                         <input type="file" name="photo" id="photo_upload" style="display: none;" accept="image/png, image/jpeg, image/gif">
                     </form>
@@ -79,16 +79,16 @@
                         </div>
                                     <div class="mb-3">
                                         <label for="name" class="form-label">Full Name</label>
-                                        <input type="text" class="form-control" id="name" name="name" value="{{ profile.name | default('') }}">
+                                        <input type="text" class="form-control" id="name" name="name" value="{{ profile.name | default('', true) }}">
                                     </div>
                         <div class="mb-3">
                             <label for="email" class="form-label">Email</label>
-                                        <input type="email" class="form-control" id="email" name="email" value="{{ profile.email | default('') }}">
+                                        <input type="email" class="form-control" id="email" name="email" value="{{ profile.email | default('', true) }}">
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="dob" class="form-label">Date of Birth</label>
-                                            <input type="date" class="form-control" id="dob" name="dob" value="{{ profile.dob | default('') }}" min="1900-01-01" max="{{ today }}">
+                                            <input type="date" class="form-control" id="dob" name="dob" value="{{ profile.dob | default('', true) }}" min="1900-01-01" max="{{ today }}">
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label for="gender" class="form-label">Gender</label>
@@ -102,7 +102,7 @@
                                     </div>
                                     <div class="mb-3">
                                         <label for="bio" class="form-label">Bio</label>
-                                        <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio | default('') }}</textarea>
+                                        <textarea class="form-control" id="bio" name="bio" rows="3">{{ profile.bio | default('', true) }}</textarea>
                         </div>
                         <button type="submit" class="btn btn-primary">Update Profile</button>
                     </form>
@@ -130,9 +130,73 @@
     </div>
 </div>
 
+<!-- Cropper Modal -->
+<div id="cropper-modal">
+  <div class="modal-content">
+    <h5 class="mb-3">Crop your photo</h5>
+    <div>
+      <img id="cropper-image" style="max-width: 100%; max-height: 300px;" />
+    </div>
+    <div class="cropper-preview mt-3 mb-3"></div>
+    <button class="btn btn-primary" id="crop-confirm">Crop & Upload</button>
+    <button class="btn btn-secondary" id="crop-cancel">Cancel</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet" />
 <script>
-    document.getElementById('photo_upload').onchange = function() {
-        document.getElementById('photo-upload-form').submit();
+let cropper;
+let cropperModal = document.getElementById('cropper-modal');
+let cropperImage = document.getElementById('cropper-image');
+let cropperPreview = document.querySelector('.cropper-preview');
+let photoInput = document.getElementById('photo_upload');
+
+photoInput.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        cropperImage.src = evt.target.result;
+        cropperModal.style.display = 'flex';
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(cropperImage, {
+            aspectRatio: 1,
+            viewMode: 1,
+            preview: cropperPreview,
+            autoCropArea: 1,
+            background: false,
+            movable: false,
+            zoomable: true,
+            rotatable: false,
+            scalable: false
+        });
     };
+    reader.readAsDataURL(file);
+};
+
+document.getElementById('crop-cancel').onclick = function() {
+    cropperModal.style.display = 'none';
+    if (cropper) cropper.destroy();
+    photoInput.value = '';
+};
+
+document.getElementById('crop-confirm').onclick = function() {
+    if (!cropper) return;
+    cropper.getCroppedCanvas({ width: 512, height: 512 }).toBlob(function(blob) {
+        let formData = new FormData();
+        formData.append('photo', blob, 'profile.png');
+        fetch('{{ url_for("upload_photo") }}', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        }).then(response => {
+            cropperModal.style.display = 'none';
+            if (cropper) cropper.destroy();
+            photoInput.value = '';
+            window.location.reload();
+        });
+    }, 'image/png');
+};
 </script>
 {% endblock %}

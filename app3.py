@@ -2096,6 +2096,7 @@ def remove_photo():
         cur = db.get_cursor()
         if not cur:
             flash('Database connection error', 'danger')
+            print('[DEBUG] No database cursor')
             return redirect(url_for('dash'))
         
         # First, get the current photo path to delete the file
@@ -2107,16 +2108,27 @@ def remove_photo():
         
         cur.execute(get_photo_query, (current_user.id,))
         result = cur.fetchone()
+        print(f'[DEBUG] DB result for photo_path: {result}')
         
-        if result and result[0]:
-            photo_path = result[0].lstrip('/')  # Remove leading slash for os.path
+        if result and result.get('photo_path'):
+            photo_path = result['photo_path'].lstrip('/')  # Remove leading slash for os.path
+            print(f'[DEBUG] photo_path to remove: {photo_path}')
             
             # Delete the photo file if it exists
-            if os.path.exists(photo_path):
-                try:
+            try:
+                file_exists = os.path.exists(photo_path)
+                print(f'[DEBUG] File exists: {file_exists}')
+                if file_exists:
                     os.remove(photo_path)
-                except Exception as e:
-                    logger.error(f"Error removing photo file: {e}")
+                    print('[DEBUG] File removed successfully')
+                else:
+                    print('[DEBUG] File does not exist, skipping removal')
+            except Exception as e:
+                logger.error(f"Error removing photo file: {e}")
+                print(f'[DEBUG] Exception removing file: {e}')
+                # Don't fail if file is already missing
+        else:
+            print('[DEBUG] No photo_path found in DB')
         
         # Remove the photo data from the database
         update_query = """
@@ -2133,19 +2145,28 @@ def remove_photo():
         """
         
         cur.execute(update_query, (current_user.id,))
+        print(f'[DEBUG] DB update rowcount: {cur.rowcount}')
         
         if cur.rowcount > 0:
             if db.conn is not None:
                 db.conn.commit()
             flash('Profile picture removed successfully!', 'success')
+            print('[DEBUG] DB commit successful')
         else:
             flash('No profile picture found to remove.', 'info')
+            print('[DEBUG] No DB row updated')
             
     except Exception as e:
+        logger.error(f"Error in remove_photo: {e}", exc_info=True)
+        print(f'[DEBUG] Exception in remove_photo: {e}')
         if db.conn is not None:
-            db.conn.rollback()
+            try:
+                db.conn.rollback()
+                print('[DEBUG] DB rollback successful')
+            except Exception as rollback_err:
+                logger.error(f"Error during rollback: {rollback_err}")
+                print(f'[DEBUG] Exception during rollback: {rollback_err}')
         flash('Error removing profile picture.', 'danger')
-        logger.error(f"Error in remove_photo: {e}")
     
     return redirect(url_for('dash'))
 
