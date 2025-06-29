@@ -2179,7 +2179,16 @@ def dash():
                     return jsonify({'error': 'User not found'}), 404
                 
                 # Update the profile data
-                user_data = result[0]
+                # Handle both dictionary and tuple results
+                if isinstance(result, dict):
+                    user_data = result.get('user_data')
+                else:  # tuple
+                    user_data = result[0] if len(result) > 0 else None
+                
+                if not user_data:
+                    logger.error(f"No user_data found for user {user_id}")
+                    return jsonify({'error': 'User data not found'}), 404
+                
                 if 'account' not in user_data:
                     user_data['account'] = {}
                 if 'profile' not in user_data['account']:
@@ -2281,8 +2290,18 @@ def dash():
             if not user_data:
                 return jsonify({'error': 'User not found'}), 404
             
-            user_data = user_data[0]
-            profile_data = user_data.get('account', {}).get('profile', {})
+            # Handle both dictionary and tuple results
+            if isinstance(user_data, dict):
+                user_data = user_data.get('user_data')
+            else:  # tuple
+                user_data = user_data[0] if len(user_data) > 0 else None
+            
+            if not user_data:
+                logger.error(f"No user_data found for user {user_id}")
+                user_data = {}
+                profile_data = {}
+            else:
+                profile_data = user_data.get('account', {}).get('profile', {})
         except Exception as e:
             logger.error(f"Database error getting user data: {e}")
             user_data = {}
@@ -2294,6 +2313,13 @@ def dash():
         profile_data = {}
 
     today_str = date.today().strftime('%Y-%m-%d')
+    
+    # Set photo_url for template usage
+    photo_path = profile_data.get('photo_path')
+    if photo_path:
+        profile_data['photo_url'] = photo_path
+    else:
+        profile_data['photo_url'] = None
     
     return render_template('dash.html', 
                          username=current_user.username,
