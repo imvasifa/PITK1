@@ -1344,6 +1344,24 @@
         .dark-theme .copy-icon:hover {
             color: var(--accent-color);
         }
+
+        /* ...existing styles... */
+        #autoRefreshLinearBarContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 4px;
+            z-index: 2001;
+            background: transparent;
+        }
+        #autoRefreshLinearBar {
+            height: 100%;
+            width: 0%;
+            background: #2196f3;
+            transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+            border-radius: 0 2px 2px 0;
+        }
     </style>
     <script>
         document.addEventListener('contextmenu', function(e) {
@@ -1465,13 +1483,13 @@
             <button class="btn admin-conditions-btn" id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()">
                 <i class="fas fa-list-check"></i>
             </button>
-            <button class="settings-btn" onclick="showSettingsModal()">
+            <button class="settings-btn" data-bs-toggle="modal" data-bs-target="#settingsModal">
                 <i class="fas fa-cog"></i>
             </button>
             <button class="refresh-btn" onclick="refreshData()">
                 <i class="fas fa-sync-alt"></i>
             </button>
-            <button class="nifty-btn" onclick="showNiftyModal()">
+            <button class="nifty-btn" data-bs-toggle="modal" data-bs-target="#niftyModal">
                 <i class="fas fa-chart-bar"></i>
             </button>
 
@@ -1937,6 +1955,10 @@
         </div>
     </div>
 
+    <div id="autoRefreshLinearBarContainer">
+        <div id="autoRefreshLinearBar"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
     
@@ -2146,6 +2168,38 @@
             }
         });
     </script>
+
+    <script>
+    // --- Linear auto-refresh progress bar logic (frontend only) ---
+    function getRandomInterval() {
+        return Math.floor(Math.random() * (130 - 110 + 1)) + 110;
+    }
+    var linearBar = document.getElementById('autoRefreshLinearBar');
+    var interval = getRandomInterval();
+    var secondsLeft = interval;
+    var refreshTimerText = document.getElementById('refresh-timer');
+    if (refreshTimerText) {
+        refreshTimerText.textContent = secondsLeft + ' seconds';
+    }
+    function updateLinearBarFrontend() {
+        if (secondsLeft <= 0) {
+            // Prevent further decrements and reload only once
+            if (!window.__refreshing) {
+                window.__refreshing = true;
+                window.location.reload();
+            }
+            return;
+        }
+        secondsLeft--;
+        var percent = 100 - Math.round((secondsLeft / interval) * 100);
+        linearBar.style.width = percent + '%';
+        if (refreshTimerText) {
+            refreshTimerText.textContent = secondsLeft + ' seconds';
+        }
+    }
+    linearBar.style.width = '0%';
+    setInterval(updateLinearBarFrontend, 1000);
+    </script>
 {% endblock %}
 
 {% block modals %}
@@ -2321,6 +2375,8 @@
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', filename='js/user-conditions.js') }}"></script>
+<!-- Removed old fetch-based auto-refresh progress bar logic. Only frontend timer/progress bar remains. -->
+// ... existing code ...
 {% endblock %}
 
 {% endblock %}

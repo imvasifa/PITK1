@@ -143,16 +143,24 @@
             </div>
                         <div class="tab-pane fade" id="password" role="tabpanel" aria-labelledby="password-tab">
                 <div class="card-body">
-                                <form method="POST" action="{{ url_for('dash') }}">
-                        <div class="mb-3">
-                            <label for="current_password" class="form-label">Current Password</label>
-                            <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    {% if profile.email == '' or not profile.email %}
+                    <div class="toast align-items-center text-white bg-warning border-0 show" id="emailWarningToast" role="alert" aria-live="assertive" aria-atomic="true" style="position: fixed; top: 80px; right: 20px; z-index: 2000; min-width: 300px;">
+                      <div class="d-flex">
+                        <div class="toast-body">
+                          <i class="fas fa-exclamation-triangle me-2"></i>
+                          <strong>Warning:</strong> Please set your email address in your profile. Without an email, you cannot recover your password if you forget it!
                         </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                      </div>
+                    </div>
+                    {% endif %}
+                                <form method="POST" action="{{ url_for('dash') }}">
                         <div class="mb-3">
                             <label for="new_password" class="form-label">New Password</label>
                             <input type="password" class="form-control" id="new_password" name="new_password" required>
                         </div>
                         <button type="submit" class="btn btn-primary">Change Password</button>
+                        <a href="#" id="forgotPasswordLink" class="btn btn-link">Forgot Password?</a>
                     </form>
                 </div>
             </div>
@@ -333,6 +341,28 @@ document.addEventListener('DOMContentLoaded', function() {
         removePhotoForm.addEventListener('submit', function() {
             loadingMessage.textContent = 'Removing photo...';
             loadingOverlay.style.display = 'flex';
+        });
+    }
+
+    // Toast warning for missing email
+    var email = "{{ profile.email|default('') }}";
+    if (!email) {
+        var toastEl = document.getElementById('emailWarningToast');
+        if (toastEl) {
+            var toast = new bootstrap.Toast(toastEl, { autohide: false });
+            toast.show();
+        }
+    }
+    // Forgot Password link handler
+    var forgotLink = document.getElementById('forgotPasswordLink');
+    if (forgotLink) {
+        forgotLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!email) {
+                alert('You must set your email address in your profile before you can reset your password.');
+            } else {
+                alert('A password reset link would be sent to your email (feature coming soon).');
+            }
         });
     }
 });

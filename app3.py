@@ -56,18 +56,18 @@ app = Flask(__name__, static_url_path='/static', static_folder='static')
 # Generate a secure secret key if not exists, or use environment variable
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
 
-# Configure session to expire after 7 minutes (420 seconds)
-app.config['PERMANENT_SESSION_LIFETIME'] = 420  # 7 minutes in seconds
+# Configure session to expire after 2 hours (7200 seconds)
+app.config['PERMANENT_SESSION_LIFETIME'] = 7200  # 2 hours in seconds
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_REFRESH_EACH_REQUEST'] = False  # Don't refresh on each request
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
 
 # Configure Flask-Login
-app.config['REMEMBER_COOKIE_DURATION'] = 420  # 7 minutes in seconds
+app.config['REMEMBER_COOKIE_DURATION'] = 7200  # 2 hours in seconds
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-app.config['REMEMBER_COOKIE_REFRESH_EACH_REQUEST'] = False  # Don't refresh remember token
+app.config['REMEMBER_COOKIE_REFRESH_EACH_REQUEST'] = True  # Refresh remember token on each request
 
 # Initialize Bcrypt
 bcrypt = Bcrypt(app)
@@ -78,6 +78,10 @@ login_manager.init_app(app)
 
 login_manager.login_view = 'login'  # type: ignore
 
+@app.before_request
+def make_session_permanent():
+    if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
+        session.permanent = True  # type: ignore[attr-defined]
 
 def get_user_data(user_id):
     """
@@ -2989,7 +2993,7 @@ def delete_user_condition(condition_id):
 @app.route('/reset-profile', methods=['POST'])
 @login_required
 def reset_profile():
-    """Reset user profile data to default values except username"""
+    """Reset user profile data to default values except username. Also delete the user's uploaded profile image if it exists."""
     try:
         # Get the current user ID
         user_id = current_user.id
@@ -3026,13 +3030,26 @@ def reset_profile():
         if 'profile' not in user_data['account']:
             user_data['account']['profile'] = {}
         
+        profile = user_data['account']['profile']
+        # Delete the user's uploaded photo if it exists
+        photo_path = profile.get('photo_path', '')
+        if photo_path and '/static/uploads/' in photo_path:
+            # Remove leading slash for os.path
+            file_path = photo_path.lstrip('/')
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted user profile image: {file_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting user profile image: {e}")
+        
         # Get current username and premium status to preserve them
         current_username = user_data['account'].get('username', '')
         current_premium = user_data['account'].get('profile', {}).get('premium', 'no')
         
         # Reset profile fields to default values
         user_data['account']['profile'] = {
-            'name': current_username,  # Reset to username
+            'name': '',  # Reset to empty (not username)
             'email': '',  # Reset to empty
             'premium': current_premium,  # Preserve premium status
             'dob': '',  # Reset to empty

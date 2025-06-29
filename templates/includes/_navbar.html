@@ -25,6 +25,7 @@
                             {% set user_photo = url_for('static', filename='user_photos/default_free.png') %}
                         {% endif %}
                     {% endif %}
+                    <!-- DEBUG: user_photo = {{ user_photo }} -->
                     <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="{{ user_photo }}" alt="Profile" width="36" height="36" class="rounded-circle me-2" style="object-fit: cover; border: 2px solid #fff;">
                         <span class="d-none d-lg-inline">{{ username }}</span>
