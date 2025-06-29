@@ -96,6 +96,9 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab" aria-controls="password" aria-selected="false">Change Password</button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="refresh-tab" data-bs-toggle="tab" data-bs-target="#refresh-settings" type="button" role="tab" aria-controls="refresh-settings" aria-selected="false">Auto-Refresh</button>
+                        </li>
                     </ul>
                     <div class="tab-content" id="myTabContent">
                         <div class="tab-pane fade show active" id="profile" role="tabpanel" aria-labelledby="profile-tab">
@@ -141,6 +144,39 @@
                                 </form>
                 </div>
             </div>
+                        <div class="tab-pane fade" id="refresh-settings" role="tabpanel" aria-labelledby="refresh-tab">
+                            <div class="card-body">
+                                <h5 class="card-title">Auto-Refresh Settings</h5>
+                                <p class="text-muted">Set your preferred auto-refresh interval (in seconds)</p>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <input type="number" id="refreshInterval" class="form-control" min="30" max="300" value="{{ profile.refresh_interval or 120 }}" placeholder="Enter seconds (30-300)">
+                                            <button class="btn btn-primary" type="button" id="saveRefreshInterval">
+                                                <i class="fas fa-save me-1"></i> Save
+                                            </button>
+                                        </div>
+                                        <div class="form-text">
+                                            Current setting: 
+                                            <span id="currentInterval">
+                                                {% if profile.refresh_interval %}
+                                                    {{ profile.refresh_interval }} seconds (±10 seconds)
+                                                {% else %}
+                                                    Using default (110-130 seconds)
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    The actual refresh will happen within ±10 seconds of your chosen interval to distribute server load.
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="tab-pane fade" id="password" role="tabpanel" aria-labelledby="password-tab">
                 <div class="card-body">
                     {% if profile.email == '' or not profile.email %}
@@ -363,6 +399,69 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 alert('A password reset link would be sent to your email (feature coming soon).');
             }
+        });
+    }
+    
+    // Handle refresh interval settings
+    const refreshIntervalInput = document.getElementById('refreshInterval');
+    const saveRefreshIntervalBtn = document.getElementById('saveRefreshInterval');
+    const currentIntervalSpan = document.getElementById('currentInterval');
+    
+    if (saveRefreshIntervalBtn && refreshIntervalInput) {
+        saveRefreshIntervalBtn.addEventListener('click', function() {
+            const interval = parseInt(refreshIntervalInput.value);
+            
+            if (isNaN(interval) || interval < 30 || interval > 300) {
+                alert('Please enter a valid number between 30 and 300 seconds');
+                return;
+            }
+            
+            // Show loading state
+            const originalText = saveRefreshIntervalBtn.innerHTML;
+            saveRefreshIntervalBtn.disabled = true;
+            saveRefreshIntervalBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+            
+            // Send request to update interval
+            fetch('/update-refresh-interval', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ interval: interval })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI to show new interval
+                    currentIntervalSpan.textContent = `${interval} seconds (±10 seconds)`;
+                    
+                    // Show success message
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success mt-3';
+                    alert.role = 'alert';
+                    alert.innerHTML = `
+                        <i class="fas fa-check-circle me-2"></i>
+                        ${data.message}
+                    `;
+                    saveRefreshIntervalBtn.closest('.card-body').insertBefore(alert, saveRefreshIntervalBtn.closest('.row').nextSibling);
+                    
+                    // Remove success message after 3 seconds
+                    setTimeout(() => {
+                        alert.remove();
+                    }, 3000);
+                } else {
+                    throw new Error(data.message || 'Failed to update refresh interval');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating refresh interval:', error);
+                alert('Failed to update refresh interval: ' + (error.message || 'Unknown error'));
+            })
+            .finally(() => {
+                // Reset button state
+                saveRefreshIntervalBtn.disabled = false;
+                saveRefreshIntervalBtn.innerHTML = originalText;
+            });
         });
     }
 });

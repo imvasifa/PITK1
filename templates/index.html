@@ -1646,7 +1646,11 @@
                                     {% set user_photo = url_for('static', filename='user_photos/default_free.png') %}
                                 {% endif %}
                             {% endif %}
-                            <img src="{{ user_photo }}" alt="User Photo" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" onerror="this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'">
+                            {% set default_photo = url_for('static', filename='user_photos/default_free.png') %}
+                            <img src="{{ user_photo }}" 
+                                 alt="User Photo" 
+                                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" 
+                                 onerror="this.onerror=null; this.src='{{ default_photo }}';">
                             <div style="font-weight: 500;">{{ current_user.username }}</div>
                             {% if current_user.email %}
                             <div style="font-size: 0.8em; color: #5f6368;">{{ current_user.email }}</div>
@@ -2184,16 +2188,53 @@
 
     <script>
     // --- Linear auto-refresh progress bar logic (frontend only) ---
-    function getRandomInterval() {
+    function getRandomInterval(baseInterval) {
+        // If baseInterval is provided, return a value within ±10 seconds of it
+        if (baseInterval) {
+            const min = Math.max(30, baseInterval - 10); // Ensure minimum 30 seconds
+            const max = baseInterval + 10;
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        // Default random interval between 110-130 seconds
         return Math.floor(Math.random() * (130 - 110 + 1)) + 110;
     }
+
+    // Initialize timer variables
     var linearBar = document.getElementById('autoRefreshLinearBar');
-    var interval = getRandomInterval();
-    var secondsLeft = interval;
     var refreshTimerText = document.getElementById('refresh-timer');
-    if (refreshTimerText) {
-        refreshTimerText.textContent = secondsLeft + ' seconds';
+    var baseInterval = null; // Will be set after fetching user's preference
+    var interval = getRandomInterval(110); // Default to 110-130 range initially
+    var secondsLeft = interval;
+    
+    // Function to update the timer display
+    function updateTimerDisplay() {
+        if (refreshTimerText) {
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = secondsLeft % 60;
+            refreshTimerText.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
     }
+    
+    // Initialize the timer display
+    updateTimerDisplay();
+    
+    // Fetch user's custom refresh interval
+    fetch('/get-refresh-interval')
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_custom && data.interval) {
+                baseInterval = parseInt(data.interval);
+                // Reset the interval with the custom base
+                interval = getRandomInterval(baseInterval);
+                secondsLeft = interval;
+                updateTimerDisplay();
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching refresh interval:', error);
+            // Continue with default interval
+            updateTimerDisplay();
+        });
     
     // Function to handle manual refresh
     window.refreshData = function() {
@@ -2217,16 +2258,24 @@
             // Prevent further decrements and reload only once
             if (!window.__refreshing) {
                 window.__refreshing = true;
-                window.location.reload();
+                // Show loading overlay if it exists
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'flex';
+                }
+                // Small delay to show the loading overlay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
             }
             return;
         }
         secondsLeft--;
         var percent = 100 - Math.round((secondsLeft / interval) * 100);
-        linearBar.style.width = percent + '%';
-        if (refreshTimerText) {
-            refreshTimerText.textContent = secondsLeft + ' seconds';
+        if (linearBar) {
+            linearBar.style.width = percent + '%';
         }
+        updateTimerDisplay();
     }
     linearBar.style.width = '0%';
     setInterval(updateLinearBarFrontend, 1000);

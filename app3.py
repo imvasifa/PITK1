@@ -1586,10 +1586,68 @@ def get_random_interval():
 def get_refresh_interval():
     """Return the current refresh interval in seconds"""
     global countdown_timer
+    
+    # Get user's custom refresh interval if set
+    custom_interval = None
+    if current_user.is_authenticated:
+        user_data = get_user_data(current_user.id)
+        if user_data and 'account' in user_data and 'refresh_interval' in user_data['account']:
+            custom_interval = user_data['account']['refresh_interval']
+    
     return jsonify({
-        'interval': countdown_timer,
-        'next_refresh_in': countdown_timer
+        'interval': custom_interval or countdown_timer,
+        'next_refresh_in': countdown_timer,
+        'is_custom': custom_interval is not None
     })
+
+@app.route('/update-refresh-interval', methods=['POST'])
+@login_required
+def update_refresh_interval():
+    """Update the user's refresh interval setting"""
+    try:
+        data = request.get_json()
+        interval = data.get('interval')
+        
+        # Validate interval
+        try:
+            interval = int(interval)
+            if interval < 30 or interval > 300:  # 30 seconds to 5 minutes
+                return jsonify({'success': False, 'message': 'Interval must be between 30 and 300 seconds'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'message': 'Invalid interval value'}), 400
+        
+        # Update user's refresh interval in database
+        user_data = get_user_data(current_user.id)
+        if not user_data:
+            user_data = {'account': {}}
+        
+        if 'account' not in user_data:
+            user_data['account'] = {}
+            
+        user_data['account']['refresh_interval'] = interval
+        
+        # Save updated user data
+        cur = db.get_cursor()
+        if not cur:
+            return jsonify({'success': False, 'message': 'Database error'}), 500
+            
+        cur.execute(
+            "UPDATE users SET user_data = %s WHERE id = %s RETURNING id",
+            (json.dumps(user_data), current_user.id)
+        )
+        db.conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Refresh interval updated successfully',
+            'interval': interval
+        })
+        
+    except Exception as e:
+        if 'db' in locals() and hasattr(db, 'conn') and db.conn:
+            db.conn.rollback()
+        logger.error(f"Error updating refresh interval: {e}")
+        return jsonify({'success': False, 'message': 'Server error'}), 500
 
 def update_data():
     """
@@ -2354,10 +2412,14 @@ def dash():
     else:
         profile_data['photo_url'] = None
     
+    # Get refresh interval from user data if it exists
+    refresh_interval = user_data.get('account', {}).get('refresh_interval')
+    if refresh_interval is not None:
+        profile_data['refresh_interval'] = refresh_interval
+    
     return render_template('dash.html', 
                          username=current_user.username,
                          email=profile_data.get('email', ''),
-                         refresh_interval=user_data.get('refresh_interval', 120),
                          profile=profile_data,
                          error=error,
                          success=success,
@@ -2466,13 +2528,19 @@ def index():
                     conditions_with_stocks.append({**condition, "stocks": []})
                     break
 
+    # Get user data for the template
+    user_data = None
+    if current_user.is_authenticated:
+        user_data = get_user_data(current_user.id)
+    
     # Render the template with the settings
     return render_template(
         'index.html',
         conditions=conditions_with_stocks,
         flash_message=flash_message,
         buy_suggestions=buy_suggestions,
-        sell_suggestions=sell_suggestions
+        sell_suggestions=sell_suggestions,
+        user_data=user_data
     )
 
 @app.route('/get-settings')
