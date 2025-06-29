@@ -144,6 +144,14 @@ def utility_processor():
         return get_user_data(user_id)
     return dict(get_user_data=get_user_data_processor)
 
+@app.context_processor
+def inject_profile():
+    if current_user.is_authenticated:
+        user_data = get_user_data(current_user.id)
+        profile = user_data.get('account', {}).get('profile', {}) if user_data else {}
+        return dict(profile=profile)
+    return dict(profile={})
+
 # User class with proper type handling
 class User(UserMixin):
     def __init__(self, id, username, password, email=''):
@@ -2977,6 +2985,86 @@ def delete_user_condition(condition_id):
             'error': 'Failed to delete condition',
             'message': str(e)
         }), 500
+
+@app.route('/reset-profile', methods=['POST'])
+@login_required
+def reset_profile():
+    """Reset user profile data to default values except username"""
+    try:
+        # Get the current user ID
+        user_id = current_user.id
+        
+        # Get the user's current data from PostgreSQL
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+        
+        # Get current user data
+        cur.execute("""
+            SELECT user_data FROM users WHERE id = %s
+        """, (user_id,))
+        
+        result = cur.fetchone()
+        if not result:
+            logger.error(f"User {user_id} not found in database")
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        # Handle both dictionary and tuple results
+        if isinstance(result, dict):
+            user_data = result.get('user_data')
+        else:  # tuple
+            user_data = result[0] if len(result) > 0 else None
+        
+        if not user_data:
+            logger.error(f"No user_data found for user {user_id}")
+            return jsonify({'success': False, 'error': 'User data not found'}), 404
+        
+        # Ensure account and profile structure exists
+        if 'account' not in user_data:
+            user_data['account'] = {}
+        if 'profile' not in user_data['account']:
+            user_data['account']['profile'] = {}
+        
+        # Get current username and premium status to preserve them
+        current_username = user_data['account'].get('username', '')
+        current_premium = user_data['account'].get('profile', {}).get('premium', 'no')
+        
+        # Reset profile fields to default values
+        user_data['account']['profile'] = {
+            'name': current_username,  # Reset to username
+            'email': '',  # Reset to empty
+            'premium': current_premium,  # Preserve premium status
+            'dob': '',  # Reset to empty
+            'gender': 'Prefer not to say',  # Reset to default
+            'bio': '',  # Reset to empty
+            'photo_path': '',  # Reset to empty (will remove photo)
+            'photo_url': ''  # Reset to empty
+        }
+        
+        # Save the updated data back to PostgreSQL
+        cur.execute("""
+            UPDATE users 
+            SET user_data = %s
+            WHERE id = %s
+            RETURNING id
+        """, (json.dumps(user_data), user_id))
+        
+        if cur.rowcount == 0:
+            logger.error(f"Failed to update user {user_id} profile")
+            return jsonify({'success': False, 'error': 'Failed to update profile'}), 500
+        
+        if db.conn is not None:
+            db.conn.commit()
+        
+        logger.info(f"Successfully reset profile for user {user_id}")
+        return jsonify({'success': True, 'message': 'Profile reset successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error resetting profile: {e}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({'success': False, 'error': 'Error resetting profile'}), 500
 
 def start_threads_once():
     """Start all background threads if they're not already running"""

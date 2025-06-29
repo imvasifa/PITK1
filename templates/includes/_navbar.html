@@ -15,6 +15,27 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
+                <!-- Profile dropdown with avatar -->
+                <li class="nav-item dropdown d-flex align-items-center">
+                    {% set user_photo = profile.photo_url %}
+                    {% if not user_photo or 'default.jpg' in user_photo %}
+                        {% if profile.premium == 'yes' %}
+                            {% set user_photo = url_for('static', filename='user_photos/default_premium.png') %}
+                        {% else %}
+                            {% set user_photo = url_for('static', filename='user_photos/default_free.png') %}
+                        {% endif %}
+                    {% endif %}
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <img src="{{ user_photo }}" alt="Profile" width="36" height="36" class="rounded-circle me-2" style="object-fit: cover; border: 2px solid #fff;">
+                        <span class="d-none d-lg-inline">{{ username }}</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('dash') }}"><i class="fas fa-user"></i> Dashboard</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                    </ul>
+                </li>
+                <!-- Other nav items -->
                 <li class="nav-item">
                     <button class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#conditionsModal">Conditions</button>
                 </li>
@@ -32,12 +53,6 @@
                 </li>
                 <li class="nav-item">
                     <button id="filter-btn" class="btn btn-primary me-2"><i class="fas fa-filter"></i></button>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('dash') }}" class="btn btn-primary me-2 btn-dashboard">Dashboard</a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-logout">Logout</a>
                 </li>
             </ul>
         </div>

@@ -2,7 +2,50 @@
 
 {% block title %}Register - PRICE IS THE KING{% endblock %}
 
+{% block extra_css %}
+<style>
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 9999;
+    }
+    
+    .loading-message {
+        color: white;
+        text-align: center;
+        margin-top: 20px;
+    }
+    
+    .loading-message h3 {
+        margin-bottom: 10px;
+        font-size: 1.5rem;
+    }
+    
+    .loading-message p {
+        font-size: 1rem;
+        opacity: 0.8;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;">
+    <div class="loading-message">
+        <h3>PRICE IS THE KING</h3>
+        <p>Creating your account...</p>
+    </div>
+</div>
+
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-6 col-lg-5">
@@ -16,7 +59,7 @@
                     {% if error %}
                         <div class="alert alert-danger">{{ error }}</div>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('register') }}">
+                    <form method="POST" action="{{ url_for('register') }}" id="registerForm">
                         <div class="mb-3">
                             <label for="username" class="form-label">Username</label>
                             <input type="text" class="form-control" id="username" name="username" required>
@@ -30,7 +73,7 @@
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">
+                            <button type="submit" class="btn btn-primary btn-lg" id="registerBtn">
                                 <i class="fas fa-user-plus me-2"></i>Register
                             </button>
                         </div>
@@ -45,4 +88,25 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const registerForm = document.getElementById('registerForm');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const registerBtn = document.getElementById('registerBtn');
+    
+    if (registerForm) {
+        registerForm.addEventListener('submit', function() {
+            // Show loader
+            loadingOverlay.style.display = 'flex';
+            
+            // Disable submit button to prevent double submission
+            registerBtn.disabled = true;
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating account...';
+        });
+    }
+});
+</script>
 {% endblock %}
