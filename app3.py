@@ -1600,6 +1600,48 @@ def get_refresh_interval():
         'is_custom': custom_interval is not None
     })
 
+@app.route('/get-theme', methods=['GET'])
+@login_required
+def get_theme():
+    """Return the user's saved theme preference ('dark' or 'light')"""
+    user_data = get_user_data(current_user.id)
+    theme = None
+    if user_data and 'account' in user_data and 'profile' in user_data['account']:
+        theme = user_data['account']['profile'].get('theme', 'light')
+    return jsonify({'theme': theme or 'light'})
+
+@app.route('/update-theme', methods=['POST'])
+@login_required
+def update_theme():
+    """Update the user's theme preference ('dark' or 'light')"""
+    try:
+        data = request.get_json()
+        theme = data.get('theme')
+        if theme not in ('dark', 'light'):
+            return jsonify({'success': False, 'message': 'Invalid theme'}), 400
+        user_data = get_user_data(current_user.id)
+        if not user_data:
+            user_data = {'account': {'profile': {}}}
+        if 'account' not in user_data:
+            user_data['account'] = {}
+        if 'profile' not in user_data['account']:
+            user_data['account']['profile'] = {}
+        user_data['account']['profile']['theme'] = theme
+        cur = db.get_cursor()
+        if not cur:
+            return jsonify({'success': False, 'message': 'Database error'}), 500
+        cur.execute(
+            "UPDATE users SET user_data = %s WHERE id = %s RETURNING id",
+            (json.dumps(user_data), current_user.id)
+        )
+        db.conn.commit()
+        return jsonify({'success': True, 'theme': theme})
+    except Exception as e:
+        if 'db' in locals() and hasattr(db, 'conn') and db.conn:
+            db.conn.rollback()
+        logger.error(f"Error updating theme: {e}")
+        return jsonify({'success': False, 'message': 'Server error'}), 500
+
 @app.route('/update-refresh-interval', methods=['POST'])
 @login_required
 def update_refresh_interval():
@@ -2416,11 +2458,15 @@ def dash():
     refresh_interval = user_data.get('account', {}).get('refresh_interval')
     if refresh_interval is not None:
         profile_data['refresh_interval'] = refresh_interval
+    # Get theme from user data if it exists
+    theme = user_data.get('account', {}).get('profile', {}).get('theme', 'light')
+    profile_data['theme'] = theme
     
     return render_template('dash.html', 
                          username=current_user.username,
                          email=profile_data.get('email', ''),
                          profile=profile_data,
+                         theme=theme,
                          error=error,
                          success=success,
                          today=today_str)
@@ -2530,18 +2576,19 @@ def index():
 
     # Get user data for the template
     user_data = None
+    theme = 'light'
     if current_user.is_authenticated:
         user_data = get_user_data(current_user.id)
-    
-    # Render the template with the settings
-    return render_template(
-        'index.html',
-        conditions=conditions_with_stocks,
-        flash_message=flash_message,
-        buy_suggestions=buy_suggestions,
-        sell_suggestions=sell_suggestions,
-        user_data=user_data
-    )
+        if user_data and 'account' in user_data and 'profile' in user_data['account']:
+            theme = user_data['account']['profile'].get('theme', 'light')
+    return render_template('index.html',
+                           user_data=user_data,
+                           theme=theme,
+                           conditions=conditions_with_stocks,
+                           flash_message=flash_message,
+                           buy_suggestions=buy_suggestions,
+                           sell_suggestions=sell_suggestions)
+
 
 @app.route('/get-settings')
 def get_settings():

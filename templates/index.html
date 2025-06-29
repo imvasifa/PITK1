@@ -1479,6 +1479,12 @@
             </span>
         </div>
         <div class="navbar-buttons">
+            <!-- Dark Mode Toggle with Sun/Moon Icons -->
+            <div class="d-inline-block align-middle ms-3" id="themeToggleContainer">
+                <button id="themeSwitchBtn" class="btn btn-outline-secondary" style="font-size: 1.3rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                    <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                </button>
+            </div>
             <!-- Admin Conditions Button -->
             <button class="btn admin-conditions-btn" id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()">
                 <i class="fas fa-list-check"></i>
@@ -2262,11 +2268,14 @@
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 if (loadingOverlay) {
                     loadingOverlay.style.display = 'flex';
-                }
-                // Small delay to show the loading overlay
-                setTimeout(() => {
+                    // Minimal delay for smoother transition (10ms)
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 10);  // Reduced to minimal 10ms delay
+                } else {
+                    // If no overlay, reload immediately
                     window.location.reload();
-                }, 500);
+                }
             }
             return;
         }
@@ -2279,6 +2288,35 @@
     }
     linearBar.style.width = '0%';
     setInterval(updateLinearBarFrontend, 1000);
+
+    // --- Global Dark Mode Toggle Logic with Sun/Moon Icons ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const themeSwitchBtn = document.getElementById('themeSwitchBtn');
+        const themeIcon = document.getElementById('themeIcon');
+        function setThemeIcon(isDark) {
+            if (isDark) {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            } else {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            }
+        }
+        if (themeSwitchBtn && themeIcon) {
+            // Set icon on load
+            setThemeIcon(document.body.classList.contains('dark-theme'));
+            themeSwitchBtn.addEventListener('click', function() {
+                const isDark = !document.body.classList.contains('dark-theme');
+                document.body.classList.toggle('dark-theme', isDark);
+                setThemeIcon(isDark);
+                fetch('/update-theme', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: isDark ? 'dark' : 'light' })
+                });
+            });
+        }
+    });
     </script>
 {% endblock %}
 
