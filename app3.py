@@ -2461,7 +2461,7 @@ def dash():
     # Get theme from user data if it exists
     theme = user_data.get('account', {}).get('profile', {}).get('theme', 'light')
     profile_data['theme'] = theme
-    
+    # Always pass theme to template
     return render_template('dash.html', 
                          username=current_user.username,
                          email=profile_data.get('email', ''),

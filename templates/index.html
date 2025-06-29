@@ -2205,6 +2205,73 @@
         return Math.floor(Math.random() * (130 - 110 + 1)) + 110;
     }
 
+    // Track if any modal is currently open
+    let isAnyModalOpen = false;
+    let pausedTimer = false;
+    let pausedSecondsLeft = 0;
+    
+    // Function to check if any Bootstrap modal is open
+    function checkForOpenModals() {
+        // Check for the specific conditions modal
+        const conditionsModal = document.getElementById('conditionsModal');
+        if (conditionsModal && conditionsModal.classList.contains('show')) {
+            return true;
+        }
+        
+        // Check for any other modals that might be open
+        const openModals = document.querySelectorAll('.modal.show');
+        return openModals.length > 0;
+    }
+    
+    // Direct check for the conditions modal
+    function checkConditionsModal() {
+        const conditionsModal = document.getElementById('conditionsModal');
+        return conditionsModal && (conditionsModal.classList.contains('show') || 
+               conditionsModal.style.display === 'block' || 
+               getComputedStyle(conditionsModal).display !== 'none');
+    }
+    
+    // Manual check for modals every second as a fallback
+    setInterval(function() {
+        const modalOpen = checkForOpenModals() || checkConditionsModal();
+        if (modalOpen && !isAnyModalOpen) {
+            isAnyModalOpen = true;
+            if (!pausedTimer) {
+                pausedSecondsLeft = secondsLeft;
+                pausedTimer = true;
+                console.log('Timer paused due to detected modal');
+            }
+        } else if (!modalOpen && isAnyModalOpen) {
+            isAnyModalOpen = false;
+            if (pausedTimer) {
+                secondsLeft = pausedSecondsLeft;
+                pausedTimer = false;
+                console.log('Timer resumed after modal closed');
+            }
+        }
+    }, 1000);
+    
+    // Listen for standard Bootstrap modal events
+    document.addEventListener('shown.bs.modal', function(event) {
+        console.log('Modal shown event fired', event.target.id);
+        isAnyModalOpen = true;
+        if (!pausedTimer) {
+            pausedSecondsLeft = secondsLeft;
+            pausedTimer = true;
+            console.log('Timer paused due to open modal');
+        }
+    });
+    
+    document.addEventListener('hidden.bs.modal', function() {
+        // Check if there are still other modals open
+        isAnyModalOpen = checkForOpenModals();
+        if (!isAnyModalOpen && pausedTimer) {
+            secondsLeft = pausedSecondsLeft;
+            pausedTimer = false;
+            console.log('Timer resumed after modal closed');
+        }
+    });
+    
     // Initialize timer variables
     var linearBar = document.getElementById('autoRefreshLinearBar');
     var refreshTimerText = document.getElementById('refresh-timer');
@@ -2260,18 +2327,30 @@
         }, 500);
     };
     function updateLinearBarFrontend() {
+        // Don't update timer if any modal is open
+        if (isAnyModalOpen) {
+            return;
+        }
+        
         if (secondsLeft <= 0) {
             // Prevent further decrements and reload only once
             if (!window.__refreshing) {
+                // Double-check no modals are open before refreshing
+                if (checkForOpenModals()) {
+                    console.log('Refresh prevented due to open modal');
+                    secondsLeft = 5; // Give a small buffer before checking again
+                    return;
+                }
+                
                 window.__refreshing = true;
                 // Show loading overlay if it exists
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 if (loadingOverlay) {
                     loadingOverlay.style.display = 'flex';
-                    // Minimal delay for smoother transition (10ms)
+                    // Show for minimal time before reload
                     setTimeout(() => {
                         window.location.reload();
-                    }, 10);  // Reduced to minimal 10ms delay
+                    }, 10);
                 } else {
                     // If no overlay, reload immediately
                     window.location.reload();
