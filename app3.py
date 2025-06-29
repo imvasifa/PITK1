@@ -10,14 +10,14 @@ from pathlib import Path
 import platform 
 import queue
 import random
-import bcrypt
 import re
 import sys
 import tempfile
 import threading
 import time
+import traceback
+import uuid
 import winsound
-import os
 from werkzeug.exceptions import HTTPException
 
 class AppTemporarilyUnavailable(HTTPException):
@@ -35,8 +35,6 @@ from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import os
-import json
 from functools import wraps
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo
@@ -53,12 +51,9 @@ countdown_timer = 0  # Initialize countdown timer (0 means no cooldown)
 beep_interval = 30  # Beep every 30 seconds
 beep_running = True  # Control the beep thread
 
-
-
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
 # Generate a secure secret key if not exists, or use environment variable
-import os
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
 
 # Configure session to expire after 7 minutes (420 seconds)
@@ -80,7 +75,9 @@ bcrypt = Bcrypt(app)
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+
+login_manager.login_view = 'login'  # type: ignore
+
 
 def get_user_data(user_id):
     """
@@ -132,13 +129,11 @@ def get_user_data(user_id):
                 
         except Exception as query_error:
             print(f"❌ [get_user_data] Database query failed: {query_error}")
-            import traceback
             traceback.print_exc()
             return None
             
     except Exception as e:
         print(f"❌ [get_user_data] Unexpected error: {e}")
-        import traceback
         traceback.print_exc()
         return None
 
@@ -256,7 +251,6 @@ def load_user(user_id):
         
     except Exception as e:
         print(f"❌ [load_user] Error loading user: {e}")
-        import traceback
         traceback.print_exc()
         return None
         return None
@@ -295,8 +289,9 @@ def authenticate_user(username, password):
             
         # Convert to dictionary if it's not already
         if not isinstance(user_data, dict):
-            columns = [desc[0] for desc in cur.description]
-            user_data = dict(zip(columns, user_data))
+            if cur.description:  # Add null check
+                columns = [desc[0] for desc in cur.description]
+                user_data = dict(zip(columns, user_data))
         
         # Debug print user data (without password hash for security)
         print(f"✅ Found user: {user_data.get('username')} (ID: {user_data.get('id')})")
@@ -323,7 +318,6 @@ def authenticate_user(username, password):
                 
         except Exception as e:
             print(f"❌ Error verifying password: {str(e)}")
-            import traceback
             traceback.print_exc()
             return None
                 
@@ -341,7 +335,6 @@ def authenticate_user(username, password):
             
     except Exception as e:
         print(f"❌ Error authenticating user: {e}")
-        import traceback
         traceback.print_exc()
         return None
         print(f"❌ Error authenticating user: {str(e)}")
@@ -388,9 +381,14 @@ def save_user(username, password, email=''):
             RETURNING id
         """, (username, hashed_password, json.dumps(user_data)))
         
-        user_id = cur.fetchone()[0]
-        db.conn.commit()
-        return str(user_id)
+        result = cur.fetchone()
+        if result:
+            user_id = result[0]
+            db.conn.commit()
+            return str(user_id)
+        else:
+            print("❌ Failed to get user ID after insert")
+            return None
         
     except Exception as e:
         print(f"Error saving user: {e}")
@@ -422,7 +420,7 @@ def format_number(num):
     return str(num)
 
 # Add format_number as a Jinja2 filter
-def format_number(value, column_type='default'):
+def format_number_with_type(value, column_type='default'):
     if value is None:
         return '-'
     
@@ -452,7 +450,7 @@ def format_number(value, column_type='default'):
         return str(value)
 
 # Register the filter
-app.jinja_env.filters['format_number'] = format_number
+app.jinja_env.filters['format_number'] = format_number_with_type
 
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -1398,7 +1396,7 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
             logger.error("Could not find CSRF token")
             return {"error": "Could not find CSRF token"}
         
-        header = {"x-csrf-token": meta["content"]}
+        header = {"x-csrf-token": meta["content"]}  # type: ignore
         # logger.info("CSRF token obtained successfully")
 
         try:
@@ -1609,8 +1607,6 @@ def update_data():
             except Exception as e:
                 logger.error(f"Unexpected error in _update_with_context: {str(e)}", exc_info=True)
                 return False
-            logger.error(f"Error in _update_with_context: {e}", exc_info=True)
-            return False
     
     while running:
         try:
@@ -1850,7 +1846,7 @@ def login():
                 
                 if login_success:
                     # Configure session
-                    session.permanent = True  # Make the session permanent
+                    session.permanent = True  # type: ignore
                     app.permanent_session_lifetime = timedelta(minutes=7)
                     
                     logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
@@ -1994,21 +1990,24 @@ def register():
                         RETURNING id
                     """, (username, hashed_password, json.dumps(user_data)))
                     
-                    # Get the user ID and commit the transaction
-                    user_id = cur.fetchone()[0]
-                    conn.commit()
-                    
-                    # Log the user in with the hashed password
-                    user = User(id=str(user_id), username=username, password=hashed_password, email=email)
-                    login_user(user)
-                    return redirect(url_for('index'))
+                    result = cur.fetchone()
+                    if result:
+                        user_id = result[0]
+                        conn.commit()
+                        
+                        # Log the user in with the hashed password
+                        user = User(id=str(user_id), username=username, password=hashed_password, email=email)
+                        login_user(user)
+                        return redirect(url_for('index'))
+                    else:
+                        print("❌ Failed to get user ID after insert")
+                        error = 'Error creating user. Please try again.'
                 
             except Exception as e:
                 if 'conn' in locals() and conn is not None:
                     conn.rollback()
                 error = 'Error creating user. Please try again.'
                 print(f"Registration error: {str(e)}")
-                import traceback
                 traceback.print_exc()
             finally:
                 if 'cur' in locals() and cur is not None:
