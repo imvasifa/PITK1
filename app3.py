@@ -384,7 +384,8 @@ def save_user(username, password, email=''):
         result = cur.fetchone()
         if result:
             user_id = result[0]
-            db.conn.commit()
+            if db.conn is not None:
+                db.conn.commit()
             return str(user_id)
         else:
             print("❌ Failed to get user ID after insert")
@@ -392,7 +393,7 @@ def save_user(username, password, email=''):
         
     except Exception as e:
         print(f"Error saving user: {e}")
-        if 'db' in locals() and hasattr(db, 'conn'):
+        if 'db' in locals() and hasattr(db, 'conn') and db.conn is not None:
             db.conn.rollback()
         return None
 
@@ -1068,7 +1069,8 @@ def save_user_conditions(user_id, conditions_list):
             logger.info("[DEBUG] Query executed successfully")
             
             # Commit the transaction
-            db.conn.commit()
+            if db.conn is not None:
+                db.conn.commit()
             logger.info("[DEBUG] Transaction committed successfully")
             
             # Check if update was successful
@@ -1082,14 +1084,14 @@ def save_user_conditions(user_id, conditions_list):
             
         except Exception as e:
             logger.error(f"[DEBUG] Error executing query: {e}", exc_info=True)
-            if hasattr(db, 'conn') and db.conn:
+            if 'db' in locals() and hasattr(db, 'conn') and db.conn is not None:
                 db.conn.rollback()
                 logger.info("[DEBUG] Transaction rolled back")
             raise
             
     except Exception as e:
         logger.error(f"Error in save_user_conditions: {e}", exc_info=True)
-        if 'db' in locals() and hasattr(db, 'conn') and db.conn:
+        if 'db' in locals() and hasattr(db, 'conn') and db.conn is not None:
             db.conn.rollback()
         return False
     finally:
@@ -1188,13 +1190,14 @@ def ensure_app_settings_table():
                 logger.info("Created app_settings table and inserted default settings")
                 
                 # Commit the transaction
-                db.conn.commit()
+                if db.conn is not None:
+                    db.conn.commit()
                 
             return True
             
         except Exception as e:
             logger.error(f"Error in ensure_app_settings_table: {e}", exc_info=True)
-            if 'db' in locals() and hasattr(db, 'conn'):
+            if 'db' in locals() and hasattr(db, 'conn') and db.conn is not None:
                 db.conn.rollback()
             return False
             
@@ -1337,16 +1340,18 @@ def save_settings(settings):
         result = cur.fetchone()
         if not result:
             logger.error("Failed to verify settings update")
-            db.conn.rollback()
+            if db.conn is not None:
+                db.conn.rollback()
             return False
             
-        db.conn.commit()
+        if db.conn is not None:
+            db.conn.commit()
         logger.info("Successfully saved settings to database")
         return True
         
     except Exception as e:
         logger.error(f"Error saving settings: {e}", exc_info=True)
-        if db.conn:
+        if db.conn is not None:
             db.conn.rollback()
         return False
 
@@ -2031,11 +2036,11 @@ def upload_photo():
     if file:
         try:
             # Create uploads directory if it doesn't exist
-            upload_folder = os.path.join(app.static_folder, 'uploads')
+            upload_folder = os.path.join(app.static_folder or '.', 'uploads')
             os.makedirs(upload_folder, exist_ok=True)
             
             # Generate a secure filename
-            filename = secure_filename(file.filename)
+            filename = secure_filename(file.filename or '')
             unique_filename = f"{uuid.uuid4()}_{filename}"
             filepath = os.path.join(upload_folder, unique_filename)
             
@@ -2066,11 +2071,12 @@ def upload_photo():
             if cur.rowcount == 0:
                 flash('User not found', 'danger')
             else:
-                db.conn.commit()
+                if db.conn is not None:
+                    db.conn.commit()
                 flash('Profile picture updated successfully!', 'success')
                 
         except Exception as e:
-            if db.conn:
+            if db.conn is not None:
                 db.conn.rollback()
             # Clean up the file if there was an error
             if 'filepath' in locals() and os.path.exists(filepath):
@@ -2129,13 +2135,14 @@ def remove_photo():
         cur.execute(update_query, (current_user.id,))
         
         if cur.rowcount > 0:
-            db.conn.commit()
+            if db.conn is not None:
+                db.conn.commit()
             flash('Profile picture removed successfully!', 'success')
         else:
             flash('No profile picture found to remove.', 'info')
             
     except Exception as e:
-        if db.conn:
+        if db.conn is not None:
             db.conn.rollback()
         flash('Error removing profile picture.', 'danger')
         logger.error(f"Error in remove_photo: {e}")
@@ -2179,9 +2186,13 @@ def dash():
                     user_data['account']['profile'] = {}
                 
                 profile = user_data['account']['profile']
+                
+                # Update all profile fields from the form
                 profile['email'] = request.form.get('email', profile.get('email', ''))
                 profile['name'] = request.form.get('name', profile.get('name', ''))
                 profile['dob'] = request.form.get('dob', profile.get('dob', ''))
+                profile['gender'] = request.form.get('gender', profile.get('gender', 'Prefer not to say'))
+                profile['bio'] = request.form.get('bio', profile.get('bio', ''))
                 
                 # Save the updated data back to PostgreSQL
                 cur.execute("""
@@ -2195,12 +2206,13 @@ def dash():
                     logger.error(f"Failed to update user {user_id} profile")
                     return jsonify({'error': 'Failed to update profile'}), 500
                 
-                db.conn.commit()
+                if db.conn is not None:
+                    db.conn.commit()
                 success = 'Profile updated successfully!'
                 
             except Exception as e:
                 logger.error(f"Error updating profile: {e}", exc_info=True)
-                if db.conn:
+                if db.conn is not None:
                     db.conn.rollback()
                 error = 'Error updating profile'
         
@@ -2233,12 +2245,12 @@ def dash():
                     
                     if cur.rowcount == 0:
                         return jsonify({'error': 'User not found'}), 404
-                    
-                    db.conn.commit()
+                    if db.conn is not None:
+                        db.conn.commit()
                     success = 'Password updated successfully!'
                 except Exception as e:
                     logger.error(f"Database error updating user password: {e}")
-                    if db.conn:
+                    if db.conn is not None:
                         db.conn.rollback()
                     error = 'Error changing password'
             except Exception as e:
@@ -2918,101 +2930,6 @@ def delete_user_condition(condition_id):
             'error': 'Failed to delete condition',
             'message': str(e)
         }), 500
-
-def ensure_app_settings_table():
-    """Ensure the app_settings table exists in the database"""
-    try:
-        cur = db.get_cursor()
-        if not cur:
-            logger.error("Failed to get database cursor")
-            return False
-            
-        logger.info("Checking if app_settings table exists...")
-        
-        # Check if table exists using a more reliable method
-        cur.execute("""
-            SELECT to_regclass('public.app_settings') IS NOT NULL;
-        """)
-        
-        # Handle the result safely
-        result = cur.fetchone()
-        table_exists = False
-        
-        if result:
-            # Handle both dictionary and tuple results
-            if hasattr(result, 'keys') and result:  # It's a dictionary
-                # Get the first value from the dictionary
-                table_exists = list(result.values())[0]
-            elif isinstance(result, (tuple, list)) and len(result) > 0:  # It's a tuple or list
-                table_exists = result[0]
-            
-            # Ensure boolean value
-            table_exists = bool(table_exists)
-        
-        if not table_exists:
-            logger.info("Creating app_settings table...")
-            # Create the app_settings table if it doesn't exist
-            cur.execute("""
-                CREATE TABLE app_settings (
-                    id INTEGER PRIMARY KEY,
-                    settings JSONB NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Add a trigger to update the updated_at timestamp
-            cur.execute("""
-                CREATE OR REPLACE FUNCTION update_updated_at_column()
-                RETURNS TRIGGER AS $$
-                BEGIN
-                    NEW.updated_at = NOW();
-                    RETURN NEW;
-                END;
-                $$ LANGUAGE plpgsql;
-            """)
-            
-            cur.execute("""
-                DROP TRIGGER IF EXISTS update_app_settings_updated_at ON app_settings;
-                CREATE TRIGGER update_app_settings_updated_at
-                BEFORE UPDATE ON app_settings
-                FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-            """)
-            
-            # Insert default settings
-            default_settings = {
-                'refresh_interval': 20,
-                'mute_status': False,
-                'conditions': [],
-                'selected_conditions': [],
-                'user_conditions': [],
-                'auto_refresh': True,
-                'theme': 'light',
-                'notifications': True,
-                'sound_alert': True,
-                'volume': 0.5,
-                'last_update': None,
-                'version': '1.0.0'
-            }
-            
-            cur.execute("""
-                INSERT INTO app_settings (id, settings)
-                VALUES (1, %s)
-                ON CONFLICT (id) DO NOTHING;
-            """, (json.dumps(default_settings),))
-            
-            db.conn.commit()
-            logger.info("Created app_settings table and initialized with default settings")
-        else:
-            logger.info("app_settings table already exists")
-            
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error ensuring app_settings table exists: {e}", exc_info=True)
-        if db.conn:
-            db.conn.rollback()
-        return False
 
 def start_threads_once():
     """Start all background threads if they're not already running"""
