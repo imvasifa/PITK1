@@ -2210,66 +2210,95 @@
     let pausedTimer = false;
     let pausedSecondsLeft = 0;
     
-    // Function to check if any Bootstrap modal is open
+    // Function to check if any modal is open using multiple detection methods
     function checkForOpenModals() {
-        // Check for the specific conditions modal
-        const conditionsModal = document.getElementById('conditionsModal');
-        if (conditionsModal && conditionsModal.classList.contains('show')) {
-            return true;
+        // Method 1: Check for Bootstrap modals with .show class
+        const bootstrapModals = document.querySelectorAll('.modal.show');
+        if (bootstrapModals.length > 0) return true;
+        
+        // Method 2: Check for modals with inline style display:block
+        const visibleModals = document.querySelectorAll('.modal[style*="display: block"]');
+        if (visibleModals.length > 0) return true;
+        
+        // Method 3: Check for specific known modals by ID
+        const knownModalIds = [
+            'conditionsModal',  // Conditions modal
+            'settingsModal',   // Settings modal
+            'niftyModal',      // Nifty modal
+            'userConditionModal', // User condition modal if exists
+            'adminConditionModal', // Admin condition modal if exists
+            'chartModal'       // Any chart modal
+        ];
+        
+        for (const modalId of knownModalIds) {
+            const modal = document.getElementById(modalId);
+            if (modal && (
+                modal.classList.contains('show') || 
+                modal.style.display === 'block' || 
+                getComputedStyle(modal).display !== 'none' ||
+                modal.getAttribute('aria-hidden') === 'false'
+            )) {
+                return true;
+            }
         }
         
-        // Check for any other modals that might be open
-        const openModals = document.querySelectorAll('.modal.show');
-        return openModals.length > 0;
+        // Method 4: Check for any element with modal-backdrop
+        const modalBackdrops = document.querySelectorAll('.modal-backdrop');
+        if (modalBackdrops.length > 0) return true;
+        
+        // Method 5: Check for any element with modal open class on body
+        if (document.body.classList.contains('modal-open')) return true;
+        
+        return false;
     }
     
-    // Direct check for the conditions modal
-    function checkConditionsModal() {
-        const conditionsModal = document.getElementById('conditionsModal');
-        return conditionsModal && (conditionsModal.classList.contains('show') || 
-               conditionsModal.style.display === 'block' || 
-               getComputedStyle(conditionsModal).display !== 'none');
-    }
-    
-    // Manual check for modals every second as a fallback
-    setInterval(function() {
-        const modalOpen = checkForOpenModals() || checkConditionsModal();
+    // Comprehensive modal detection that runs frequently
+    const modalCheckInterval = setInterval(function() {
+        const modalOpen = checkForOpenModals();
+        
         if (modalOpen && !isAnyModalOpen) {
+            // Modal just opened
             isAnyModalOpen = true;
             if (!pausedTimer) {
                 pausedSecondsLeft = secondsLeft;
                 pausedTimer = true;
-                console.log('Timer paused due to detected modal');
+                console.log('Timer paused - modal detected');
             }
         } else if (!modalOpen && isAnyModalOpen) {
+            // All modals just closed
             isAnyModalOpen = false;
             if (pausedTimer) {
                 secondsLeft = pausedSecondsLeft;
                 pausedTimer = false;
-                console.log('Timer resumed after modal closed');
+                console.log('Timer resumed - all modals closed');
             }
         }
-    }, 1000);
+    }, 500); // Check every 500ms for better responsiveness
     
-    // Listen for standard Bootstrap modal events
+    // Standard Bootstrap modal events as additional detection
     document.addEventListener('shown.bs.modal', function(event) {
-        console.log('Modal shown event fired', event.target.id);
+        console.log('Modal shown:', event.target.id);
         isAnyModalOpen = true;
         if (!pausedTimer) {
             pausedSecondsLeft = secondsLeft;
             pausedTimer = true;
-            console.log('Timer paused due to open modal');
+            console.log('Timer paused - modal shown event');
         }
     });
     
-    document.addEventListener('hidden.bs.modal', function() {
+    document.addEventListener('hidden.bs.modal', function(event) {
+        console.log('Modal hidden:', event.target.id);
         // Check if there are still other modals open
-        isAnyModalOpen = checkForOpenModals();
-        if (!isAnyModalOpen && pausedTimer) {
-            secondsLeft = pausedSecondsLeft;
-            pausedTimer = false;
-            console.log('Timer resumed after modal closed');
-        }
+        setTimeout(() => {
+            if (!checkForOpenModals()) {
+                isAnyModalOpen = false;
+                if (pausedTimer) {
+                    secondsLeft = pausedSecondsLeft;
+                    pausedTimer = false;
+                    console.log('Timer resumed - modal hidden event');
+                }
+            }
+        }, 100); // Small delay to ensure DOM is updated
     });
     
     // Initialize timer variables
