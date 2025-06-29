@@ -1351,7 +1351,7 @@
             top: 0;
             left: 0;
             width: 100vw;
-            height: 4px;
+            height: 6px;
             z-index: 2001;
             background: transparent;
         }
@@ -1586,6 +1586,7 @@
                     width: 100%;
                     height: 100%;
                     object-fit: cover;
+                    border-radius: 50%;
                 }
                 #userDropdown {
                     display: none;
@@ -1634,11 +1635,23 @@
                 </div>
                 <!-- Dropdown menu -->
                 <div id="userDropdown">
-                    <!-- User info section -->
-                    <div style="padding: 12px 16px; border-bottom: 1px solid #e0e0e0;">
-                        <div style="font-weight: 500;">{{ current_user.username }}</div>
-                        <div style="font-size: 0.8em; color: #5f6368;">{{ current_user.email if current_user.email else 'No email' }}</div>
-                    </div>
+                        <!-- User avatar in dropdown -->
+                        <div style="display: flex; flex-direction: column; align-items: center; padding: 16px 16px 8px 16px; border-bottom: 1px solid #e0e0e0;">
+                            {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
+                                {% set user_photo = url_for('static', filename=user_data.account.profile.photo_url) %}
+                            {% else %}
+                                {% if user_data and user_data.account.profile.premium == 'yes' %}
+                                    {% set user_photo = url_for('static', filename='user_photos/default_premium.png') %}
+                                {% else %}
+                                    {% set user_photo = url_for('static', filename='user_photos/default_free.png') %}
+                                {% endif %}
+                            {% endif %}
+                            <img src="{{ user_photo }}" alt="User Photo" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" onerror="this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'">
+                            <div style="font-weight: 500;">{{ current_user.username }}</div>
+                            {% if current_user.email %}
+                            <div style="font-size: 0.8em; color: #5f6368;">{{ current_user.email }}</div>
+                            {% endif %}
+                        </div>
                     <!-- Menu items -->
                     <a href="{{ url_for('dash') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #202124; text-decoration: none; transition: background 0.2s;">
                         <i class="fas fa-tachometer-alt" style="width: 24px; text-align: center; margin-right: 8px; color: #5f6368;"></i>
@@ -2181,6 +2194,24 @@
     if (refreshTimerText) {
         refreshTimerText.textContent = secondsLeft + ' seconds';
     }
+    
+    // Function to handle manual refresh
+    window.refreshData = function() {
+        // Show loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'flex';
+        }
+        
+        // Reset the timer
+        secondsLeft = 0;
+        updateLinearBarFrontend();
+        
+        // Force page reload after a short delay to show loading state
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+    };
     function updateLinearBarFrontend() {
         if (secondsLeft <= 0) {
             // Prevent further decrements and reload only once
