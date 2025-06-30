@@ -1483,15 +1483,16 @@
 
     <!-- Navbar -->
     <nav class="navbar">
-        <div class="navbar-brand">
-            <img src="/static/pitk-logo.svg" alt="PITK Logo" class="me-2">
-            PRICE IS THE KING
-            <span id="next-refresh">
-                <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i>
-                <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span>
-                <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
-            </span>
-        </div>
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+            <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+            <span>PRICE IS THE KING</span>
+        </a>
+
+        <span id="next-refresh">
+            <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i>
+            <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span>
+            <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
+        </span>
         <div class="navbar-buttons">
 
             <!-- Dark Mode Toggle with Sun/Moon Icons -->
@@ -1500,6 +1501,11 @@
     <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
 </button>
             </div>
+            <!-- Mute/Unmute Button with Theme Style -->
+            <button id="muteToggleBtn" class="btn navbar-round-btn ms-2" style="background: linear-gradient(135deg, #283593, #1976d2); border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: all 0.3s ease;" title="Toggle sound">
+                <i id="muteIcon" class="fas fa-volume-up"></i>
+            </button>
+            <audio id="alert-audio" src="{{ url_for('static', filename='alert.mp3') }}" preload="auto"></audio>
             <!-- Admin Conditions Button with Enhanced Style -->
             <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
                 background: linear-gradient(135deg, #7b1fa2, #9c27b0);
@@ -1891,20 +1897,6 @@
     <!-- Screener link (scan definition) -->
     {% if condition.link %}
     <a href="{{ condition.link }}" target="_blank" class="text-success me-2" title="Open Screener">
-        <i class="fas fa-search"></i>
-    </a>
-    {% else %}
-    <span class="text-secondary me-2" title="Screener link not available">
-        <i class="fas fa-search"></i>
-    </span>
-    {% endif %}
-    
-    <!-- Chart link (stock chart for this scan) -->
-    {% if condition.chart_link and stock.nsecode %}
-    <a href="{{ condition.chart_link }}{{ stock.nsecode }}" target="_blank" class="text-success" title="Open Chart">
-        <i class="fas fa-chart-line"></i>
-    </a>
-    {% else %}
     <span class="text-secondary" title="Chart link not available">
         <i class="fas fa-chart-line"></i>
     </span>
@@ -2480,7 +2472,93 @@
             });
         }
     });
-    </script>
+
+    // Mute/unmute logic (ensure DOM is loaded)
+    document.addEventListener('DOMContentLoaded', function() {
+        const muteBtn = document.getElementById('muteToggleBtn');
+        const muteIcon = document.getElementById('muteIcon');
+        const alertAudio = document.getElementById('alert-audio');
+        let isMuted = false;
+        if (localStorage.getItem('pitk-muted') === null) {
+            // Default: sound ON
+            isMuted = false;
+            localStorage.setItem('pitk-muted', 'false');
+        } else {
+            isMuted = localStorage.getItem('pitk-muted') === 'true';
+        }
+        let alertPlayed = false;
+
+        function updateMuteIcon() {
+            if (isMuted) {
+                muteIcon.classList.remove('fa-volume-up');
+                muteIcon.classList.add('fa-volume-mute');
+            } else {
+                muteIcon.classList.remove('fa-volume-mute');
+                muteIcon.classList.add('fa-volume-up');
+            }
+        }
+        updateMuteIcon();
+        if (muteBtn) {
+            muteBtn.addEventListener('click', function() {
+                isMuted = !isMuted;
+                localStorage.setItem('pitk-muted', isMuted);
+                updateMuteIcon();
+                // Unlock audio for browsers and debug
+                alertAudio.play().then(() => {
+                    console.log('[DEBUG] Mute toggled. isMuted:', isMuted, '| alertAudio.paused:', alertAudio.paused, '| alertAudio.src:', alertAudio.src);
+                }).catch((err) => {
+                    console.log('[DEBUG] Mute toggled. isMuted:', isMuted, '| alertAudio.paused:', alertAudio.paused, '| alertAudio.src:', alertAudio.src, '| play() error:', err);
+                });
+                // Send mute state to backend for terminal logging
+                fetch('/debug-mute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isMuted })
+                });
+            });
+        }
+
+        // Universal audio unlock logic for browser autoplay
+        let audioUnlocked = false;
+        function unlockAudio() {
+            if (!audioUnlocked) {
+                alertAudio.play().catch(()=>{});
+                audioUnlocked = true;
+            }
+        }
+        document.querySelectorAll('.navbar-round-btn').forEach(btn => {
+            btn.addEventListener('click', unlockAudio);
+        });
+
+        // Example: Hook into your auto-refresh timer logic
+        // Replace this with your actual timer variable and logic
+        let timerInterval = null;
+        let refreshTime = 60; // Example starting value
+
+        function startAutoRefreshTimer() {
+            refreshTime = 60; // or whatever your timer starts at
+            alertPlayed = false;
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                refreshTime--;
+                // When timer reaches 0, play alert ONCE if not muted
+                if (refreshTime === 0 && !alertPlayed) {
+                    if (!isMuted) {
+                        alertAudio.currentTime = 0;
+                        alertAudio.play();
+                    }
+                    alertPlayed = true;
+                }
+                // Reset logic example (if you restart the timer)
+                // if (refreshTime < 0) {
+                //     refreshTime = 60; alertPlayed = false;
+                // }
+            }, 1000);
+        }
+        // Uncomment the next line to simulate the timer for demo:
+        // startAutoRefreshTimer();
+    });
+</script>
 {% endblock %}
 
 {% block modals %}
