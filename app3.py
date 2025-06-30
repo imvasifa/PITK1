@@ -2769,6 +2769,97 @@ def validate_licence():
             'message': 'An error occurred while validating the licence key.'
         }), 500
 
+@app.route('/api/check-licence', methods=['GET'])
+@login_required
+def check_licence():
+    """
+    Check if the current user has a valid licence
+    
+    Returns:
+        JSON response with licence status and expiry information
+    """
+    if not current_user.is_authenticated:
+        return jsonify({
+            'hasLicence': False,
+            'message': 'User not authenticated',
+            'isExpired': True
+        }), 401
+        
+    try:
+        # Hardcoded Redis credentials from redis.txt
+        redis_url = 'ohio-keyvalue.render.com'
+        redis_port = 6379
+        redis_username = 'red-d109u7qli9vc73dkjp30'
+        redis_password = 'gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW'
+        
+        # Connect to Redis with SSL
+        r = redis.Redis(
+            host=redis_url,
+            port=redis_port,
+            username=redis_username,
+            password=redis_password,
+            ssl=True,
+            ssl_cert_reqs=None,
+            ssl_ca_certs=None,
+            ssl_certfile=None,
+            ssl_keyfile=None,
+            ssl_check_hostname=False,
+            decode_responses=True
+        )
+        
+        # Check if user has a valid licence
+        user_licence_key = f'user:licence:{current_user.username}'
+        licence_data = r.get(user_licence_key)
+        
+        if not licence_data:
+            return jsonify({
+                'hasLicence': False,
+                'message': 'No active licence found',
+                'isExpired': True
+            })
+            
+        # Parse the licence data
+        licence_info = json.loads(licence_data)
+        expires_at = datetime.fromisoformat(licence_info['expires_at'])
+        now = datetime.utcnow()
+
+        # Convert UTC to IST (UTC+5:30)
+        from datetime import timedelta
+        ist_offset = timedelta(hours=5, minutes=30)
+        expires_at_ist = expires_at + ist_offset
+        now_ist = now + ist_offset
+
+        # Format IST date as ddmmyy and time as HH:MM:SS
+        expires_at_ist_str = expires_at_ist.strftime('%d%m%y')
+        expires_at_ist_time = expires_at_ist.strftime('%H:%M:%S')
+
+        if now > expires_at:
+            return jsonify({
+                'hasLicence': False,
+                'message': 'LICENCE EXPIRED',
+                'isExpired': True,
+                'expiredAt': licence_info['expires_at'],
+                'expiredAtIST': f'{expires_at_ist_str} {expires_at_ist_time}'
+            })
+
+        return jsonify({
+            'hasLicence': True,
+            'message': 'Active licence found',
+            'isExpired': False,
+            'expiresAt': licence_info['expires_at'],
+            'expiresAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
+            'timeLeft': (expires_at - now).total_seconds()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in check_licence: {str(e)}")
+        return jsonify({
+            'hasLicence': False,
+            'message': 'Error checking licence status',
+            'isExpired': True,
+            'error': str(e)
+        }), 500
+
 @app.route('/nifty-data')
 def fetch_nifty_data():
     """

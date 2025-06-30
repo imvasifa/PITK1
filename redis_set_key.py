@@ -45,10 +45,10 @@ try:
     
     # Check if key already exists
     if r.exists(redis_key):
-        print(f"⚠️  Key {licence_key} already exists in Redis")
+        print(f"[WARNING] Key {licence_key} already exists in Redis")
     else:
         r.set(redis_key, 'active')
-        print(f"✅ Created new licence key: {licence_key}")
+        print(f"[SUCCESS] Created new licence key: {licence_key}")
     
     # Get the TTL for this specific key
     ttl = r.ttl(redis_key)

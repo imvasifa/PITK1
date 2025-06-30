@@ -38,7 +38,8 @@
 
 {% block content %}
     <!-- Licence Status Banner -->
-    <div id="licenceStatusBanner" class="alert alert-warning d-none" role="alert" style="margin-bottom: 1rem;">
+    <div id="licenceStatusBanner" class="alert alert-warning d-none position-relative" role="alert" style="margin-bottom: 1rem;">
+    <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close" id="closeLicenceBanner" style="font-size:1.5rem;z-index:2;"></button>
         <i class="fas fa-exclamation-triangle me-2"></i>
         <span id="licenceStatusMessage"></span>
     </div>
@@ -405,15 +406,12 @@ async function checkLicenceStatus() {
             message.innerHTML = `
                 <strong>Premium Active</strong> - 
                 Expires in ${timeLeft} minute${timeLeft !== 1 ? 's' : ''}
-                <span class="ms-2 small">(${expiresAt.toLocaleString()})</span>
+                <span class="ms-2 small">(${data.expiresAtIST})</span>
             `;
             banner.classList.remove('d-none');
             
-            // Check again when the licence is about to expire
-            const checkTime = Math.min(data.timeLeft * 1000, 60 * 60 * 1000); // Check at least every hour
-            if (checkTime > 0) {
-                setTimeout(checkLicenceStatus, checkTime);
-            }
+            // Check every minute for expiry
+            setTimeout(checkLicenceStatus, 60000);
         } else {
             banner.className = 'alert alert-warning d-flex align-items-center';
             message.innerHTML = 'No active licence. Please enter a valid licence key to access premium features.';
@@ -428,6 +426,14 @@ async function checkLicenceStatus() {
 document.addEventListener('DOMContentLoaded', function() {
     // Initial licence status check
     checkLicenceStatus();
+    // Add close button handler for licence banner
+    const closeBtn = document.getElementById('closeLicenceBanner');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            const banner = document.getElementById('licenceStatusBanner');
+            if (banner) banner.classList.add('d-none');
+        });
+    }
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingMessage = document.getElementById('loadingMessage');
     
