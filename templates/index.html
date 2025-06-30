@@ -1496,24 +1496,65 @@
 
             <!-- Dark Mode Toggle with Sun/Moon Icons -->
             <div class="d-inline-block align-middle ms-3" id="themeToggleContainer">
-                <button id="themeSwitchBtn" class="btn btn-outline-secondary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+                <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
     <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
 </button>
             </div>
-            <!-- Admin Conditions Button -->
-            <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn btn-primary ms-2 navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
-    <i class="fas fa-list-check"></i>
-</button>
-            <button class="refresh-btn navbar-round-btn" onclick="refreshData()" style="border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
-    <i class="fas fa-sync-alt"></i>
-</button>
-<button class="nifty-btn navbar-round-btn" data-bs-toggle="modal" data-bs-target="#niftyModal" style="border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
-    <i class="fas fa-chart-bar"></i>
-</button>
+            <!-- Admin Conditions Button with Enhanced Style -->
+            <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
+                background: linear-gradient(135deg, #7b1fa2, #9c27b0);
+                border: none;
+                border-radius: 50%;
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                color: white;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-list-check"></i>
+            </button>
 
-<button class="theme-toggle-btn navbar-round-btn" id="themeToggleBtn" title="Toggle Theme" style="background: none; border: none; color: var(--text-dark); font-size: 1.2rem; cursor: pointer; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;">
-    <i class="fas fa-moon" id="themeToggleIcon"></i>
-</button>
+            <!-- Refresh Button with Enhanced Style -->
+            <button class="btn navbar-round-btn" onclick="refreshData()" style="
+                background: linear-gradient(135deg, #00796b, #009688);
+                border: none;
+                border-radius: 50%;
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                color: white;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+
+            <!-- Nifty Button with Enhanced Style -->
+            <button class="btn navbar-round-btn" data-bs-toggle="modal" data-bs-target="#niftyModal" style="
+                background: linear-gradient(135deg, #e65100, #ff6d00);
+                border: none;
+                border-radius: 50%;
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                color: white;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-chart-bar"></i>
+            </button>
+
+
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     const themeToggleBtn = document.getElementById('themeToggleBtn');
@@ -1637,19 +1678,21 @@
                     <!-- Status indicator circle -->
                     <div class="user-status-indicator {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-premium{% else %}user-status-free{% endif %}"></div>
                     <!-- Profile picture button -->
-                    <button id="userMenuButton" title="{{ current_user.username }}">
-                        {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
-                            <img src="{{ user_data.account.profile.photo_url }}" alt="Profile" class="user-avatar-img">
-                        {% else %}
-                            {% set is_premium = user_data and user_data.account.profile.premium == 'yes' %}
-                            {% set default_image = 'default_premium.png' if is_premium else 'default_free.png' %}
-                            <img src="{{ url_for('static', filename='user_photos/' ~ default_image) }}" 
-                                 alt="{{ 'Premium' if is_premium else 'Free' }} User" 
-                                 class="user-avatar-img"
-                                 data-fallback-src="{{ url_for('static', filename='user_photos/default_free.png') }}"
-                            >
-                        {% endif %}
-                    </button>
+                    <span class="user-avatar-wrapper">
+    <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
+        {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
+            <img src="{{ user_data.account.profile.photo_url }}" alt="Profile" class="user-avatar-img">
+        {% else %}
+            {% set is_premium = user_data and user_data.account.profile.premium == 'yes' %}
+            {% set default_image = 'default_premium.png' if is_premium else 'default_free.png' %}
+            <img src="{{ url_for('static', filename='user_photos/' ~ default_image) }}" 
+                 alt="{{ 'Premium' if is_premium else 'Free' }} User" 
+                 class="user-avatar-img"
+                 data-fallback-src="{{ url_for('static', filename='user_photos/default_free.png') }}"
+            >
+        {% endif %}
+    </button>
+</span>
                 </div>
                 <!-- Dropdown menu -->
                 <div id="userDropdown">
