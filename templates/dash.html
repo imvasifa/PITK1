@@ -37,6 +37,12 @@
 {% endblock %}
 
 {% block content %}
+    <!-- Licence Status Banner -->
+    <div id="licenceStatusBanner" class="alert alert-warning d-none" role="alert" style="margin-bottom: 1rem;">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="licenceStatusMessage"></span>
+    </div>
+    
     <!-- Navigation Buttons -->
     <div class="d-flex justify-content-end mb-4">
         <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
@@ -100,7 +106,10 @@
                             <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab" aria-controls="password" aria-selected="false">Change Password</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="refresh-tab" data-bs-toggle="tab" data-bs-target="#refresh-settings" type="button" role="tab" aria-controls="refresh-settings" aria-selected="false">Auto-Refresh</button>
+                            <button class="nav-link" id="refresh-tab" data-bs-toggle="tab" data-bs-target="#refresh-settings" type="button" role="tab" aria-controls="refresh-settings" aria-selected="false">Settings</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="licence-tab" data-bs-toggle="tab" data-bs-target="#licence" type="button" role="tab" aria-controls="licence" aria-selected="false">Licence Key</button>
                         </li>
                     </ul>
                     <div class="tab-content" id="myTabContent">
@@ -147,6 +156,32 @@
                                 </form>
                 </div>
             </div>
+                        <div class="tab-pane fade" id="licence" role="tabpanel" aria-labelledby="licence-tab">
+                            <div class="card-body">
+                                <h5 class="card-title">Enter Your Licence Key</h5>
+                                <p class="text-muted">Please enter your 4-digit licence key</p>
+                                <form id="licence-form">
+                                    <div class="row mb-3">
+                                    <div class="col-3">
+                                        <input type="text" class="form-control text-center licence-key-input" maxlength="4" data-index="1" pattern="[A-Za-z0-9]{4}" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="text" class="form-control text-center licence-key-input" maxlength="4" data-index="2" pattern="[A-Za-z0-9]{4}" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="text" class="form-control text-center licence-key-input" maxlength="4" data-index="3" pattern="[A-Za-z0-9]{4}" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="text" class="form-control text-center licence-key-input" maxlength="4" data-index="4" pattern="[A-Za-z0-9]{4}" required>
+                                    </div>
+                                </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <button type="submit" class="btn btn-primary">Validate Licence</button>
+                                        <div id="licence-status" class="d-none alert mb-0"></div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                         <div class="tab-pane fade" id="refresh-settings" role="tabpanel" aria-labelledby="refresh-tab">
                             <div class="card-body">
                                 <h5 class="card-title">Auto-Refresh Settings</h5>
@@ -342,8 +377,57 @@ function resetProfile() {
     }
 }
 
+// Check licence status when page loads
+async function checkLicenceStatus() {
+    try {
+        const response = await fetch('/api/check-licence');
+        const data = await response.json();
+        
+        const banner = document.getElementById('licenceStatusBanner');
+        const message = document.getElementById('licenceStatusMessage');
+        
+        if (!response.ok) {
+            banner.className = 'alert alert-danger d-flex align-items-center';
+            message.textContent = 'Error checking licence status';
+            banner.classList.remove('d-none');
+            return;
+        }
+        
+        if (data.isExpired) {
+            banner.className = 'alert alert-danger d-flex align-items-center';
+            message.innerHTML = `<strong>LICENCE EXPIRED</strong> - Please renew your licence to continue using premium features.`;
+            banner.classList.remove('d-none');
+        } else if (data.hasLicence) {
+            const expiresAt = new Date(data.expiresAt);
+            const timeLeft = Math.floor((expiresAt - new Date()) / 1000 / 60); // in minutes
+            
+            banner.className = 'alert alert-success d-flex align-items-center';
+            message.innerHTML = `
+                <strong>Premium Active</strong> - 
+                Expires in ${timeLeft} minute${timeLeft !== 1 ? 's' : ''}
+                <span class="ms-2 small">(${expiresAt.toLocaleString()})</span>
+            `;
+            banner.classList.remove('d-none');
+            
+            // Check again when the licence is about to expire
+            const checkTime = Math.min(data.timeLeft * 1000, 60 * 60 * 1000); // Check at least every hour
+            if (checkTime > 0) {
+                setTimeout(checkLicenceStatus, checkTime);
+            }
+        } else {
+            banner.className = 'alert alert-warning d-flex align-items-center';
+            message.innerHTML = 'No active licence. Please enter a valid licence key to access premium features.';
+            banner.classList.remove('d-none');
+        }
+    } catch (error) {
+        console.error('Error checking licence status:', error);
+    }
+}
+
 // Add form submission handlers for loaders
 document.addEventListener('DOMContentLoaded', function() {
+    // Initial licence status check
+    checkLicenceStatus();
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingMessage = document.getElementById('loadingMessage');
     
@@ -468,5 +552,141 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+    // Licence Key Input Handling
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = Array.from(document.querySelectorAll('.licence-key-input'));
+        const form = document.getElementById('licence-form');
+        const statusDiv = document.getElementById('licence-status');
+
+        // Focus the first input when tab is shown
+        document.getElementById('licence-tab').addEventListener('shown.bs.tab', function() {
+            const firstEmptyInput = inputs.find(input => input.value.length < 4) || inputs[0];
+            firstEmptyInput.focus();
+            firstEmptyInput.setSelectionRange(0, firstEmptyInput.value.length);
+        });
+
+        // Handle input events for all licence key inputs
+        inputs.forEach((input, index) => {
+            // Handle typing in the input
+            input.addEventListener('input', function(e) {
+                // Convert to uppercase and remove any non-alphanumeric characters
+                this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                
+                // If we've reached max length, move to next input
+                if (this.value.length >= 4 && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+            });
+
+            // Handle backspace and arrow keys
+            input.addEventListener('keydown', function(e) {
+                // Move to previous input on backspace at start of field
+                if (e.key === 'Backspace' && this.selectionStart === 0 && index > 0) {
+                    e.preventDefault();
+                    const prevInput = inputs[index - 1];
+                    prevInput.focus();
+                    prevInput.setSelectionRange(prevInput.value.length, prevInput.value.length);
+                }
+                // Move to previous input on left arrow at start of field
+                else if (e.key === 'ArrowLeft' && this.selectionStart === 0 && index > 0) {
+                    inputs[index - 1].focus();
+                }
+                // Move to next input on right arrow at end of field
+                else if (e.key === 'ArrowRight' && this.selectionStart >= this.value.length && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+            });
+
+            // Handle paste event
+            input.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const pasteText = (e.clipboardData || window.clipboardData).getData('text').toUpperCase();
+                const cleanText = pasteText.replace(/[^A-Z0-9]/g, '');
+                
+                // Distribute pasted text across all inputs
+                let remainingText = cleanText;
+                for (let i = index; i < inputs.length && remainingText.length > 0; i++) {
+                    const maxLength = 4;
+                    const chunk = remainingText.substring(0, maxLength - inputs[i].value.length);
+                    if (chunk) {
+                        inputs[i].value = chunk;
+                        remainingText = remainingText.substring(chunk.length);
+                    }
+                }
+                
+                // Move focus to appropriate input
+                const nextInput = inputs.find((input, i) => i >= index && input.value.length < 4) || 
+                                 inputs[Math.min(index + Math.ceil(cleanText.length / 4), inputs.length - 1)];
+                nextInput.focus();
+                nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+            });
+
+            // Auto-advance when reaching max length
+            input.addEventListener('keyup', function(e) {
+                if (this.value.length >= 4 && index < inputs.length - 1 && 
+                    e.key !== 'Backspace' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+                    inputs[index + 1].focus();
+                }
+            });
+        });
+
+        // Handle form submission
+        if (form) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                // Get the full licence key
+                const licenceKey = Array.from(inputs).map(input => input.value).join('').toUpperCase();
+                
+                // Show loading state
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                statusDiv.className = 'alert alert-info mb-0';
+                statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Validating licence key...';
+                statusDiv.classList.remove('d-none');
+                
+                try {
+                    // Call the server to validate the licence key
+                    const response = await fetch('/api/validate-licence', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ licenceKey: licenceKey })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.valid) {
+                        statusDiv.className = 'alert alert-success mb-0';
+                        statusDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i> ' + (result.message || 'Licence key validated successfully!');
+                        
+                        // Clear the form
+                        inputs.forEach(input => input.value = '');
+                        inputs[0].focus();
+                        
+                        // Reload the page to show premium features if applicable
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        throw new Error(result.message || 'Invalid licence key');
+                    }
+                } catch (error) {
+                    statusDiv.className = 'alert alert-danger mb-0';
+                    statusDiv.innerHTML = `<i class="fas fa-times-circle me-2"></i> ${error.message || 'Failed to validate licence key. Please try again.'}`;
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    
+                    // Hide the status message after 5 seconds
+                    setTimeout(() => {
+                        statusDiv.classList.add('d-none');
+                    }, 5000);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}

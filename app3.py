@@ -18,6 +18,7 @@ import time
 import traceback
 import uuid
 import winsound
+import redis
 from werkzeug.exceptions import HTTPException
 
 class AppTemporarilyUnavailable(HTTPException):
@@ -2675,56 +2676,97 @@ def get_conditions():
     return jsonify(all_conditions)
 
 @app.route('/api/validate-licence', methods=['POST'])
+@login_required
 def validate_licence():
     """
-    Validate a user's licence key
+    Validate a user's licence key against Redis
     
     Request body should be JSON with format:
     {
-        "licenceKey": "user-licence-key-here"
+        "licenceKey": "USER-ENTERED-KEY"
     }
     
     Returns:
         JSON response with success/error message
     """
-    if not current_user.is_authenticated:
-        return jsonify({'error': 'Authentication required'}), 401
-        
     try:
         data = request.get_json()
         if not data or 'licenceKey' not in data:
-            return jsonify({'error': 'Licence key is required'}), 400
+            return jsonify({'valid': False, 'message': 'Licence key is required'}), 400
             
-        # Here you would typically validate the licence key against your database
-        # This is a basic example - replace with your actual validation logic
-        licence_key = data['licenceKey'].strip()
+        user_key = data['licenceKey'].strip().upper()
         
-        # Example validation (replace with your actual validation logic)
-        if not licence_key:
-            return jsonify({'error': 'Licence key cannot be empty'}), 400
+        # Connect to Redis
+        try:
+            # Hardcoded Redis credentials from redis.txt
+            redis_url = 'ohio-keyvalue.render.com'  # From External Key Value URL
+            redis_port = 6379  # Default Redis port
+            redis_username = 'red-d109u7qli9vc73dkjp30'  # From External Key Value URL
+            redis_password = 'gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW'  # From External Key Value URL
             
-        # In a real implementation, you would check against your licence database
-        # For now, we'll just check if the key starts with 'PITK-'
-        is_valid = licence_key.startswith('PITK-')
-        
-        if is_valid:
-            # If valid, you might want to update the user's licence status in the database
-            # For example: update_user_licence_status(current_user.id, licence_key, is_valid=True)
+            # Connect to Redis with SSL
+            r = redis.Redis(
+                host=redis_url,
+                port=redis_port,
+                username=redis_username,
+                password=redis_password,
+                ssl=True,
+                ssl_cert_reqs=None,
+                ssl_ca_certs=None,
+                ssl_certfile=None,
+                ssl_keyfile=None,
+                ssl_check_hostname=False,
+                decode_responses=True
+            )
+            
+            # Check if the key exists and is not expired
+            redis_key = f'licence:key:{user_key}'
+            key_exists = r.exists(redis_key)
+            
+            if not key_exists:
+                return jsonify({
+                    'valid': False,
+                    'message': 'Invalid or expired licence key. Please check and try again.'
+                }), 400
+                
+            # If we get here, the key is valid
+            # Store user details with the licence key and set 5-min TTL
+            user_licence_key = f'user:licence:{current_user.username}'
+            user_details = {
+                'username': current_user.username,
+                'email': getattr(current_user, 'email', ''),
+                'licence_key': user_key,
+                'validated_at': datetime.utcnow().isoformat(),
+                'expires_at': (datetime.utcnow() + timedelta(seconds=300)).isoformat()
+            }
+            
+            # Store with 5-min TTL
+            r.setex(user_licence_key, 300, json.dumps(user_details))
+            
+            # Also store the key itself with user reference
+            r.setex(f'licence:key:{user_key}', 300, current_user.username)
+            
             return jsonify({
-                'message': 'Licence key validated successfully!',
                 'valid': True,
-                'expiry_date': '2099-12-31'  # Example expiry date
+                'message': 'Licence key validated successfully! Premium features activated for 5 minutes.',
+                'isPremium': True,
+                'expiresIn': 300,  # 5 minutes in seconds
+                'user': current_user.username,
+                'expiresAt': user_details['expires_at']
             })
-        else:
+                
+        except Exception as redis_error:
+            logger.error(f"Redis connection error: {str(redis_error)}")
             return jsonify({
-                'error': 'Invalid licence key. Please check and try again.',
-                'valid': False
-            }), 400
+                'valid': False,
+                'message': 'Error connecting to licence server. Please try again later.'
+            }), 500
             
     except Exception as e:
-        app.logger.error(f"Error validating licence key: {str(e)}")
+        logger.error(f"Error in validate_licence: {str(e)}")
         return jsonify({
-            'error': 'An error occurred while validating the licence key. Please try again later.'
+            'valid': False,
+            'message': 'An error occurred while validating the licence key.'
         }), 500
 
 @app.route('/nifty-data')

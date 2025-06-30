@@ -1513,6 +1513,12 @@
 {% endblock %}
 
 {% block content %}
+    <!-- Licence Status Banner -->
+    <div id="licenceStatusBanner" class="alert alert-warning d-none" role="alert" style="margin-bottom: 1rem;">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="licenceStatusMessage"></span>
+    </div>
+    
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;"> <!-- Adjust the size as needed -->
@@ -1952,8 +1958,11 @@
                         <div class="tab-pane fade" id="licence-key" role="tabpanel" aria-labelledby="licence-key-tab">
                             <div class="mt-3">
                                 <h6>Enter your licence key to activate premium features</h6>
-                                <div class="input-group mb-3">
-                                    <input type="text" class="form-control" id="licenceKeyInput" placeholder="Enter your licence key">
+                                <div class="licence-key-container d-flex justify-content-center gap-2 mb-3">
+                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="1">
+                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="2">
+                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="3">
+                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="4">
                                     <button class="btn btn-primary" type="button" id="validateLicenceKey">Validate</button>
                                 </div>
                                 <div id="licenceKeyMessage" class="alert d-none"></div>
@@ -2703,7 +2712,59 @@ async function populateUserConditions() {
         }
         // Uncomment the next line to simulate the timer for demo:
         // startAutoRefreshTimer();
+        
+        // Check licence status on page load
+        checkLicenceStatus();
     });
+    
+    // Check licence status when page loads
+    async function checkLicenceStatus() {
+        try {
+            const response = await fetch('/api/check-licence');
+            const data = await response.json();
+            
+            const banner = document.getElementById('licenceStatusBanner');
+            const message = document.getElementById('licenceStatusMessage');
+            
+            if (!banner || !message) return;
+            
+            if (!response.ok) {
+                banner.className = 'alert alert-danger d-flex align-items-center';
+                message.textContent = 'Error checking licence status';
+                banner.classList.remove('d-none');
+                return;
+            }
+            
+            if (data.isExpired) {
+                banner.className = 'alert alert-danger d-flex align-items-center';
+                message.innerHTML = `<strong>LICENCE EXPIRED</strong> - Please renew your licence to continue using premium features.`;
+                banner.classList.remove('d-none');
+            } else if (data.hasLicence) {
+                const expiresAt = new Date(data.expiresAt);
+                const timeLeft = Math.floor((expiresAt - new Date()) / 1000 / 60); // in minutes
+                
+                banner.className = 'alert alert-success d-flex align-items-center';
+                message.innerHTML = `
+                    <strong>Premium Active</strong> - 
+                    Expires in ${timeLeft} minute${timeLeft !== 1 ? 's' : ''}
+                    <span class="ms-2 small">(${expiresAt.toLocaleString()})</span>
+                `;
+                banner.classList.remove('d-none');
+                
+                // Check again when the licence is about to expire
+                const checkTime = Math.min(data.timeLeft * 1000, 60 * 60 * 1000); // Check at least every hour
+                if (checkTime > 0) {
+                    setTimeout(checkLicenceStatus, checkTime);
+                }
+            } else {
+                banner.className = 'alert alert-warning d-flex align-items-center';
+                message.innerHTML = 'No active licence. Please enter a valid licence key to access premium features.';
+                banner.classList.remove('d-none');
+            }
+        } catch (error) {
+            console.error('Error checking licence status:', error);
+        }
+    }
 </script>
 {% endblock %}
 

@@ -12,6 +12,7 @@ flask-wtf>=1.2.1
 # Database
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
+redis==6.2.0
 
 # Data Processing
 pandas==2.1.4
