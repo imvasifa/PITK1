@@ -1521,7 +1521,7 @@
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
                 transition: all 0.3s ease;
             ">
-                <i class="fas fa-list-check"></i>
+                <i class="fas fa-list-ul"></i>
             </button>
 
             <!-- Refresh Button with Enhanced Style -->
@@ -2528,6 +2528,13 @@
         }
         document.querySelectorAll('.navbar-round-btn').forEach(btn => {
             btn.addEventListener('click', unlockAudio);
+        });
+
+        // Remove focus from modal trigger buttons after modal closes
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('hidden.bs.modal', function() {
+                document.querySelectorAll('.navbar-round-btn:focus').forEach(btn => btn.blur());
+            });
         });
 
         // Example: Hook into your auto-refresh timer logic
