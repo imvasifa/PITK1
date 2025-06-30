@@ -1,0 +1,9 @@
+Internal Key Value URL
+redis://red-d109u7qli9vc73dkjp30:6379
+
+External Key Value URL
+rediss://red-d109u7qli9vc73dkjp30:gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW@ohio-keyvalue.render.com:6379
+
+
+Valkey CLI Command
+ REDISCLI_AUTH=gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW valkey-cli --user red-d109u7qli9vc73dkjp30 -h ohio-keyvalue.render.com -p 6379 --tls

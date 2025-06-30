@@ -2674,6 +2674,59 @@ def get_conditions():
     
     return jsonify(all_conditions)
 
+@app.route('/api/validate-licence', methods=['POST'])
+def validate_licence():
+    """
+    Validate a user's licence key
+    
+    Request body should be JSON with format:
+    {
+        "licenceKey": "user-licence-key-here"
+    }
+    
+    Returns:
+        JSON response with success/error message
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Authentication required'}), 401
+        
+    try:
+        data = request.get_json()
+        if not data or 'licenceKey' not in data:
+            return jsonify({'error': 'Licence key is required'}), 400
+            
+        # Here you would typically validate the licence key against your database
+        # This is a basic example - replace with your actual validation logic
+        licence_key = data['licenceKey'].strip()
+        
+        # Example validation (replace with your actual validation logic)
+        if not licence_key:
+            return jsonify({'error': 'Licence key cannot be empty'}), 400
+            
+        # In a real implementation, you would check against your licence database
+        # For now, we'll just check if the key starts with 'PITK-'
+        is_valid = licence_key.startswith('PITK-')
+        
+        if is_valid:
+            # If valid, you might want to update the user's licence status in the database
+            # For example: update_user_licence_status(current_user.id, licence_key, is_valid=True)
+            return jsonify({
+                'message': 'Licence key validated successfully!',
+                'valid': True,
+                'expiry_date': '2099-12-31'  # Example expiry date
+            })
+        else:
+            return jsonify({
+                'error': 'Invalid licence key. Please check and try again.',
+                'valid': False
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Error validating licence key: {str(e)}")
+        return jsonify({
+            'error': 'An error occurred while validating the licence key. Please try again later.'
+        }), 500
+
 @app.route('/nifty-data')
 def fetch_nifty_data():
     """
