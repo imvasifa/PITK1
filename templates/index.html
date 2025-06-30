@@ -1870,7 +1870,7 @@
                                                 <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
                                                 <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
                                                 <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
-                                                <td>{{ stock.volume|format_number }}</td>
+                                                <td class="d-none d-md-table-cell">{{ stock.volume|format_number }}</td>
                                                 <td>{{ stock.potential_score|format_number('score') }}</td>
                                             </tr>
                                         {% endfor %}
@@ -1882,9 +1882,9 @@
                                         <tr>
                                             <th>Stock</th>
                                             <th>Close</th>
-                                            <th>Chartink</th>
+                                            <th class="d-none d-md-table-cell">Chartink</th>
                                             <th>Change %</th>
-                                            <th>Volume</th>
+                                            <th class="d-none d-md-table-cell">Volume</th>
                                             <th>Score</th>
                                         </tr>
                                     </thead>
@@ -1893,7 +1893,7 @@
                                             <tr>
                                                 <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
                                                 <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
-                                                <td>
+                                                <td class="d-none d-md-table-cell">
     <!-- Screener link (scan definition) -->
     {% if condition.link %}
     <a href="{{ condition.link }}" target="_blank" class="text-success me-2" title="Open Screener">
@@ -1903,7 +1903,7 @@
     {% endif %}
 </td>
                                                 <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
-                                                <td>{{ stock.volume|format_number }}</td>
+                                                <td class="d-none d-md-table-cell">{{ stock.volume|format_number }}</td>
                                                 <td>{{ stock.potential_score|format_number('score') }}</td>
                                             </tr>
                                         {% endfor %}
