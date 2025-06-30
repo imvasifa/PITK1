@@ -114,6 +114,54 @@
             gap: 8px;
             flex-shrink: 0;
         }
+        /* Responsive user conditions flex row */
+        .user-conditions-flex-list .list-group-item {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .user-condition-row {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            width: 100%;
+            gap: 0.5rem;
+        }
+        .user-condition-info {
+            flex: 1 1 200px;
+            min-width: 0;
+            word-break: break-word;
+        }
+        .user-condition-actions {
+            display: flex;
+            flex-direction: row;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+        @media (max-width: 900px) {
+    .user-condition-row, .user-conditions-flex-list .list-group-item {
+        flex-direction: row !important;
+        align-items: center !important;
+    }
+    .user-condition-info {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 50vw;
+        display: block;
+    }
+    .user-condition-actions {
+        margin-top: 0 !important;
+        margin-left: 0.5rem;
+        flex-direction: row !important;
+        justify-content: flex-end;
+    }
+}
 
         .condition-actions .btn {
             padding: 0.25rem 0.5rem;
@@ -278,6 +326,26 @@
             background-color: #252525 !important;
         }
 
+        /* User avatar status dot */
+        .user-status-dot {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 3;
+            box-shadow: 0 0 2px rgba(34, 34, 34, 0.2);
+            display: block;
+        }
+        .user-status-dot-premium {
+            background-color: #19d142;
+        }
+        .user-status-dot-free {
+            background-color: orange;
+        }
+        
         /* Theme toggle button */
         .theme-toggle-btn {
             background: none;
@@ -1458,7 +1526,7 @@
 
     <!-- Nifty Indices Modal -->
     <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
             <div class="modal-content bg-dark text-light">
                 <div class="modal-header">
                     <h5 class="modal-title" id="niftyModalLabel">
@@ -1684,7 +1752,7 @@
                     <!-- Avatar border indicates status -->
                     <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
     <!-- Status dot above avatar -->
-    <span style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; z-index: 3; background: {% if user_data and user_data.account.profile.premium == 'yes' %}#19d142{% else %}orange{% endif %}; box-shadow: 0 0 2px #2222; display: block;"></span>
+    <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
     <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
         {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
             <img src="{{ user_data.account.profile.photo_url }}" alt="Profile" class="user-avatar-img">
@@ -1767,7 +1835,7 @@
 
     <!-- Conditions Modal (Admin + User) -->
     <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="conditionsModalLabel">Manage Conditions</h5>
@@ -2571,7 +2639,7 @@
 {% block modals %}
 <!-- Conditions Modal (Admin) -->
 <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="conditionsModalLabel">Manage Conditions</h5>
@@ -2630,7 +2698,7 @@
 
 <!-- User Conditions Modal -->
 <div class="modal fade" id="userConditionsModal" tabindex="-1" aria-labelledby="userConditionsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">My Custom Conditions</h5>
@@ -2716,7 +2784,7 @@
 
 <!-- Nifty Indices Modal -->
 <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content bg-dark text-light">
             <div class="modal-header">
                 <h5 class="modal-title" id="niftyModalLabel">
