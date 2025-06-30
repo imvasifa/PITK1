@@ -2737,20 +2737,20 @@ def validate_licence():
                 'email': getattr(current_user, 'email', ''),
                 'licence_key': user_key,
                 'validated_at': datetime.utcnow().isoformat(),
-                'expires_at': (datetime.utcnow() + timedelta(seconds=300)).isoformat()
+                'expires_at': (datetime.utcnow() + timedelta(seconds=600)).isoformat()
             }
             
-            # Store with 5-min TTL
-            r.setex(user_licence_key, 300, json.dumps(user_details))
-            
-            # Also store the key itself with user reference
-            r.setex(f'licence:key:{user_key}', 300, current_user.username)
-            
+            # Store with 10-min TTL
+            r.setex(user_licence_key, 600, json.dumps(user_details))
+
+            # Delete the original licence key so it cannot be reused
+            r.delete(f'licence:key:{user_key}')
+
             return jsonify({
                 'valid': True,
-                'message': 'Licence key validated successfully! Premium features activated for 5 minutes.',
+                'message': 'Licence key validated successfully! Premium features activated for 10 minutes.',
                 'isPremium': True,
-                'expiresIn': 300,  # 5 minutes in seconds
+                'expiresIn': 600,  # 10 minutes in seconds
                 'user': current_user.username,
                 'expiresAt': user_details['expires_at']
             })
@@ -2812,16 +2812,30 @@ def check_licence():
         licence_data = r.get(user_licence_key)
         
         if not licence_data:
+            # Try to get is_premium from DB (fallback)
+            is_premium = 'no'
+            try:
+                user_data = get_user_data(current_user.id)
+                is_premium = user_data.get('account', {}).get('profile', {}).get('premium', 'no')
+            except Exception:
+                pass
             return jsonify({
                 'hasLicence': False,
                 'message': 'No active licence found',
-                'isExpired': True
+                'isExpired': True,
+                'is_premium': is_premium
             })
             
         # Parse the licence data
         licence_info = json.loads(licence_data)
         expires_at = datetime.fromisoformat(licence_info['expires_at'])
         now = datetime.utcnow()
+        is_premium = 'no'
+        try:
+            user_data = get_user_data(current_user.id)
+            is_premium = user_data.get('account', {}).get('profile', {}).get('premium', 'no')
+        except Exception:
+            pass
 
         # Convert UTC to IST (UTC+5:30)
         from datetime import timedelta
@@ -2839,7 +2853,8 @@ def check_licence():
                 'message': 'LICENCE EXPIRED',
                 'isExpired': True,
                 'expiredAt': licence_info['expires_at'],
-                'expiredAtIST': f'{expires_at_ist_str} {expires_at_ist_time}'
+                'expiredAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
+                'is_premium': is_premium
             })
 
         return jsonify({
@@ -2848,7 +2863,8 @@ def check_licence():
             'isExpired': False,
             'expiresAt': licence_info['expires_at'],
             'expiresAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
-            'timeLeft': (expires_at - now).total_seconds()
+            'timeLeft': (expires_at - now).total_seconds(),
+            'is_premium': is_premium
         })
         
     except Exception as e:

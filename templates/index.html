@@ -1528,42 +1528,38 @@
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if toast was already shown in this session
-        if (sessionStorage.getItem('licenceToastShown')) {
-            return; // Don't show toast again in this session
-        }
-        
         const toastElement = document.getElementById('licenceStatusToast');
         const toastMessage = document.getElementById('licenceStatusMessage');
-        
+
         // Function to show toast with message and type
         function showToast(message, type = 'info') {
             if (!toastElement || !toastMessage) return;
-            
             toastElement.classList.remove('bg-danger', 'bg-success', 'bg-warning');
             toastElement.classList.add(`bg-${type}`);
             toastMessage.textContent = message;
-            
             const toast = new bootstrap.Toast(toastElement);
             toast.show();
-            
-            // Mark toast as shown in session storage
-            sessionStorage.setItem('licenceToastShown', 'true');
         }
-        
+
         // Check licence status and show toast if needed
         fetch('/api/check-licence')
             .then(response => response.json())
             .then(data => {
-                if (data.hasLicence) {
-                    if (data.isExpired) {
-                        showToast(`Your licence expired on ${data.expiresAtIST}`, 'danger');
-                    } else {
-                        showToast(`Licence active until ${data.expiresAtIST}`, 'success');
-                    }
-                } else {
-                    showToast('No active licence found', 'warning');
+                // Free user: never show toast
+                if (!data.is_premium || data.is_premium === 'no') {
+                    return;
                 }
+                // Premium user
+                if (data.isExpired) {
+                    // Show toast up to 3 times only
+                    let expiredCount = parseInt(localStorage.getItem('premiumLicenceExpiredCount') || '0', 10);
+                    if (expiredCount < 3) {
+                        showToast(`Your premium licence expired on ${data.expiresAtIST}`, 'danger');
+                        localStorage.setItem('premiumLicenceExpiredCount', (expiredCount + 1).toString());
+                    }
+                    // After 3 times, never show again
+                }
+                // If premium and not expired: never show toast
             })
             .catch(error => {
                 console.error('Error checking licence:', error);
@@ -1674,10 +1670,10 @@
             <span>PRICE IS THE KING</span>
         </a>
 
-        <span id="next-refresh">
-            <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i>
-            <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span>
-            <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
+        <span id="next-refresh" style="font-size: 1.1em; font-weight: 500;">
+            <i class="fas fa-clock" style="font-size: 1.1em; margin-left: 35px;"></i>
+            <span style="margin-left: 5px;">Next refresh in</span>
+            <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
         </span>
         <div class="navbar-buttons">
 
