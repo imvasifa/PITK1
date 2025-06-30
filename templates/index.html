@@ -1675,10 +1675,10 @@
             </script>
             <div class="user-menu">
                 <div class="user-menu-avatar-container">
-                    <!-- Status indicator circle -->
-                    <div class="user-status-indicator {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-premium{% else %}user-status-free{% endif %}"></div>
-                    <!-- Profile picture button -->
-                    <span class="user-avatar-wrapper">
+                    <!-- Avatar border indicates status -->
+                    <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
+    <!-- Status dot above avatar -->
+    <span style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; z-index: 3; background: {% if user_data and user_data.account.profile.premium == 'yes' %}#19d142{% else %}orange{% endif %}; box-shadow: 0 0 2px #2222; display: block;"></span>
     <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
         {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
             <img src="{{ user_data.account.profile.photo_url }}" alt="Profile" class="user-avatar-img">

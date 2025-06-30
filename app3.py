@@ -2166,8 +2166,9 @@ def upload_photo():
                 flash('Database connection error', 'danger')
                 return redirect(url_for('dash'))
             
-            # Update the user's photo path in the database
-            query = """
+            # Update the user's photo_path and photo_url in the database (JSONB)
+            # First, set photo_path, then set photo_url (atomic update)
+            query_path = """
                 UPDATE users 
                 SET user_data = jsonb_set(
                     COALESCE(user_data, '{}'::jsonb),
@@ -2175,17 +2176,34 @@ def upload_photo():
                     %s::jsonb
                 )
                 WHERE id = %s
-                RETURNING id
+                RETURNING user_data
             """
-            
-            cur.execute(query, (json.dumps(relative_path), current_user.id))
-            
+            cur.execute(query_path, (json.dumps(relative_path), current_user.id))
             if cur.rowcount == 0:
                 flash('User not found', 'danger')
-            else:
                 if db.conn is not None:
-                    db.conn.commit()
-                flash('Profile picture updated successfully!', 'success')
+                    db.conn.rollback()
+            else:
+                # Now update photo_url in the returned JSONB
+                query_url = """
+                    UPDATE users
+                    SET user_data = jsonb_set(
+                        user_data,
+                        '{account,profile,photo_url}',
+                        %s::jsonb
+                    )
+                    WHERE id = %s
+                    RETURNING id
+                """
+                cur.execute(query_url, (json.dumps(relative_path), current_user.id))
+                if cur.rowcount == 0:
+                    flash('User not found', 'danger')
+                    if db.conn is not None:
+                        db.conn.rollback()
+                else:
+                    if db.conn is not None:
+                        db.conn.commit()
+                    flash('Profile picture updated successfully!', 'success')
                 
         except Exception as e:
             if db.conn is not None:
