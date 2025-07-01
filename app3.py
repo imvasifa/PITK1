@@ -3041,6 +3041,25 @@ def app3_logic():
 from flask import jsonify
 from flask_cors import CORS
 
+# API Response Utilities
+def api_response(success=True, data=None, error=None, message=None, status_code=200):
+    """Standard API response format"""
+    response_data = {
+        'success': success,
+        'data': data,
+        'error': error,
+        'message': message or ('Operation completed successfully' if success else 'An error occurred')
+    }
+    return jsonify(response_data), status_code
+
+def success_response(data=None, message=None, status_code=200):
+    """Helper for successful responses"""
+    return api_response(True, data, None, message, status_code)
+
+def error_response(error, message=None, status_code=400):
+    """Helper for error responses"""
+    return api_response(False, None, {'code': error}, message or error.replace('_', ' ').title(), status_code)
+
 # Enable CORS for all routes
 CORS(app)
 
@@ -3064,61 +3083,47 @@ def app3_output():
 def get_user_conditions():
     """Get all user conditions for the current user"""
     try:
-        logger.info(f"Fetching conditions for user: {current_user.id}")
-        
-        # Load conditions for the current user
+        # Get user's conditions
         conditions = load_user_conditions(current_user.id)
         
+        # If no conditions found, return empty array
         if not isinstance(conditions, list):
-            logger.warning(f"Invalid conditions format for user {current_user.id}, initializing empty list")
             conditions = []
             
-        logger.debug(f"Found {len(conditions)} conditions for user {current_user.id}")
-        
-        return jsonify({
-            'success': True,
-            'status': 'success',
-            'user_conditions': conditions,
-            'count': len(conditions)
-        })
+        return success_response(
+            data={'conditions': conditions},
+            message='Conditions retrieved successfully'
+        )
         
     except Exception as e:
         error_msg = f"Error getting user conditions: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return jsonify({
-            'success': False,
-            'status': 'error',
-            'message': 'Failed to load user conditions',
-            'error': str(e)
-        }), 500
+        return error_response(
+            'INTERNAL_ERROR',
+            'Failed to retrieve conditions',
+            500
+        )
 
 @app.route('/api/user-conditions', methods=['POST'])
 @login_required
 def add_user_condition():
     """Add a new user condition"""
     try:
-        # Validate request data
         data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'No data provided'
-            }), 400
-            
+        logger.info(f"Adding new condition for user {current_user.id}: {data}")
+        
         # Validate required fields
         required_fields = ['name', 'scan_clause']
-        missing_fields = [field for field in required_fields if field not in data or not str(data[field]).strip()]
+        missing_fields = [field for field in required_fields if not data.get(field)]
         
         if missing_fields:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': f'Missing required fields: {", ".join(missing_fields)}',
-                'missing_fields': missing_fields
-            }), 400
-        
-        # Get current user's conditions
+            return error_response(
+                'MISSING_FIELDS',
+                f'Missing required fields: {", ".join(missing_fields)}',
+                400
+            )
+            
+        # Get current conditions
         conditions = load_user_conditions(current_user.id)
         if not isinstance(conditions, list):
             conditions = []
@@ -3126,50 +3131,49 @@ def add_user_condition():
         # Check for duplicate name (case-insensitive)
         name = str(data['name']).strip()
         if any(str(c.get('name', '')).lower() == name.lower() for c in conditions):
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'A condition with this name already exists'
-            }), 400
-        
-        # Prepare condition data with defaults
-        condition_data = {
-            'id': f"user_condition_{int(time.time() * 1000)}",  # Use timestamp for unique ID
+            return error_response(
+                'DUPLICATE_CONDITION',
+                'A condition with this name already exists',
+                400
+            )
+            
+        # Create new condition
+        new_condition = {
+            'id': f"user_condition_{int(time.time() * 1000)}",
             'name': name,
             'scan_clause': str(data['scan_clause']).strip(),
             'link': str(data.get('link', '')).strip() or '#',
-            'chart_link': str(data.get('chart_link', '')).strip() or ''
+            'chart_link': str(data.get('chart_link', '')).strip() or str(data.get('link', '')).strip() or '#',
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
         }
         
-        # If chart_link is empty, use link as fallback
-        if not condition_data['chart_link'] and condition_data['link'] != '#':
-            condition_data['chart_link'] = condition_data['link']
-        
         # Add to conditions list
-        conditions.insert(0, condition_data)
+        conditions.append(new_condition)
         
         # Save to database
         if save_user_conditions(current_user.id, conditions):
-            logger.info(f"Added new condition '{condition_data['name']}' for user {current_user.id}")
-            return jsonify({
-                'success': True,
-                'status': 'success',
-                'message': 'Condition added successfully',
-                'id': condition_data['id'],
-                'condition': condition_data
-            }), 201
+            logger.info(f"Added new condition '{name}' for user {current_user.id}")
+            return success_response(
+                data=new_condition,
+                message='Condition added successfully',
+                status_code=201
+            )
         else:
-            raise Exception("Failed to save condition to database")
+            return error_response(
+                'DATABASE_ERROR',
+                'Failed to save condition',
+                500
+            )
             
     except Exception as e:
         error_msg = f"Error adding user condition: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return jsonify({
-            'success': False,
-            'status': 'error',
-            'error': 'Failed to add condition',
-            'message': str(e)
-        }), 500
+        return error_response(
+            'INTERNAL_ERROR',
+            'An error occurred while adding the condition',
+            500
+        )
 
 @app.route('/api/user-conditions/<condition_id>', methods=['PUT'])
 @login_required
@@ -3177,31 +3181,30 @@ def update_user_condition(condition_id):
     """Update an existing user condition"""
     try:
         if not condition_id:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'Condition ID is required'
-            }), 400
+            return error_response(
+                'INVALID_INPUT',
+                'Condition ID is required',
+                400
+            )
             
         data = request.get_json()
         if not data:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'No data provided'
-            }), 400
+            return error_response(
+                'INVALID_INPUT',
+                'No data provided',
+                400
+            )
             
         # Validate required fields
         required_fields = ['name', 'scan_clause']
         missing_fields = [field for field in required_fields if field not in data or not str(data[field]).strip()]
         
         if missing_fields:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': f'Missing required fields: {", ".join(missing_fields)}',
-                'missing_fields': missing_fields
-            }), 400
+            return error_response(
+                'MISSING_FIELDS',
+                f'Missing required fields: {", ".join(missing_fields)}',
+                400
+            )
             
         # Get current user's conditions
         conditions = load_user_conditions(current_user.id)
@@ -3213,11 +3216,11 @@ def update_user_condition(condition_id):
         if any(str(c.get('name', '')).lower() == name.lower() 
                for c in conditions 
                if c.get('id') != condition_id):
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'A condition with this name already exists'
-            }), 400
+            return error_response(
+                'DUPLICATE_CONDITION',
+                'A condition with this name already exists',
+                400
+            )
         
         # Find and update the condition
         updated = False
@@ -3230,7 +3233,8 @@ def update_user_condition(condition_id):
                     'name': name,
                     'scan_clause': str(data['scan_clause']).strip(),
                     'link': str(data.get('link', condition.get('link', ''))).strip() or '#',
-                    'chart_link': str(data.get('chart_link', condition.get('chart_link', ''))).strip()
+                    'chart_link': str(data.get('chart_link', condition.get('chart_link', ''))).strip(),
+                    'updated_at': datetime.utcnow().isoformat()
                 })
                 
                 # If chart_link is empty, use link as fallback
@@ -3242,33 +3246,34 @@ def update_user_condition(condition_id):
                 break
         
         if not updated:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'Condition not found'
-            }), 404
+            return error_response(
+                'CONDITION_NOT_FOUND',
+                'Condition not found',
+                404
+            )
         
         # Save to database
         if save_user_conditions(current_user.id, conditions):
             logger.info(f"Updated condition '{condition_id}' for user {current_user.id}")
-            return jsonify({
-                'success': True,
-                'status': 'success',
-                'message': 'Condition updated successfully',
-                'condition': updated_condition
-            })
+            return success_response(
+                data=updated_condition,
+                message='Condition updated successfully'
+            )
         else:
-            raise Exception("Failed to update condition in database")
+            return error_response(
+                'DATABASE_ERROR',
+                'Failed to update condition in database',
+                500
+            )
             
     except Exception as e:
         error_msg = f"Error updating user condition: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return jsonify({
-            'success': False,
-            'status': 'error',
-            'error': 'Failed to update condition',
-            'message': str(e)
-        }), 500
+        return error_response(
+            'INTERNAL_ERROR',
+            'An error occurred while updating the condition',
+            500
+        )
 
 @app.route('/api/user-conditions/<condition_id>', methods=['DELETE'])
 @login_required
@@ -3276,54 +3281,48 @@ def delete_user_condition(condition_id):
     """Delete a user condition"""
     try:
         if not condition_id or not str(condition_id).strip():
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'Condition ID is required'
-            }), 400
+            return error_response(
+                'INVALID_INPUT',
+                'Condition ID is required',
+                400
+            )
             
         condition_id = str(condition_id).strip()
         logger.info(f"Deleting condition {condition_id} for user {current_user.id}")
         
-        # Get current user's conditions
-        conditions = load_user_conditions(current_user.id)
-        if not isinstance(conditions, list):
-            conditions = []
+        # Load current conditions
+        user_conditions = load_user_conditions(current_user.id)
+        updated_conditions = [c for c in user_conditions if c.get('id') != condition_id]
         
-        # Find and remove the condition
-        initial_count = len(conditions)
-        updated_conditions = [
-            c for c in conditions 
-            if str(c.get('id', '')).strip() != condition_id
-        ]
-        
-        if len(updated_conditions) == initial_count:
-            return jsonify({
-                'success': False,
-                'status': 'error',
-                'error': 'Condition not found'
-            }), 404
-        
-        # Save to database
+        if len(updated_conditions) == len(user_conditions):
+            return error_response(
+                'CONDITION_NOT_FOUND',
+                'Condition not found',
+                404
+            )
+            
+        # Save updated conditions
         if save_user_conditions(current_user.id, updated_conditions):
             logger.info(f"Deleted condition {condition_id} for user {current_user.id}")
-            return jsonify({
-                'success': True,
-                'status': 'success',
-                'message': 'Condition deleted successfully'
-            })
+            return success_response(
+                data={'deleted_id': condition_id},
+                message='Condition deleted successfully'
+            )
         else:
-            raise Exception("Failed to delete condition from database")
+            return error_response(
+                'DATABASE_ERROR',
+                'Failed to save conditions after deletion',
+                500
+            )
             
     except Exception as e:
         error_msg = f"Error deleting user condition: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return jsonify({
-            'success': False,
-            'status': 'error',
-            'error': 'Failed to delete condition',
-            'message': str(e)
-        }), 500
+        return error_response(
+            'INTERNAL_ERROR',
+            'An error occurred while deleting the condition',
+            500
+        )
 
 @app.route('/reset-profile', methods=['POST'])
 @login_required

@@ -72,12 +72,14 @@ function showAddConditionForm() {
 
 // Cancel editing and return to list view
 function cancelEditCondition() {
+    console.log('[UserConditions] Canceling edit condition');
     document.getElementById('user-conditions-list-view').style.display = 'block';
     document.getElementById('user-condition-form-view').style.display = 'none';
 }
 
 // Edit an existing condition
 function editUserCondition(condition) {
+    console.log('[UserConditions] Starting to edit condition:', JSON.stringify(condition, null, 2));
     try {
         // Hide list and show form
         document.getElementById('user-conditions-list-view').style.display = 'none';
@@ -114,69 +116,175 @@ function editUserCondition(condition) {
     }
 }
 
+// Show the condition form
+function showConditionForm() {
+    console.log('[UserConditions] Showing condition form');
+    const formView = document.getElementById('user-condition-form-view');
+    const listView = document.getElementById('user-conditions-list-view');
+    
+    if (formView && listView) {
+        formView.style.display = 'block';
+        listView.style.display = 'none';
+        document.getElementById('condition-name').focus();
+        console.log('[UserConditions] Form shown, list view hidden');
+    } else {
+        console.error('[UserConditions] Could not find form or list view elements');
+    }
+}
+
+// Hide the condition form
+function hideConditionForm() {
+    console.log('[UserConditions] Hiding condition form');
+    const form = document.getElementById('user-condition-form');
+    const formView = document.getElementById('user-condition-form-view');
+    const listView = document.getElementById('user-conditions-list-view');
+    
+    if (form && formView && listView) {
+        form.reset();
+        document.getElementById('edit-condition-id').value = '';
+        formView.style.display = 'none';
+        listView.style.display = 'block';
+        console.log('[UserConditions] Form hidden, list view shown');
+    } else {
+        console.error('[UserConditions] Could not find form elements to hide');
+    }
+}
+
+// Initialize the modal when it's shown
+document.addEventListener('DOMContentLoaded', function() {
+    const userConditionsModal = document.getElementById('userConditionsModal');
+    if (userConditionsModal) {
+        userConditionsModal.addEventListener('show.bs.modal', function() {
+            populateUserConditions();
+        });
+    }
+});
+
 // Populate user conditions
 async function populateUserConditions() {
     const container = document.getElementById('user-conditions-list-container');
-    if (!container) return;
+    if (!container) {
+        console.error('User conditions container not found');
+        return;
+    }
     
-    container.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+    // Show loading state
+    container.innerHTML = `
+        <div class="d-flex justify-content-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>`;
     
     try {
-        const response = await fetch('/api/user-conditions');
+        console.log('Fetching user conditions...');
+        const response = await fetch('/api/user-conditions', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+        
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
+        console.log('User conditions data:', data);
+        
+        // Handle both array and object response formats
         const conditions = Array.isArray(data) ? data : (data.user_conditions || []);
         
+        // Clear container
         container.innerHTML = '';
         
         if (conditions.length === 0) {
             container.innerHTML = `
-                <div class="empty-state">
+                <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
                     No custom conditions found. Click "Add New Condition" to create one.
                 </div>`;
             return;
         }
         
+        // Create a list group for the conditions
+        const listGroup = document.createElement('div');
+        listGroup.className = 'list-group list-group-flush';
+        
+        // Add each condition to the list
         conditions.forEach(condition => {
-            const div = document.createElement('div');
-            div.className = 'condition-row';
-            div.setAttribute('data-condition-id', condition.id);
+            const conditionId = condition.id;
+            const conditionName = condition.name || 'Unnamed Condition';
+            const scanClause = condition.scan_clause || '';
+            const chartLink = condition.chart_link || '';
             
-            // Create a link element if chart_link exists and is not empty
-            const chartLink = condition.chart_link && condition.chart_link.trim() !== '' && condition.chart_link !== '#' ? 
-                `<a href="${escapeHtml(condition.chart_link)}" target="_blank" class="chart-link">
-                    <i class="fas fa-external-link-alt"></i>View in Chartink
-                </a>` : '';
-
-            // Create the condition HTML with new structure
-            const conditionHTML = `
-                <div class="condition-content">
-                    <div class="condition-name">${escapeHtml(condition.name)}</div>
-                    <span class="condition-formula" title="${escapeHtml(condition.scan_clause)}">
-                        ${escapeHtml(condition.scan_clause.substring(0, 100))}${condition.scan_clause.length > 100 ? '...' : ''}
-                    </span>
-                    ${chartLink}
-                </div>
-                <div class="condition-actions">
-                    <button class="btn btn-outline-primary btn-sm" 
-                            onclick="editUserCondition(${JSON.stringify(condition).replace(/"/g, '&quot;')}); return false;"
-                            title="Edit condition">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm delete-condition" 
-                            data-condition-id="${condition.id}"
-                            title="Delete condition">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>`;
-
-            div.innerHTML = conditionHTML;
-            container.appendChild(div);
+            // Create condition item
+            const conditionItem = document.createElement('div');
+            conditionItem.className = 'list-group-item d-flex justify-content-between align-items-center py-3';
+            conditionItem.setAttribute('data-condition-id', conditionId);
+            
+            // Create condition content
+            const conditionContent = document.createElement('div');
+            conditionContent.className = 'flex-grow-1';
+            
+            const nameElement = document.createElement('h6');
+            nameElement.className = 'mb-1';
+            nameElement.textContent = conditionName;
+            
+            const clauseElement = document.createElement('div');
+            clauseElement.className = 'text-muted small text-truncate';
+            clauseElement.textContent = scanClause;
+            clauseElement.title = scanClause;
+            clauseElement.style.maxWidth = '500px';
+            
+            conditionContent.appendChild(nameElement);
+            conditionContent.appendChild(clauseElement);
+            
+            // Create action buttons
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'btn-group btn-group-sm';
+            
+            // Edit button
+            const editButton = document.createElement('button');
+            editButton.className = 'btn btn-outline-primary';
+            editButton.innerHTML = '<i class="fas fa-edit"></i>';
+            editButton.title = 'Edit condition';
+            editButton.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                editUserCondition(condition);
+            };
+            
+            // Delete button
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'btn btn-outline-danger delete-condition';
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteButton.title = 'Delete condition';
+            deleteButton.setAttribute('data-condition-id', conditionId);
+            deleteButton.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                deleteUserCondition(conditionId, e);
+            };
+            
+            // Add buttons to button group
+            buttonGroup.appendChild(editButton);
+            buttonGroup.appendChild(deleteButton);
+            
+            // Add elements to condition item
+            conditionItem.appendChild(conditionContent);
+            conditionItem.appendChild(buttonGroup);
+            
+            // Add condition item to list group
+            listGroup.appendChild(conditionItem);
         });
+        
+        // Add list group to container
+        container.appendChild(listGroup);
     } catch (error) {
         console.error('Error loading user conditions:', error);
         container.innerHTML = `
@@ -192,6 +300,8 @@ async function populateUserConditions() {
 
 // Delete a condition
 async function deleteUserCondition(conditionId, event) {
+    console.log(`[UserConditions] Delete initiated for condition ID: ${conditionId}`);
+    
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -203,14 +313,15 @@ async function deleteUserCondition(conditionId, event) {
         return;
     }
 
-    if (!confirm('Are you sure you want to delete this condition? This action cannot be undone.')) {
-        return;
-    }
-
     // Get the condition element to remove
     const conditionElement = document.querySelector(`[data-condition-id="${conditionId}"]`);
     const conditionContainer = conditionElement?.closest('.list-group-item') || conditionElement;
     const conditionName = conditionElement?.querySelector('h6')?.textContent || 'this condition';
+    
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to delete the condition "${conditionName}"?`)) {
+        return;
+    }
     
     // Show loading state
     const deleteButtons = document.querySelectorAll(`.delete-condition[data-condition-id="${conditionId}"]`);
@@ -228,44 +339,55 @@ async function deleteUserCondition(conditionId, event) {
     const originalButtonHTML = originalButton?.innerHTML;
 
     try {
-        console.log(`[DEBUG] Attempting to delete condition with ID: ${conditionId}`);
+        console.log(`Attempting to delete condition with ID: ${conditionId}`);
+        
+        // Get CSRF token from meta tag
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         
         const response = await fetch(`/api/user-conditions/${encodeURIComponent(conditionId)}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
             },
             credentials: 'same-origin'
         });
 
-        console.log(`[DEBUG] Delete response status: ${response.status}`);
+        console.log(`Delete response status: ${response.status}`);
         
         let result;
         try {
             result = await response.json();
-            console.log('[DEBUG] Delete response data:', result);
+            console.log('[UserConditions] API response data:', result);
         } catch (parseError) {
-            console.error('Error parsing delete response:', parseError);
-            throw new Error('Invalid response from server');
+            console.error('[UserConditions] Error parsing JSON response:', parseError);
+            const textResponse = await response.text();
+            console.error('[UserConditions] Raw response text:', textResponse.substring(0, 500));
+            throw new Error(`Invalid response from server: ${parseError.message}`);
         }
-
-        if (!response.ok) {
-            const errorMsg = result?.error || result?.message || 
-                           `Failed to delete condition (${response.status} ${response.statusText})`;
+        
+        if (!response.ok || (result && result.success === false)) {
+            const errorMsg = result?.error || result?.message || `HTTP error! status: ${response.status}`;
+            console.error('[UserConditions] API error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorMsg,
+                response: result
+            });
             throw new Error(errorMsg);
         }
 
         // If we get here, the delete was successful
-        console.log(`[DEBUG] Successfully deleted condition ${conditionId}`);
+        console.log(`Successfully deleted condition ${conditionId}`);
 
         // Show success message
-        showToast(`Successfully deleted condition: ${conditionName}`, 'success');
+        showToast(result?.message || `Successfully deleted condition: ${conditionName}`, 'success');
         
         // Remove the condition from the UI with fade out animation
         if (conditionContainer) {
-            conditionContainer.style.opacity = '0.5';
-            conditionContainer.style.transition = 'opacity 0.3s';
+            conditionContainer.style.opacity = '0';
+            conditionContainer.style.transition = 'opacity 0.3s ease';
             
             // Wait for the fade out animation to complete
             setTimeout(() => {
@@ -273,15 +395,23 @@ async function deleteUserCondition(conditionId, event) {
                 
                 // Check if we need to show the empty state
                 const conditionsContainer = document.getElementById('user-conditions-list-container');
+                const noConditionsMessage = document.getElementById('no-conditions-message');
+                
                 if (conditionsContainer && conditionsContainer.children.length === 0) {
-                    conditionsContainer.innerHTML = `
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            No custom conditions found. Click "Add New Condition" to create one.
-                        </div>`;
+                    if (noConditionsMessage) {
+                        noConditionsMessage.style.display = 'block';
+                    } else {
+                        conditionsContainer.innerHTML = `
+                            <div class="alert alert-info" id="no-conditions-message">
+                                <i class="fas fa-info-circle me-2"></i>
+                                No custom conditions found. Click "Add New Condition" to create one.
+                            </div>`;
+                    }
                 }
             }, 300);
         }
+        
+        return true;
         
     } catch (error) {
         console.error('Error deleting condition:', error);
@@ -289,9 +419,14 @@ async function deleteUserCondition(conditionId, event) {
         // Show specific error messages for common issues
         let errorMessage = 'Failed to delete condition';
         if (error.message) {
-            if (error.message.includes('404')) {
+            if (error.message.includes('404') || error.message.toLowerCase().includes('not found')) {
                 errorMessage = 'Condition not found. It may have already been deleted.';
-            } else if (error.message.includes('500')) {
+                
+                // If we get a 404, remove the element anyway since it doesn't exist on the server
+                if (conditionContainer) {
+                    conditionContainer.remove();
+                }
+            } else if (error.message.includes('500') || error.message.toLowerCase().includes('server error')) {
                 errorMessage = 'Server error. Please try again later.';
             } else {
                 errorMessage = error.message;
@@ -314,22 +449,16 @@ async function deleteUserCondition(conditionId, event) {
             originalButton.innerHTML = originalButtonHTML;
         }
         
-        // Show more detailed error in console for debugging
-        if (error instanceof Error) {
-            console.error('Error details:', {
-                message: error.message,
-                stack: error.stack,
-                name: error.name
-            });
-        }
+        return false;
     }
 }
 
 // Handle form submission
 async function handleUserConditionSubmit(e) {
+    console.log('[UserConditions] Form submission started');
     // Prevent multiple submissions
     if (isSubmitting) {
-        console.log('Preventing duplicate submission');
+        console.log('[UserConditions] Preventing duplicate submission');
         e.preventDefault();
         return false;
     }
@@ -344,6 +473,13 @@ async function handleUserConditionSubmit(e) {
     const linkInput = document.getElementById('user-condition-link');
     const chartLinkInput = document.getElementById('user-condition-chart-link');
     const clauseInput = document.getElementById('user-condition-clause');
+    
+    console.log('[UserConditions] Form inputs:', {
+        nameInput: nameInput ? 'found' : 'not found',
+        linkInput: linkInput ? 'found' : 'not found',
+        chartLinkInput: chartLinkInput ? 'found' : 'not found',
+        clauseInput: clauseInput ? 'found' : 'not found'
+    });
     
     // Prepare condition data with proper fallbacks
     const conditionData = {
@@ -361,7 +497,18 @@ async function handleUserConditionSubmit(e) {
         scan_clause: conditionData.scanClause
     };
     
-    console.log('[DEBUG] Prepared request data:', requestData);
+    console.log('[UserConditions] Form data prepared:', {
+        isEdit: !!conditionId,
+        conditionId: conditionId || 'new',
+        conditionData: {
+            ...conditionData,
+            scanClause: conditionData.scanClause ? `${conditionData.scanClause.substring(0, 50)}...` : 'empty'
+        },
+        requestData: {
+            ...requestData,
+            scan_clause: requestData.scan_clause ? `${requestData.scan_clause.substring(0, 50)}...` : 'empty'
+        }
+    });
     
     // If chartLink is empty but link exists, use link as fallback
     if (!conditionData.chartLink && conditionData.link && conditionData.link !== '#') {
@@ -371,15 +518,21 @@ async function handleUserConditionSubmit(e) {
     
     // Validate required fields
     if (!conditionData.name) {
-        showToast('Please enter a condition name', 'error');
-        document.getElementById('user-condition-name').focus();
-        return;
+        const errorMsg = 'Please enter a condition name';
+        console.error('[UserConditions] Validation failed:', errorMsg);
+        showToast(errorMsg, 'error');
+        document.getElementById('user-condition-name')?.focus();
+        isSubmitting = false;
+        return false;
     }
     
-    if (!conditionData.scan_clause) {
-        showToast('Please enter a scan clause', 'error');
-        document.getElementById('user-condition-clause').focus();
-        return;
+    if (!conditionData.scanClause) {
+        const errorMsg = 'Please enter a scan clause';
+        console.error('[UserConditions] Validation failed:', errorMsg);
+        showToast(errorMsg, 'error');
+        document.getElementById('user-condition-clause')?.focus();
+        isSubmitting = false;
+        return false;
     }
     
     // Show loading state
@@ -389,54 +542,98 @@ async function handleUserConditionSubmit(e) {
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
     
     try {
+        console.log('[UserConditions] Starting form submission...');
+        
         // First, check for duplicate names if this is a new condition
         if (!isEdit) {
-            const conditions = await fetch('/api/user-conditions')
-                .then(res => res.json())
-                .catch(() => []);
-                
+            console.log('[UserConditions] Checking for duplicate condition names...');
+            const response = await fetch('/api/user-conditions');
+            const conditions = await response.json().catch(() => []);
+            
+            console.log('[UserConditions] Existing conditions:', conditions);
+            
             const duplicateExists = Array.isArray(conditions) && 
                 conditions.some(cond => 
                     cond.name.toLowerCase() === conditionData.name.toLowerCase()
                 );
                 
             if (duplicateExists) {
-                throw new Error('A condition with this name already exists');
+                const errorMsg = `A condition with the name "${conditionData.name}" already exists`;
+                console.error('[UserConditions] Duplicate condition found:', errorMsg);
+                throw new Error(errorMsg);
             }
         }
         
-        const url = isEdit 
-            ? `/api/user-conditions/${conditionId}`
-            : '/api/user-conditions';
+        // Prepare the API request
+        const url = isEdit ? `/api/user-conditions/${conditionId}` : '/api/user-conditions';
+        const method = isEdit ? 'PUT' : 'POST';
         
-        console.log('[DEBUG] Sending request to:', url);
-        console.log('[DEBUG] Request data:', conditionData);
-        
-        const response = await fetch(url, {
-            method: isEdit ? 'PUT' : 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-            },
-            body: JSON.stringify(requestData),
-            credentials: 'same-origin'  // Ensure cookies are sent
+        console.log('[UserConditions] Sending API request:', {
+            method,
+            url,
+            isEdit,
+            conditionId: conditionId || 'new',
+            requestData: {
+                ...requestData,
+                scan_clause: requestData.scan_clause ? `${requestData.scan_clause.substring(0, 50)}...` : 'empty'
+            }
         });
         
+        const startTime = Date.now();
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(requestData),
+            credentials: 'same-origin'
+        });
+        
+        const responseTime = Date.now() - startTime;
+        
+        // Clone the response to read it multiple times if needed
+        const responseClone = response.clone();
+        
+        console.log(`[UserConditions] API response received in ${responseTime}ms`, {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url
+        });
+        
+        // Try to parse response as JSON
         let result;
         try {
             result = await response.json();
-            console.log('Server response:', result);
+            console.log('[UserConditions] API response data:', {
+                ...result,
+                // Truncate large data in logs
+                scan_clause: result.scan_clause ? `${result.scan_clause.substring(0, 50)}...` : 'empty'
+            });
         } catch (parseError) {
-            console.error('Error parsing server response:', parseError);
-            throw new Error('Invalid response from server');
+            console.error('[UserConditions] Error parsing JSON response:', parseError);
+            const textResponse = await responseClone.text();
+            console.error('[UserConditions] Raw response text:', textResponse.substring(0, 500));
+            throw new Error(`Invalid response from server: ${parseError.message}`);
         }
         
         if (!response.ok) {
-            const errorMsg = result.error || 
-                          result.message || 
-                          `Failed to ${isEdit ? 'update' : 'save'} condition (${response.status} ${response.statusText})`;
+            const errorMsg = result?.message || `HTTP error! status: ${response.status}`;
+            console.error('[UserConditions] API error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorMsg,
+                response: result
+            });
             throw new Error(errorMsg);
         }
+        
+        // If we get here, the request was successful (status 2xx)
+        console.log(`[UserConditions] ${isEdit ? 'Update' : 'Create'} successful:`, {
+            conditionId: result?.id || 'unknown',
+            name: result?.name || 'unknown'
+        });
 
         // If we get here, the request was successful (status 2xx)
         console.log('[DEBUG] Request successful, result:', result);

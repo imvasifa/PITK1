@@ -2845,18 +2845,43 @@ async function populateUserConditions() {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- Example condition row -->
-                <div class="custom-condition-item">
-                    <div class="custom-condition-text" title="((cash) (latest ema (latest close, 5) > latest ema (latest close, 200)) and ...)">
-                        ((cash) (latest ema (latest close, 5) > latest ema (latest close, 200)) and ...)
-                    </div>
-                    <div class="custom-condition-actions">
-                        <button class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                    </div>
+                <!-- Form View (initially hidden) -->
+                <div id="user-condition-form-view" style="display: none;">
+                    <form id="user-condition-form" onsubmit="handleUserConditionSubmit(event)">
+                        <input type="hidden" id="edit-condition-id" value="">
+                        <div class="mb-3">
+                            <label for="condition-name" class="form-label">Condition Name</label>
+                            <input type="text" class="form-control" id="condition-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="condition-link" class="form-label">Link (Optional)</label>
+                            <input type="url" class="form-control" id="condition-link">
+                        </div>
+                        <div class="mb-3">
+                            <label for="chart-link" class="form-label">Chart Link (Optional)</label>
+                            <input type="url" class="form-control" id="chart-link">
+                        </div>
+                        <div class="mb-3">
+                            <label for="scan-clause" class="form-label">Scan Clause</label>
+                            <textarea class="form-control" id="scan-clause" rows="4" required></textarea>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" onclick="hideConditionForm()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Condition</button>
+                        </div>
+                    </form>
                 </div>
-                <!-- User conditions will be loaded here -->
-                <div id="user-conditions-list-container"></div>
+
+                <!-- List View -->
+                <div id="user-conditions-list-view">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Your Custom Conditions</h6>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="showConditionForm()">
+                            <i class="fas fa-plus me-1"></i> Add New Condition
+                        </button>
+                    </div>
+                    <div id="user-conditions-list-container" class="list-group"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
