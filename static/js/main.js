@@ -332,7 +332,8 @@ window.editUserCondition = function(condition) {
 };
 
 window.deleteUserCondition = async function(id) {
-    if (!confirm('Are you sure you want to delete this condition?')) return;
+    const confirmed = await (typeof showConfirmDialog === 'function' ? showConfirmDialog('Are you sure you want to delete this condition?') : Promise.resolve(confirm('Are you sure you want to delete this condition?')));
+    if (!confirmed) return;
     try {
         const response = await fetch(`/api/user-conditions/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete condition');

@@ -304,9 +304,71 @@ async function populateUserConditions() {
     }
 }
 
+// Helper: Bootstrap confirmation dialog returns Promise<boolean>
+async function showConfirmDialog(message = 'Are you sure?') {
+    // Create modal lazily
+    let modalEl = document.getElementById('confirmDeleteModal');
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.innerHTML = `
+        <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="confirmDeleteModalLabel">Confirm Delete</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="confirmDeleteMessage"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="confirmNoBtn">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="confirmYesBtn">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.body.appendChild(modalEl);
+    }
+
+    // Update message
+    modalEl.querySelector('#confirmDeleteMessage').textContent = message;
+
+    const bsModal = new bootstrap.Modal(modalEl);
+
+    return new Promise((resolve) => {
+        const yesBtn = modalEl.querySelector('#confirmYesBtn');
+        const noBtn = modalEl.querySelector('#confirmNoBtn');
+
+        const cleanup = () => {
+            yesBtn.removeEventListener('click', onYes);
+            noBtn.removeEventListener('click', onNo);
+            modalEl.removeEventListener('hidden.bs.modal', onNo);
+        };
+
+        const onYes = () => {
+            cleanup();
+            bsModal.hide();
+            resolve(true);
+        };
+
+        const onNo = () => {
+            cleanup();
+            bsModal.hide();
+            resolve(false);
+        };
+
+        yesBtn.addEventListener('click', onYes);
+        noBtn.addEventListener('click', onNo);
+        modalEl.addEventListener('hidden.bs.modal', onNo);
+
+        bsModal.show();
+    });
+}
+
 // Delete a condition
 async function deleteUserCondition(conditionId, event) {
-    console.log(`[UserConditions] Delete initiated for condition ID: ${conditionId}`);
+    console.debug('[UserConditions] Delete initiated for condition ID:', conditionId);
     
     // Prevent multiple submissions
     if (isSubmitting) {
@@ -323,24 +385,25 @@ async function deleteUserCondition(conditionId, event) {
         event.stopPropagation();
     }
     
-    // Set submitting flag
+    // Identify the element and condition name BEFORE confirming
+    const conditionElement = document.querySelector(`[data-condition-id="${conditionId}"]`);
+    const conditionContainer = conditionElement?.closest('.list-group-item') || conditionElement;
+    const conditionName = conditionElement?.querySelector('h6')?.textContent || 'this condition';
+
+    // Show confirmation dialog *before* enabling submitting flag
+    const confirmed = await showConfirmDialog(`Are you sure you want to delete ${conditionName}?`);
+    if (!confirmed) return;
+
+    // Set submitting flag only after user confirmed
     isSubmitting = true;
-    
+
     if (!conditionId) {
         console.error('No condition ID provided for deletion');
         showToast('Error: No condition ID provided', 'error');
         return;
     }
 
-    // Get the condition element to remove
-    const conditionElement = document.querySelector(`[data-condition-id="${conditionId}"]`);
-    const conditionContainer = conditionElement?.closest('.list-group-item') || conditionElement;
-    const conditionName = conditionElement?.querySelector('h6')?.textContent || 'this condition';
-    
-    // Show confirmation dialog
-    if (!confirm(`Are you sure you want to delete the condition "${conditionName}"?`)) {
-        return;
-    }
+
     
     // Show loading state
     const deleteButtons = document.querySelectorAll(`.delete-condition[data-condition-id="${conditionId}"]`);
@@ -474,7 +537,7 @@ async function deleteUserCondition(conditionId, event) {
             }
         });
         
-        // Reset button state on error
+        // Reset submitting flag and button state on error
         if (originalButton && originalButtonHTML) {
             originalButton.disabled = false;
             originalButton.innerHTML = originalButtonHTML;

@@ -508,6 +508,27 @@ admin_conditions = [
     ) )"""
     },
     {
+    "name": "Chanu 5-200 CASH ✅",
+    "type": "admin",
+    "link": "",
+    "chart_link": "",
+    "scan_clause": "( {cash} ( \
+        latest ema( latest close , 5 ) > latest ema( latest close , 200 ) and \
+        1 day ago ema( latest close , 5 ) <= 1 day ago ema( latest close , 200 ) and \
+        latest close > latest max( 20 , latest vwap ) and \
+        latest volume > 1 day ago volume * 1 and \
+        latest volume > latest sma( latest volume , 5 ) * 0.75 and \
+        latest close < 2250 and \
+        latest volume > latest sma( latest volume , 20 ) * 2 and \
+        latest close > latest open and \
+        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and \
+        latest close > latest ema( latest close , 20 ) and \
+        latest max( 10 , latest high ) > latest min( 10 , latest low ) * 1.05 and \
+        latest volume > latest sma( latest volume , 20 ) and \
+        latest max( 50 , latest high ) / latest min( 50 , latest low ) >= 1.35 \
+    ) )"
+    },
+    {
     "name": "AN Kumar Cash",
     "type": "admin",
     "link": "https://chartink.com/screener/ank-1073",
