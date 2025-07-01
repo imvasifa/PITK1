@@ -1998,7 +1998,12 @@
                                     <tbody>
                                         {% for stock in condition.stocks %}
                                             <tr>
-                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td style="white-space:nowrap;">
+    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+        <i class="fas fa-copy"></i>
+    </button>
+    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+</td>
                                                 <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
                                                 <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
                                                 <td class="d-none d-md-table-cell">{{ stock.volume|format_number }}</td>
@@ -2022,7 +2027,12 @@
                                     <tbody>
                                         {% for stock in condition.stocks %}
                                             <tr>
-                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td style="white-space:nowrap;">
+    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+        <i class="fas fa-copy"></i>
+    </button>
+    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+</td>
                                                 <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
                                                 <td class="d-none d-md-table-cell">
     <!-- Screener link (scan definition) -->
@@ -2074,7 +2084,12 @@
                                     <tbody>
                                         {% for stock in buy_suggestions %}
                                             <tr>
-                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td style="white-space:nowrap;">
+    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+        <i class="fas fa-copy"></i>
+    </button>
+    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+</td>
                                                 <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
                                                 <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('percentage') }}%</td>
                                                 <td>{{ stock.volume | format_number }}</td>
@@ -2111,7 +2126,12 @@
                                     <tbody>
                                         {% for stock in sell_suggestions %}
                                             <tr>
-                                                <td><a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a></td>
+                                                <td style="white-space:nowrap;">
+    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+        <i class="fas fa-copy"></i>
+    </button>
+    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+</td>
                                                 <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
                                                 <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('percentage') }}%</td>
                                                 <td>{{ stock.volume | format_number }}</td>
@@ -2764,7 +2784,7 @@ async function populateUserConditions() {
             <div class="modal-header">
                 <h5 class="modal-title" id="conditionsModalLabel">Manage Conditions</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
+            </div>
             <div class="modal-body">
                 <ul class="nav nav-tabs" id="conditionsTab" role="tablist">
                     <li class="nav-item" role="presentation">
@@ -2902,6 +2922,8 @@ async function populateUserConditions() {
         </div>
     </div>
 </div>
+{% endblock %}
+
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', filename='js/user-conditions.js') }}"></script>
@@ -2963,6 +2985,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %}
-
+<script>
+// Copy stock name to clipboard functionality
+function showCopyFeedback(btn) {
+    const icon = btn.querySelector('i');
+    if (!icon) return;
+    const original = icon.className;
+    icon.classList.remove('fa-copy');
+    icon.classList.add('fa-check', 'text-success');
+    setTimeout(() => {
+        icon.classList.remove('fa-check', 'text-success');
+        icon.className = original;
+    }, 1200);
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.copy-stock-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const stock = btn.getAttribute('data-stock');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(stock);
+                showCopyFeedback(btn);
+            } else {
+                // fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = stock;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showCopyFeedback(btn);
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
