@@ -37,12 +37,6 @@
 {% endblock %}
 
 {% block content %}
-    <!-- Licence Status Banner -->
-    <div id="licenceStatusBanner" class="alert alert-warning d-none position-relative" role="alert" style="margin-bottom: 1rem;">
-    <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close" id="closeLicenceBanner" style="font-size:1.5rem;z-index:2;"></button>
-        <i class="fas fa-exclamation-triangle me-2"></i>
-        <span id="licenceStatusMessage"></span>
-    </div>
     
     <!-- Navigation Buttons -->
     <div class="d-flex justify-content-end mb-4">
@@ -378,62 +372,8 @@ function resetProfile() {
     }
 }
 
-// Check licence status when page loads
-async function checkLicenceStatus() {
-    try {
-        const response = await fetch('/api/check-licence');
-        const data = await response.json();
-        
-        const banner = document.getElementById('licenceStatusBanner');
-        const message = document.getElementById('licenceStatusMessage');
-        
-        if (!response.ok) {
-            banner.className = 'alert alert-danger d-flex align-items-center';
-            message.textContent = 'Error checking licence status';
-            banner.classList.remove('d-none');
-            return;
-        }
-        
-        if (data.isExpired) {
-            banner.className = 'alert alert-danger d-flex align-items-center';
-            message.innerHTML = `<strong>LICENCE EXPIRED</strong> - Please renew your licence to continue using premium features.`;
-            banner.classList.remove('d-none');
-        } else if (data.hasLicence) {
-            const expiresAt = new Date(data.expiresAt);
-            const timeLeft = Math.floor((expiresAt - new Date()) / 1000 / 60); // in minutes
-            
-            banner.className = 'alert alert-success d-flex align-items-center';
-            message.innerHTML = `
-                <strong>Premium Active</strong> - 
-                Expires in ${timeLeft} minute${timeLeft !== 1 ? 's' : ''}
-                <span class="ms-2 small">(${data.expiresAtIST})</span>
-            `;
-            banner.classList.remove('d-none');
-            
-            // Check every minute for expiry
-            setTimeout(checkLicenceStatus, 60000);
-        } else {
-            banner.className = 'alert alert-warning d-flex align-items-center';
-            message.innerHTML = 'No active licence. Please enter a valid licence key to access premium features.';
-            banner.classList.remove('d-none');
-        }
-    } catch (error) {
-        console.error('Error checking licence status:', error);
-    }
-}
-
-// Add form submission handlers for loaders
+// Form submission handlers for loaders
 document.addEventListener('DOMContentLoaded', function() {
-    // Initial licence status check
-    checkLicenceStatus();
-    // Add close button handler for licence banner
-    const closeBtn = document.getElementById('closeLicenceBanner');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', function() {
-            const banner = document.getElementById('licenceStatusBanner');
-            if (banner) banner.classList.add('d-none');
-        });
-    }
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingMessage = document.getElementById('loadingMessage');
     

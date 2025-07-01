@@ -400,7 +400,7 @@
             background-color: #19d142;
         }
         .user-status-dot-free {
-            background-color: orange;
+            background-color: #28a745;
         }
         
         /* Theme toggle button */
@@ -1513,59 +1513,7 @@
 {% endblock %}
 
 {% block content %}
-    <!-- Toast Container (positioned at bottom-right) -->
-    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-        <div id="licenceStatusToast" class="toast align-items-center text-white border-0 d-none" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <span id="licenceStatusMessage"></span>
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    </div>
     
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const toastElement = document.getElementById('licenceStatusToast');
-        const toastMessage = document.getElementById('licenceStatusMessage');
-
-        // Function to show toast with message and type
-        function showToast(message, type = 'info') {
-            if (!toastElement || !toastMessage) return;
-            toastElement.classList.remove('bg-danger', 'bg-success', 'bg-warning');
-            toastElement.classList.add(`bg-${type}`);
-            toastMessage.textContent = message;
-            const toast = new bootstrap.Toast(toastElement);
-            toast.show();
-        }
-
-        // Check licence status and show toast if needed
-        fetch('/api/check-licence')
-            .then(response => response.json())
-            .then(data => {
-                // Free user: never show toast
-                if (!data.is_premium || data.is_premium === 'no') {
-                    return;
-                }
-                // Premium user
-                if (data.isExpired) {
-                    // Show toast up to 3 times only
-                    let expiredCount = parseInt(localStorage.getItem('premiumLicenceExpiredCount') || '0', 10);
-                    if (expiredCount < 3) {
-                        showToast(`Your premium licence expired on ${data.expiresAtIST}`, 'danger');
-                        localStorage.setItem('premiumLicenceExpiredCount', (expiredCount + 1).toString());
-                    }
-                    // After 3 times, never show again
-                }
-                // If premium and not expired: never show toast
-            })
-            .catch(error => {
-                console.error('Error checking licence:', error);
-            });
-    });
-    </script>
     
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
@@ -1963,9 +1911,6 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="user-conditions-tab" data-bs-toggle="tab" data-bs-target="#user-conditions" type="button" role="tab" aria-controls="user-conditions" aria-selected="false">Your Conditions</button>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="licence-key-tab" data-bs-toggle="tab" data-bs-target="#licence-key" type="button" role="tab" aria-controls="licence-key" aria-selected="false">Licence Key</button>
-                        </li>
                     </ul>
                     <div class="tab-content" id="conditionsTabContent">
                         <div class="tab-pane fade show active" id="admin-conditions" role="tabpanel" aria-labelledby="admin-conditions-tab">
@@ -2003,19 +1948,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="tab-pane fade" id="licence-key" role="tabpanel" aria-labelledby="licence-key-tab">
-                            <div class="mt-3">
-                                <h6>Enter your licence key to activate premium features</h6>
-                                <div class="licence-key-container d-flex justify-content-center gap-2 mb-3">
-                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="1">
-                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="2">
-                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="3">
-                                    <input type="text" class="form-control text-center licence-key-part" maxlength="1" style="width: 50px;" data-part="4">
-                                    <button class="btn btn-primary" type="button" id="validateLicenceKey">Validate</button>
-                                </div>
-                                <div id="licenceKeyMessage" class="alert d-none"></div>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             </div>
@@ -2761,8 +2694,6 @@ async function populateUserConditions() {
         // Uncomment the next line to simulate the timer for demo:
         // startAutoRefreshTimer();
         
-        // Initial licence status check
-        checkLicenceStatus();
         // Add close button handler for licence banner
         const closeBtn = document.getElementById('closeLicenceBanner');
         if (closeBtn) {
