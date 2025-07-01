@@ -340,10 +340,27 @@ async function showConfirmDialog(message = 'Are you sure?') {
         const yesBtn = modalEl.querySelector('#confirmYesBtn');
         const noBtn = modalEl.querySelector('#confirmNoBtn');
 
+        // --- Helper to clean listener references ---
         const cleanup = () => {
             yesBtn.removeEventListener('click', onYes);
             noBtn.removeEventListener('click', onNo);
-            modalEl.removeEventListener('hidden.bs.modal', onNo);
+            modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        };
+
+        // Properly dispose the modal and backdrop once fully hidden
+        const disposeModal = () => {
+            try {
+                bsModal.dispose();
+            } catch (_) {}
+            if (modalEl && modalEl.parentNode) {
+                modalEl.parentNode.removeChild(modalEl);
+            }
+            // Remove any stray backdrop or body class in case Bootstrap missed it
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) backdrop.remove();
+            document.body.classList.remove('modal-open');
+            // Notify any global timer/listener that all modals are closed
+            document.dispatchEvent(new Event('allModalsClosed'));
         };
 
         const onYes = () => {
@@ -358,9 +375,13 @@ async function showConfirmDialog(message = 'Are you sure?') {
             resolve(false);
         };
 
+        const onHidden = () => {
+            disposeModal();
+        };
+
         yesBtn.addEventListener('click', onYes);
         noBtn.addEventListener('click', onNo);
-        modalEl.addEventListener('hidden.bs.modal', onNo);
+        modalEl.addEventListener('hidden.bs.modal', onHidden);
 
         bsModal.show();
     });

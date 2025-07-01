@@ -332,7 +332,23 @@ window.editUserCondition = function(condition) {
 };
 
 window.deleteUserCondition = async function(id) {
-    const confirmed = await (typeof showConfirmDialog === 'function' ? showConfirmDialog('Are you sure you want to delete this condition?') : Promise.resolve(confirm('Are you sure you want to delete this condition?')));
+    // Always prefer Bootstrap confirmation; if helper missing, dynamically load it then retry
+let confirmed = false;
+if (typeof showConfirmDialog === 'function') {
+    confirmed = await showConfirmDialog('Are you sure you want to delete this condition?');
+} else {
+    // Lazy-load the helper from user-conditions.js (ensures no native confirm)
+    try {
+        await import('/static/js/user-conditions.js');
+        if (typeof showConfirmDialog === 'function') {
+            confirmed = await showConfirmDialog('Are you sure you want to delete this condition?');
+        }
+    } catch (err) {
+        console.warn('Failed to lazy-load showConfirmDialog, falling back to confirm()', err);
+        confirmed = confirm('Are you sure you want to delete this condition?');
+    }
+}
+
     if (!confirmed) return;
     try {
         const response = await fetch(`/api/user-conditions/${id}`, { method: 'DELETE' });
