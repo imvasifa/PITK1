@@ -178,13 +178,19 @@ async function populateUserConditions() {
     
     try {
         console.log('Fetching user conditions...');
-        const response = await fetch('/api/user-conditions', {
+        // Add timestamp to prevent caching
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/user-conditions?_=${timestamp}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             },
-            credentials: 'same-origin'
+            credentials: 'same-origin',
+            cache: 'no-store'
         });
         
         if (!response.ok) {
@@ -302,10 +308,23 @@ async function populateUserConditions() {
 async function deleteUserCondition(conditionId, event) {
     console.log(`[UserConditions] Delete initiated for condition ID: ${conditionId}`);
     
+    // Prevent multiple submissions
+    if (isSubmitting) {
+        console.log('[UserConditions] Preventing duplicate delete submission');
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        return;
+    }
+    
     if (event) {
         event.preventDefault();
         event.stopPropagation();
     }
+    
+    // Set submitting flag
+    isSubmitting = true;
     
     if (!conditionId) {
         console.error('No condition ID provided for deletion');
@@ -384,6 +403,23 @@ async function deleteUserCondition(conditionId, event) {
         // Show success message
         showToast(result?.message || `Successfully deleted condition: ${conditionName}`, 'success');
         
+        // Force reload the conditions list from server
+        console.log('[UserConditions] Refreshing conditions list after delete');
+        
+        // Clear the container first
+        const container = document.getElementById('user-conditions-list-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="d-flex justify-content-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>`;
+        }
+        
+        // Force reload the conditions
+        await populateUserConditions();
+        
         // Remove the condition from the UI with fade out animation
         if (conditionContainer) {
             conditionContainer.style.opacity = '0';
@@ -414,20 +450,15 @@ async function deleteUserCondition(conditionId, event) {
         return true;
         
     } catch (error) {
-        console.error('Error deleting condition:', error);
+        console.error('[UserConditions] Error deleting condition:', error);
         
-        // Show specific error messages for common issues
+        // Show detailed error message
         let errorMessage = 'Failed to delete condition';
         if (error.message) {
-            if (error.message.includes('404') || error.message.toLowerCase().includes('not found')) {
+            if (error.message.includes('NetworkError')) {
+                errorMessage = 'Network error. Please check your connection and try again.';
+            } else if (error.message.includes('404') || error.message.toLowerCase().includes('not found')) {
                 errorMessage = 'Condition not found. It may have already been deleted.';
-                
-                // If we get a 404, remove the element anyway since it doesn't exist on the server
-                if (conditionContainer) {
-                    conditionContainer.remove();
-                }
-            } else if (error.message.includes('500') || error.message.toLowerCase().includes('server error')) {
-                errorMessage = 'Server error. Please try again later.';
             } else {
                 errorMessage = error.message;
             }

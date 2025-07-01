@@ -38,14 +38,14 @@ class Database:
                 result = cur.fetchone()
                 if result[0] == 1:
                     if not hasattr(Database, '_connection_printed'):
-                        print("✅ Successfully connected to PostgreSQL!")
-                        print("✅ PostgreSQL connection test successful")
+                        print("[OK] Successfully connected to PostgreSQL!")
+                        print("[OK] PostgreSQL connection test successful")
                         Database._connection_printed = True
                 else:
-                    print("❌ PostgreSQL connection test failed")
+                    print("[ERROR] PostgreSQL connection test failed")
                     
         except Exception as e:
-            error_msg = f"❌ Application service unavailable: {e}"
+            error_msg = f"[ERROR] Application service unavailable: {e}"
             print(error_msg)
             raise AppTemporarilyUnavailable(description=error_msg)
     

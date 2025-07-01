@@ -30,6 +30,7 @@ import pandas as pd
 import pygame
 import requests
 import psycopg2
+import psycopg2.extras as pg_extras
 from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app
 from flask_wtf import FlaskForm
 from flask_bcrypt import Bcrypt
@@ -902,15 +903,61 @@ thread_started = False
 scan_results = {}
 previous_scores = {}  # Initialize previous_scores globally
 
-# Global variable to store conditions cache
+# Global variable to store conditions cache with TTL
 _conditions_cache = {
-    'all_users': None,
-    'users': {}
+    'all_users': {'data': None, 'timestamp': None},
+    'users': {},
+    'ttl': 300,  # Cache TTL in seconds (5 minutes)
+    'lock': threading.Lock()  # Thread lock for thread-safe cache operations
 }
+
+def invalidate_user_conditions_cache(user_id=None):
+    """
+    Invalidate cache for specific user or all users
+    
+    Args:
+        user_id: If provided, only invalidate cache for this user.
+                If None, invalidate cache for all users.
+    """
+    global _conditions_cache
+    
+    with _conditions_cache['lock']:
+        try:
+            if user_id is not None:
+                # Invalidate specific user's cache
+                user_id_int = int(user_id)
+                if user_id_int in _conditions_cache['users']:
+                    logger.info(f"[CACHE] Invalidating cache for user {user_id_int}")
+                    del _conditions_cache['users'][user_id_int]
+                
+                # Also invalidate the all_users cache since it contains data from all users
+                if _conditions_cache['all_users']['data'] is not None:
+                    logger.info("[CACHE] Invalidating all_users cache")
+                    _conditions_cache['all_users'] = {'data': None, 'timestamp': None}
+            else:
+                # Invalidate all caches
+                logger.info("[CACHE] Invalidating ALL user caches")
+                _conditions_cache['users'] = {}
+                _conditions_cache['all_users'] = {'data': None, 'timestamp': None}
+                
+        except Exception as e:
+            logger.error(f"[CACHE] Error during cache invalidation: {str(e)}", exc_info=True)
+            # Even if there's an error, we want to force cache refresh
+            _conditions_cache['users'] = {}
+            _conditions_cache['all_users'] = {'data': None, 'timestamp': None}
+
+def clear_cache():
+    """Clear all cached data"""
+    global _conditions_cache
+    _conditions_cache = {
+        'all_users': {'data': None, 'timestamp': None},
+        'users': {},
+        'ttl': _conditions_cache.get('ttl', 300)  # Preserve TTL setting
+    }
 
 def load_user_conditions(user_id=None):
     """
-    Load user conditions from the PostgreSQL database
+    Load user conditions from the PostgreSQL database or cache
     Returns list of conditions for the specified user, or empty list if none found
     """
     global _conditions_cache
@@ -918,17 +965,26 @@ def load_user_conditions(user_id=None):
     logger.info(f"[DEBUG] load_user_conditions called with user_id: {user_id}")
     
     # Skip loading during app initialization (before first request)
-    from flask import has_request_context
-    if not has_request_context() and not _conditions_cache['all_users']:
-        logger.info("[DEBUG] No request context, returning empty list")
+    if 'app' not in globals() or not current_app or not current_user:
+        logger.info("[DEBUG] App not initialized, returning empty list")
         return []
     
     # If no user_id provided, return admin conditions
     if user_id is None:
         logger.info("[DEBUG] No user_id provided, loading all conditions")
-        if _conditions_cache['all_users'] is not None:
-            logger.info(f"[DEBUG] Returning {len(_conditions_cache['all_users'])} conditions from cache")
-            return _conditions_cache['all_users']
+        
+        # Use thread-safe cache access
+        with _conditions_cache['lock']:
+            # Check if we have a valid cache entry that hasn't expired
+            current_time = time.time()
+            cache_entry = _conditions_cache['all_users']
+            
+            if (cache_entry['data'] is not None and
+                cache_entry['timestamp'] is not None and
+                current_time - cache_entry['timestamp'] < _conditions_cache['ttl']):
+                
+                logger.info(f"[CACHE] Returning {len(cache_entry['data'])} conditions from cache")
+                return cache_entry['data'].copy()  # Return a copy to prevent modification
             
         try:
             logger.info("[DEBUG] Querying database for all conditions")
@@ -950,9 +1006,14 @@ def load_user_conditions(user_id=None):
                     logger.info(f"[DEBUG] Found {len(row['conditions'])} conditions for user {row['id']}")
                     all_conditions.extend(row['conditions'])
             
-            _conditions_cache['all_users'] = all_conditions
-            logger.info(f"[DEBUG] Loaded total {len(all_conditions)} conditions from database")
-            return all_conditions
+            # Store in cache with timestamp
+            with _conditions_cache['lock']:
+                _conditions_cache['all_users'] = {
+                    'data': all_conditions.copy(),  # Store a copy to prevent modification
+                    'timestamp': time.time()
+                }
+                logger.info(f"[CACHE] Cached {len(all_conditions)} conditions")
+                return all_conditions.copy()  # Return a copy to prevent modification
             
         except Exception as e:
             logger.error(f"[DEBUG] Error loading all conditions: {e}", exc_info=True)
@@ -962,11 +1023,17 @@ def load_user_conditions(user_id=None):
     try:
         user_id_int = int(user_id)  # Ensure user_id is an integer for the cache key
         
-        # Try to get from cache first
-        if user_id_int in _conditions_cache['users']:
-            cached = _conditions_cache['users'][user_id_int]
-            logger.info(f"[DEBUG] Returning {len(cached)} conditions from cache for user {user_id_int}")
-            return cached
+        # Try to get from cache first if it hasn't expired
+        with _conditions_cache['lock']:
+            cache_entry = _conditions_cache['users'].get(user_id_int)
+            current_time = time.time()
+            
+            if (cache_entry is not None and 
+                cache_entry.get('timestamp') is not None and
+                current_time - cache_entry['timestamp'] < _conditions_cache['ttl']):
+                
+                logger.info(f"[CACHE] Returning {len(cache_entry['data'])} conditions from cache for user {user_id_int}")
+                return cache_entry['data'].copy()  # Return a copy to prevent modification
             
         # Query the database for user's conditions
         logger.info(f"[DEBUG] Querying database for conditions for user {user_id_int}")
@@ -988,10 +1055,14 @@ def load_user_conditions(user_id=None):
             logger.info(f"[DEBUG] No conditions found for user {user_id_int}")
             return []
             
-        # Cache the result
-        _conditions_cache['users'][user_id_int] = result['conditions']
-        logger.info(f"[DEBUG] Loaded {len(result['conditions'])} conditions for user {user_id_int}")
-        return result['conditions']
+        # Cache the result with timestamp
+        with _conditions_cache['lock']:
+            _conditions_cache['users'][user_id_int] = {
+                'data': result['conditions'].copy(),  # Store a copy to prevent modification
+                'timestamp': time.time()
+            }
+            logger.info(f"[CACHE] Cached {len(result['conditions'])} conditions for user {user_id_int}")
+            return result['conditions'].copy()  # Return a copy to prevent modification
         
     except Exception as e:
         logger.error(f"[DEBUG] Error loading conditions for user {user_id}: {e}", exc_info=True)
@@ -1066,8 +1137,9 @@ def save_user_conditions(user_id, conditions_list):
         
         # Convert conditions to JSON string
         try:
-            conditions_json = json.dumps(unique_conditions, ensure_ascii=False, default=str)
-            logger.info(f"[DEBUG] Converted conditions to JSON")
+            # Use psycopg2 Json adapter for safe JSONB binding
+            conditions_json = pg_extras.Json(unique_conditions, dumps=lambda x: json.dumps(x, ensure_ascii=False, default=str))
+            logger.info(f"[DEBUG] Prepared conditions Json adapter")
         except (TypeError, ValueError) as e:
             logger.error(f"Error encoding conditions to JSON: {e}", exc_info=True)
             return False
@@ -1093,6 +1165,10 @@ def save_user_conditions(user_id, conditions_list):
                 
             logger.info(f"[DEBUG] Successfully updated {cur.rowcount} rows")
             logger.info(f"Successfully saved {len(unique_conditions)} conditions for user {user_id_int}")
+            
+            # Invalidate cache for this user
+            invalidate_user_conditions_cache(user_id_int)
+                
             return True
             
         except Exception as e:
@@ -1367,6 +1443,73 @@ def save_settings(settings):
         if db.conn is not None:
             db.conn.rollback()
         return False
+
+def save_user_conditions_legacy(*args, **kwargs):
+    """Deprecated duplicate; do not use. Left for reference."""
+    logger.warning("save_user_conditions_legacy called -- this function is deprecated and will be ignored.")
+    return False
+    """
+    Save user conditions to the database
+    """
+    try:
+        logger.info("Getting database cursor...")
+        conn = db.get_cursor()
+        if not conn:
+            logger.error("Failed to get database cursor")
+            return False
+        
+        # Ensure conditions is a dictionary
+        if not isinstance(conditions, dict):
+            logger.error(f"Invalid conditions type: {type(conditions)}, expected dict")
+            return False
+            
+        logger.info(f"Saving user conditions to database for user {user_id}: {conditions}")
+            
+        # Upsert user conditions into the database
+        conn.execute("""
+            INSERT INTO user_conditions (user_id, conditions)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id) 
+            DO UPDATE SET conditions = EXCLUDED.conditions
+            RETURNING user_id
+        """, (user_id, json.dumps(conditions)))
+        
+        # Verify the update
+        result = conn.fetchone()
+        if not result:
+            logger.error("Failed to verify user conditions update")
+            if conn and not conn.closed:
+                conn.rollback()
+            return False
+            
+        if conn and not conn.closed:
+            conn.commit()
+        logger.info("Successfully saved user conditions to database")
+        
+        # Clear the cache for this user
+        if user_id is not None:
+            try:
+                user_id_int = int(user_id)
+                if user_id_int in _conditions_cache['users']:
+                    del _conditions_cache['users'][user_id_int]
+                _conditions_cache['all_users'] = {'data': None, 'timestamp': None}  # Invalidate the all_users cache
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error clearing cache for user {user_id}: {str(e)}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error saving user conditions: {str(e)}", exc_info=True)
+        if conn and not conn.closed:
+            conn.rollback()
+        logger.error(f"[DEBUG] Error details: {str(e)}")
+        return False
+    finally:
+        if 'conn' in locals() and conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 # Load existing settings on startup
 # Load settings and ensure mute_status is properly set
@@ -3041,25 +3184,6 @@ def app3_logic():
 from flask import jsonify
 from flask_cors import CORS
 
-# API Response Utilities
-def api_response(success=True, data=None, error=None, message=None, status_code=200):
-    """Standard API response format"""
-    response_data = {
-        'success': success,
-        'data': data,
-        'error': error,
-        'message': message or ('Operation completed successfully' if success else 'An error occurred')
-    }
-    return jsonify(response_data), status_code
-
-def success_response(data=None, message=None, status_code=200):
-    """Helper for successful responses"""
-    return api_response(True, data, None, message, status_code)
-
-def error_response(error, message=None, status_code=400):
-    """Helper for error responses"""
-    return api_response(False, None, {'code': error}, message or error.replace('_', ' ').title(), status_code)
-
 # Enable CORS for all routes
 CORS(app)
 
@@ -3083,47 +3207,71 @@ def app3_output():
 def get_user_conditions():
     """Get all user conditions for the current user"""
     try:
-        # Get user's conditions
+        logger.info(f"Fetching conditions for user: {current_user.id}")
+        
+        # Load conditions for the current user
         conditions = load_user_conditions(current_user.id)
         
-        # If no conditions found, return empty array
         if not isinstance(conditions, list):
+            logger.warning(f"Invalid conditions format for user {current_user.id}, initializing empty list")
             conditions = []
             
-        return success_response(
-            data={'conditions': conditions},
-            message='Conditions retrieved successfully'
-        )
+        logger.debug(f"Found {len(conditions)} conditions for user {current_user.id}")
+        
+        # Create response with cache control headers
+        response = jsonify({
+            'success': True,
+            'status': 'success',
+            'user_conditions': conditions,
+            'count': len(conditions),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+        # Add headers to prevent caching
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.headers['Last-Modified'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+        
+        return response
         
     except Exception as e:
         error_msg = f"Error getting user conditions: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return error_response(
-            'INTERNAL_ERROR',
-            'Failed to retrieve conditions',
-            500
-        )
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'message': 'Failed to load user conditions',
+            'error': str(e)
+        }), 500
 
 @app.route('/api/user-conditions', methods=['POST'])
 @login_required
 def add_user_condition():
     """Add a new user condition"""
     try:
+        # Validate request data
         data = request.get_json()
-        logger.info(f"Adding new condition for user {current_user.id}: {data}")
-        
+        if not data:
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'No data provided'
+            }), 400
+            
         # Validate required fields
         required_fields = ['name', 'scan_clause']
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        missing_fields = [field for field in required_fields if field not in data or not str(data[field]).strip()]
         
         if missing_fields:
-            return error_response(
-                'MISSING_FIELDS',
-                f'Missing required fields: {", ".join(missing_fields)}',
-                400
-            )
-            
-        # Get current conditions
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': f'Missing required fields: {", ".join(missing_fields)}',
+                'missing_fields': missing_fields
+            }), 400
+        
+        # Get current user's conditions
         conditions = load_user_conditions(current_user.id)
         if not isinstance(conditions, list):
             conditions = []
@@ -3131,49 +3279,54 @@ def add_user_condition():
         # Check for duplicate name (case-insensitive)
         name = str(data['name']).strip()
         if any(str(c.get('name', '')).lower() == name.lower() for c in conditions):
-            return error_response(
-                'DUPLICATE_CONDITION',
-                'A condition with this name already exists',
-                400
-            )
-            
-        # Create new condition
-        new_condition = {
-            'id': f"user_condition_{int(time.time() * 1000)}",
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'A condition with this name already exists'
+            }), 400
+        
+        # Prepare condition data with defaults
+        condition_data = {
+            'id': f"user_condition_{int(time.time() * 1000)}",  # Use timestamp for unique ID
             'name': name,
             'scan_clause': str(data['scan_clause']).strip(),
             'link': str(data.get('link', '')).strip() or '#',
-            'chart_link': str(data.get('chart_link', '')).strip() or str(data.get('link', '')).strip() or '#',
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat()
+            'chart_link': str(data.get('chart_link', '')).strip() or ''
         }
         
+        # If chart_link is empty, use link as fallback
+        if not condition_data['chart_link'] and condition_data['link'] != '#':
+            condition_data['chart_link'] = condition_data['link']
+        
         # Add to conditions list
-        conditions.append(new_condition)
+        conditions.insert(0, condition_data)
         
         # Save to database
         if save_user_conditions(current_user.id, conditions):
-            logger.info(f"Added new condition '{name}' for user {current_user.id}")
-            return success_response(
-                data=new_condition,
-                message='Condition added successfully',
-                status_code=201
-            )
+            logger.info(f"Added new condition '{condition_data['name']}' for user {current_user.id}")
+            
+            # Explicitly invalidate cache for this user
+            invalidate_user_conditions_cache(current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'status': 'success',
+                'message': 'Condition added successfully',
+                'id': condition_data['id'],
+                'condition': condition_data
+            }), 201
         else:
-            return error_response(
-                'DATABASE_ERROR',
-                'Failed to save condition',
-                500
-            )
+            raise Exception("Failed to save condition to database")
             
     except Exception as e:
         error_msg = f"Error adding user condition: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return error_response(
-            'INTERNAL_ERROR',
-            'An error occurred while adding the condition',
-            500
-        )
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': 'Failed to add condition',
+            'message': str(e)
+        }), 500
 
 @app.route('/api/user-conditions/<condition_id>', methods=['PUT'])
 @login_required
@@ -3181,30 +3334,31 @@ def update_user_condition(condition_id):
     """Update an existing user condition"""
     try:
         if not condition_id:
-            return error_response(
-                'INVALID_INPUT',
-                'Condition ID is required',
-                400
-            )
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'Condition ID is required'
+            }), 400
             
         data = request.get_json()
         if not data:
-            return error_response(
-                'INVALID_INPUT',
-                'No data provided',
-                400
-            )
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'No data provided'
+            }), 400
             
         # Validate required fields
         required_fields = ['name', 'scan_clause']
         missing_fields = [field for field in required_fields if field not in data or not str(data[field]).strip()]
         
         if missing_fields:
-            return error_response(
-                'MISSING_FIELDS',
-                f'Missing required fields: {", ".join(missing_fields)}',
-                400
-            )
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': f'Missing required fields: {", ".join(missing_fields)}',
+                'missing_fields': missing_fields
+            }), 400
             
         # Get current user's conditions
         conditions = load_user_conditions(current_user.id)
@@ -3216,11 +3370,11 @@ def update_user_condition(condition_id):
         if any(str(c.get('name', '')).lower() == name.lower() 
                for c in conditions 
                if c.get('id') != condition_id):
-            return error_response(
-                'DUPLICATE_CONDITION',
-                'A condition with this name already exists',
-                400
-            )
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'A condition with this name already exists'
+            }), 400
         
         # Find and update the condition
         updated = False
@@ -3233,8 +3387,7 @@ def update_user_condition(condition_id):
                     'name': name,
                     'scan_clause': str(data['scan_clause']).strip(),
                     'link': str(data.get('link', condition.get('link', ''))).strip() or '#',
-                    'chart_link': str(data.get('chart_link', condition.get('chart_link', ''))).strip(),
-                    'updated_at': datetime.utcnow().isoformat()
+                    'chart_link': str(data.get('chart_link', condition.get('chart_link', ''))).strip()
                 })
                 
                 # If chart_link is empty, use link as fallback
@@ -3246,83 +3399,95 @@ def update_user_condition(condition_id):
                 break
         
         if not updated:
-            return error_response(
-                'CONDITION_NOT_FOUND',
-                'Condition not found',
-                404
-            )
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'Condition not found'
+            }), 404
         
         # Save to database
         if save_user_conditions(current_user.id, conditions):
-            logger.info(f"Updated condition '{condition_id}' for user {current_user.id}")
-            return success_response(
-                data=updated_condition,
-                message='Condition updated successfully'
-            )
+            logger.info(f"Updated condition {condition_id} for user {current_user.id}")
+            
+            # Invalidate cache for this user
+            invalidate_user_conditions_cache(current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'status': 'success',
+                'message': 'Condition updated successfully',
+                'id': condition_id,
+                'condition': updated_condition
+            })
         else:
-            return error_response(
-                'DATABASE_ERROR',
-                'Failed to update condition in database',
-                500
-            )
+            raise Exception("Failed to update condition in database")
             
     except Exception as e:
         error_msg = f"Error updating user condition: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return error_response(
-            'INTERNAL_ERROR',
-            'An error occurred while updating the condition',
-            500
-        )
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': 'Failed to update condition',
+            'message': str(e)
+        }), 500
 
 @app.route('/api/user-conditions/<condition_id>', methods=['DELETE'])
 @login_required
 def delete_user_condition(condition_id):
     """Delete a user condition"""
     try:
-        if not condition_id or not str(condition_id).strip():
-            return error_response(
-                'INVALID_INPUT',
-                'Condition ID is required',
-                400
-            )
+        if not condition_id:
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'Condition ID is required'
+            }), 400
             
-        condition_id = str(condition_id).strip()
-        logger.info(f"Deleting condition {condition_id} for user {current_user.id}")
+        # Get current user's conditions
+        conditions = load_user_conditions(current_user.id)
+        if not isinstance(conditions, list):
+            conditions = []
         
-        # Load current conditions
-        user_conditions = load_user_conditions(current_user.id)
-        updated_conditions = [c for c in user_conditions if c.get('id') != condition_id]
+        # Find and remove the condition
+        initial_count = len(conditions)
+        updated_conditions = [
+            c for c in conditions 
+            if str(c.get('id', '')).strip() != str(condition_id).strip()
+        ]
         
-        if len(updated_conditions) == len(user_conditions):
-            return error_response(
-                'CONDITION_NOT_FOUND',
-                'Condition not found',
-                404
-            )
-            
-        # Save updated conditions
+        if len(updated_conditions) == initial_count:
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'error': 'Condition not found'
+            }), 404
+        
+        # Save to database
         if save_user_conditions(current_user.id, updated_conditions):
             logger.info(f"Deleted condition {condition_id} for user {current_user.id}")
-            return success_response(
-                data={'deleted_id': condition_id},
-                message='Condition deleted successfully'
-            )
+            
+            # Invalidate cache for this user
+            invalidate_user_conditions_cache(current_user.id)
+            
+            return jsonify({
+                'success': True,
+                'status': 'success',
+                'message': 'Condition deleted successfully',
+                'id': condition_id
+            })
         else:
-            return error_response(
-                'DATABASE_ERROR',
-                'Failed to save conditions after deletion',
-                500
-            )
+            raise Exception("Failed to delete condition from database")
             
     except Exception as e:
         error_msg = f"Error deleting user condition: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return error_response(
-            'INTERNAL_ERROR',
-            'An error occurred while deleting the condition',
-            500
-        )
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': 'Failed to delete condition',
+            'message': str(e)
+        }), 500
 
 @app.route('/reset-profile', methods=['POST'])
 @login_required
