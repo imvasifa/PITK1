@@ -1889,27 +1889,13 @@ if (niftyModal) {
                 </div>
                 <!-- Dropdown menu -->
                 <div id="userDropdown">
-                        <!-- User avatar in dropdown -->
-                        <div style="display: flex; flex-direction: column; align-items: center; padding: 16px 16px 8px 16px; border-bottom: 1px solid #e0e0e0;">
-                            {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
-                                {% set user_photo = url_for('static', filename=user_data.account.profile.photo_url) %}
-                            {% else %}
-                                {% if user_data and user_data.account.profile.premium == 'yes' %}
-                                    {% set user_photo = url_for('static', filename='user_photos/default_premium.png') %}
-                                {% else %}
-                                    {% set user_photo = url_for('static', filename='user_photos/default_free.png') %}
-                                {% endif %}
-                            {% endif %}
-                            {% set default_photo = url_for('static', filename='user_photos/default_free.png') %}
-                            <img src="{{ user_photo }}" 
-                                 alt="User Photo" 
-                                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" 
-                                 onerror="this.onerror=null; this.src='{{ default_photo }}';">
-                            <div style="font-weight: 500;">{{ current_user.username }}</div>
-                            {% if current_user.email %}
-                            <div style="font-size: 0.8em; color: #5f6368;">{{ current_user.email }}</div>
-                            {% endif %}
-                        </div>
+                    <!-- User info in dropdown (without image) -->
+                    <div style="padding: 12px 16px; border-bottom: 1px solid #e0e0e0;">
+                        <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">{{ current_user.username }}</div>
+                        {% if current_user.email %}
+                        <div style="font-size: 0.85em; color: #5f6368;">{{ current_user.email }}</div>
+                        {% endif %}
+                    </div>
                     <!-- Menu items -->
                     <a href="{{ url_for('dash') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #202124; text-decoration: none; transition: background 0.2s;">
                         <i class="fas fa-tachometer-alt" style="width: 24px; text-align: center; margin-right: 8px; color: #5f6368;"></i>
@@ -2591,34 +2577,91 @@ async function populateUserConditions() {
             updateTimerDisplay();
         });
     
+    // Global audio context and beep state variables
+    let audioCtx = null;
+    let isBeeping = false;
+    let lastBeepTime = 0;
+    
+    // Function to initialize audio context on user interaction
+    function initAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            // Resume the audio context in case it was suspended
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+        return audioCtx;
+    }
+    
     // Function to play system beep
     function playBeep() {
+        // Prevent multiple beeps from overlapping
+        const now = Date.now();
+        if (isBeeping || (now - lastBeepTime < 1000)) {
+            return; // Skip if already beeping or beeped recently
+        }
+        
+        isBeeping = true;
+        lastBeepTime = now;
+        
         try {
-            // Create audio context if it doesn't exist
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            const audioCtx = new AudioContext();
+            // Initialize audio context on first interaction
+            const audioCtx = initAudioContext();
             
             // Create oscillator for the beep
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             
             // Configure the oscillator
-            oscillator.type = 'triangle';
-            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz frequency
-            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); // 20% volume (softer)
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            
+            // Configure gain (volume)
+            gainNode.gain.value = 0.2;
             
             // Connect nodes
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
             
             // Play the beep (500ms duration)
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.50);
+            const audioNow = audioCtx.currentTime;
+            oscillator.start(audioNow);
+            oscillator.stop(audioNow + 0.5);
+            
+            // Schedule gain to ramp down for clean stop
+            gainNode.gain.setValueAtTime(0.2, audioNow);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioNow + 0.48);
+            
+            // Clean up after the beep is done
+            setTimeout(() => {
+                try {
+                    oscillator.disconnect();
+                    gainNode.disconnect();
+                    isBeeping = false;
+                } catch (e) {
+                    console.log('Cleanup error (can be ignored):', e);
+                    isBeeping = false;
+                }
+            }, 600);
             
         } catch (error) {
             console.error('Error playing beep:', error);
+            // Fallback to browser's built-in beep if Web Audio API fails
+            try {
+                const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU' + 
+                    'A'.repeat(1000));
+                beep.volume = 0.2;
+                beep.play().catch(e => console.error('Fallback beep failed:', e));
+            } catch (fallbackError) {
+                console.error('Fallback beep also failed:', fallbackError);
+            }
         }
     }
+    
+    // Initialize audio context on any user interaction
+    document.addEventListener('click', initAudioContext, { once: true });
     
     // Function to handle manual refresh
     window.refreshData = function() {
@@ -2643,6 +2686,8 @@ async function populateUserConditions() {
     function updateLinearBarFrontend() {
         // Play beep when progress bar starts (only when it wasn't running before)
         if (Math.abs(secondsLeft - interval) < 0.01) {  // Use a small epsilon for floating point comparison
+            playBeep();
+        } else if (secondsLeft <= 0.5 && secondsLeft > 0.4) {  // Only play once when crossing 0.5s
             playBeep();
         }
         
