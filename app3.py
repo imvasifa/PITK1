@@ -3603,6 +3603,237 @@ def reset_profile():
             db.conn.rollback()
         return jsonify({'success': False, 'error': 'Error resetting profile'}), 500
 
+# -------------------- License Key System (10-minute premium) --------------------
+# Redis connection (optional fast path)
+try:
+    redis_client = redis.Redis(
+        host=os.getenv('REDIS_HOST', 'localhost'),
+        port=int(os.getenv('REDIS_PORT', 6379)),
+        decode_responses=True,
+    )
+    redis_client.ping()
+    logger.info("✅ Connected to Redis server")
+except Exception as e:
+    logger.warning(f"⚠️  Redis connection failed: {e}. Continuing without Redis cache.")
+    redis_client = None
+
+# Ensure licenses table exists
+
+def ensure_licenses_table():
+    """Create the licenses table if it doesn't already exist"""
+    try:
+        cur = db.get_cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS licenses (
+                key TEXT PRIMARY KEY,
+                is_used BOOLEAN DEFAULT FALSE,
+                used_by INTEGER,
+                used_at TIMESTAMPTZ
+            )
+            """
+        )
+        if db.conn is not None:
+            db.conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error creating licenses table: {e}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return False
+
+
+def _set_premium_expiry(user_id: int, seconds: int = 600):
+    """Set premium = 'yes' and premium_expires_at = now+seconds. Returns expiry epoch."""
+    expiry_epoch = int(time.time()) + seconds
+    try:
+        cur = db.get_cursor()
+        cur.execute(
+            """
+            UPDATE users
+            SET user_data =
+                jsonb_set(
+                    jsonb_set(
+                        COALESCE(user_data, '{}'::jsonb),
+                        '{account,profile,premium}', '"yes"'::jsonb, true
+                    ),
+                    '{account,profile,premium_expires_at}', to_jsonb(%s::bigint), true
+                )
+            WHERE id = %s
+            RETURNING id
+            """,
+            (expiry_epoch, user_id),
+        )
+        if db.conn is not None:
+            db.conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to set premium expiry: {e}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+    return expiry_epoch
+
+
+def update_user_premium_status(user_id: int, is_premium: bool):
+    """Toggle premium flag in user_data JSONB."""
+    status_json = '"yes"' if is_premium else '"no"'
+    try:
+        cur = db.get_cursor()
+        cur.execute(
+            """
+            UPDATE users
+            SET user_data = jsonb_set(
+                COALESCE(user_data, '{}'::jsonb),
+                '{account,profile,premium}', %s::jsonb, true
+            )
+            WHERE id = %s
+            RETURNING id
+            """,
+            (status_json, user_id),
+        )
+        if db.conn is not None:
+            db.conn.commit()
+        return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating premium status: {e}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return False
+
+
+@app.route('/api/generate-license', methods=['POST'])
+@login_required
+def generate_license():
+    """Dev-only: generate a random 16-char key and store unused in licenses table."""
+    # Only allow in development/debug mode
+    if not app.debug:
+        return jsonify({'success': False, 'error': 'Not allowed'}), 403
+    key = ''.join(random.choices('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', k=16))
+    try:
+        cur = db.get_cursor()
+        cur.execute("INSERT INTO licenses(key) VALUES (%s) ON CONFLICT DO NOTHING", (key,))
+        if db.conn is not None:
+            db.conn.commit()
+        return jsonify({'success': True, 'key': key})
+    except Exception as e:
+        logger.error(f"generate_license error: {e}")
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({'success': False, 'error': 'DB error'}), 500
+
+
+@app.route('/api/activate-license', methods=['POST'])
+@login_required
+def activate_license():
+    """Validate a 16-digit license key, grant 10-minute premium, and mark key used."""
+    data = request.get_json(silent=True) or {}
+    license_key = str(data.get('key', '')).strip()
+    if not re.fullmatch(r'[A-Za-z0-9]{16}', license_key):
+        return jsonify({'success': False, 'error': 'Invalid key format'}), 400
+
+    try:
+        cur = db.get_cursor()
+        # Atomically mark key as used by this user if not already used
+        cur.execute(
+            """
+            UPDATE licenses
+            SET is_used = TRUE, used_by = %s, used_at = NOW()
+            WHERE key = %s AND is_used = FALSE
+            RETURNING key
+            """,
+            (current_user.id, license_key),
+        )
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': 'Key invalid or already used'}), 400
+
+        expiry_epoch = _set_premium_expiry(current_user.id, 600)  # 10 minutes
+
+        # Cache in Redis for fast checks
+        if redis_client:
+            try:
+                redis_client.setex(f"premium:{current_user.id}", 600, "1")
+            except Exception as e:
+                logger.warning(f"Redis setex failed: {e}")
+
+        return jsonify({'success': True, 'expires_at': expiry_epoch})
+    except Exception as e:
+        logger.error(f"activate_license error: {e}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
+@app.route('/api/check-premium')
+@login_required
+def check_premium():
+    """Return premium status and optionally increment expiry warning count (max 3)."""
+    user_id = current_user.id
+    now_epoch = int(time.time())
+
+    # Fast path via Redis
+    if redis_client:
+        try:
+            ttl = redis_client.ttl(f"premium:{user_id}")
+            if ttl and ttl > 0:
+                return jsonify({'premium': True, 'remaining': ttl, 'show_msg': False})
+        except Exception:
+            pass
+
+    try:
+        cur = db.get_cursor()
+        cur.execute(
+            """
+            SELECT
+                (user_data->'account'->'profile'->>'premium') AS premium,
+                (user_data->'account'->'profile'->>'premium_expires_at')::bigint AS expires,
+                (user_data->'account'->'profile'->>'expiry_warn_count')::int AS warn
+            FROM users WHERE id = %s
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+        premium_flag = (row[0] == 'yes') if row else False
+        expires_at = row[1] or 0
+        warn_count = row[2] or 0
+
+        if premium_flag and expires_at > now_epoch:
+            remaining = expires_at - now_epoch
+            # Refresh Redis cache
+            if redis_client:
+                try:
+                    redis_client.setex(f"premium:{user_id}", remaining, "1")
+                except Exception:
+                    pass
+            return jsonify({'premium': True, 'remaining': remaining, 'show_msg': False})
+
+        # Premium expired or not premium
+        if premium_flag:
+            update_user_premium_status(user_id, False)
+
+        show_msg = False
+        if warn_count < 3:
+            warn_count += 1
+            show_msg = True
+        # Persist new warn_count
+        cur.execute(
+            """UPDATE users
+                SET user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,profile,expiry_warn_count}', to_jsonb(%s::int), true)
+             WHERE id = %s""",
+            (warn_count, user_id),
+        )
+        if db.conn is not None:
+            db.conn.commit()
+
+        return jsonify({'premium': False, 'show_msg': show_msg})
+    except Exception as e:
+        logger.error(f"check_premium error: {e}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({'premium': False, 'show_msg': False, 'error': 'Internal server error'}), 500
+
+# ------------------------------------------------------------------------------
+
 def start_threads_once():
     """Start all background threads if they're not already running"""
     global update_thread

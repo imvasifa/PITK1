@@ -38,17 +38,27 @@
 
 {% block content %}
     
-    <!-- Navigation Buttons -->
-    <div class="d-flex justify-content-end mb-4">
-        <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
-            <i class="fas fa-home"></i> Home
-        </a>
-
-        <a href="{{ url_for('logout') }}" class="btn btn-danger">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
-    </div>
-<div class="container my-5">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
+        <div class="container d-flex justify-content-between align-items-center">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+                <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
+            </a>
+            <div>
+                <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
+                    <i class="fas fa-home"></i> <span class="d-none d-sm-inline">Home</span>
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">
+                    <i class="fas fa-sign-out-alt"></i> <span class="d-none d-sm-inline">Logout</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Add padding to account for fixed navbar -->
+    <div style="padding-top: 80px;"></div>
+<div class="container mb-5" style="margin-top:8px !important; padding-top:0 !important;">
     <div class="row">
         <div class="col-lg-4">
             <div class="card mb-4">
@@ -154,7 +164,13 @@
                         <div class="tab-pane fade" id="licence" role="tabpanel" aria-labelledby="licence-tab">
                             <div class="card-body">
                                 <h5 class="card-title">Enter Your Licence Key</h5>
-                                <p class="text-muted">Please enter your 4-digit licence key</p>
+                                <p class="text-muted">Please enter your 16-digit licence key</p>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <button id="generateLicenceBtn" type="button" class="btn btn-outline-secondary me-2">
+                                            <i class="fas fa-magic me-1"></i> Generate Licence Key
+                                        </button>
+                                        <span id="generatedLicenceKey" class="fw-bold text-success"></span>
+                                    </div>
                                 <form id="licence-form">
                                     <div class="row mb-3">
                                     <div class="col-3">
@@ -503,6 +519,46 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputs = Array.from(document.querySelectorAll('.licence-key-input'));
         const form = document.getElementById('licence-form');
         const statusDiv = document.getElementById('licence-status');
+        const generateBtn = document.getElementById('generateLicenceBtn');
+        const generatedSpan = document.getElementById('generatedLicenceKey');
+
+        if (generateBtn) {
+            generateBtn.addEventListener('click', async function () {
+                const originalHtml = generateBtn.innerHTML;
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+                generatedSpan.textContent = '';
+
+                try {
+                    const resp = await fetch('/api/generate-license', { method: 'POST' });
+                    const data = await resp.json();
+
+                    if (resp.ok && data.key) {
+                        generatedSpan.textContent = data.key;
+                        generatedSpan.classList.remove('text-danger');
+                        generatedSpan.classList.add('text-success');
+
+                        // Autofill licence key inputs
+                        const chunks = data.key.match(/.{1,4}/g) || [];
+                        chunks.forEach((chunk, idx) => {
+                            if (inputs[idx]) {
+                                inputs[idx].value = chunk;
+                            }
+                        });
+                        inputs[0].focus();
+                    } else {
+                        throw new Error(data.error || 'Failed to generate key');
+                    }
+                } catch (err) {
+                    generatedSpan.textContent = err.message || 'Error generating key';
+                    generatedSpan.classList.remove('text-success');
+                    generatedSpan.classList.add('text-danger');
+                } finally {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = originalHtml;
+                }
+            });
+        }
 
         // Focus the first input when tab is shown
         document.getElementById('licence-tab').addEventListener('shown.bs.tab', function() {

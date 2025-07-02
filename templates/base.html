@@ -67,8 +67,20 @@
             opacity: 1 !important;
         }
         body {
-            padding-top: 4rem;
+            padding-top: 70px;  /* Increased from 4rem to ensure enough space for navbar */
             padding-bottom: 60px;
+        }
+        
+
+        
+        @media (max-width: 768px) {
+            body {
+                padding-top: 60px;  /* Slightly less padding on mobile */
+            }
+            
+            .container {
+                padding-top: 15px;
+            }
         }
         .floating-btn {
             position: fixed;
@@ -93,20 +105,41 @@
             text-decoration: none;
         }
     </style>
+    <style>
+    .pitk-navbar-gradient {
+        background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    @media (max-width: 767.98px) {
+        .brand-title,
+        .refresh-timer {
+            display: none !important;
+        }
+        .refresh-timer-icon {
+            display: inline !important;
+        }
+    }
+    @media (min-width: 768px) {
+        .refresh-timer-icon {
+            display: none !important;
+        }
+    }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body{% if theme == 'dark' %} class="dark-theme"{% endif %}>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
-                <span>PRICE IS THE KING</span>
-            </a>
+    <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+    <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
+</a>
 
         </div>
     </nav>
     
-    <div class="container mt-5 pt-4">
+    <div class="container mt-2 pt-2">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
