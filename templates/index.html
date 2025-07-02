@@ -1666,7 +1666,7 @@ if (niftyModal) {
                     </h5>
                     <div class="modal-header-actions">
                         <button id="niftyReloadBtn" class="btn btn-outline-light me-2" title="Reload Data" onclick="showNiftyModal()">
-                            <i class="fas fa-sync-alt"></i>
+                            <i class="fas fa-rotate-right"></i>
                         </button>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
@@ -1688,8 +1688,8 @@ if (niftyModal) {
             <span>PRICE IS THE KING</span>
         </a>
 
-        <span id="next-refresh" style="font-size: 1.1em; font-weight: 500;">
-            <i class="fas fa-clock" style="font-size: 1.1em; margin-left: 35px;"></i>
+        <span id="next-refresh" style="font-size: 0.9em; font-weight: 500;">
+            <i class="fas fa-clock" style="font-size: 0.9em; margin-left: 35px;"></i>
             <span style="margin-left: 5px;">Next refresh in</span>
             <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
         </span>
@@ -1697,15 +1697,19 @@ if (niftyModal) {
 
             <!-- Dark Mode Toggle with Sun/Moon Icons -->
             <div class="d-inline-block align-middle ms-3" id="themeToggleContainer">
-                <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+                <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
     <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
 </button>
             </div>
             <!-- Mute/Unmute Button with Theme Style -->
-            <button id="muteToggleBtn" class="btn navbar-round-btn ms-2" style="background: linear-gradient(135deg, #283593, #1976d2); border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: all 0.3s ease;" title="Toggle sound">
+            <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle sound">
                 <i id="muteIcon" class="fas fa-volume-up"></i>
             </button>
-            <audio id="alert-audio" src="{{ url_for('static', filename='alert.mp3') }}" preload="auto"></audio>
+            
+            <!-- Refresh Button with Theme Style -->
+            <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
+                <i class="fas fa-rotate-right"></i>
+            </button>
             <!-- Admin Conditions Button with Enhanced Style -->
             <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
                 background: linear-gradient(135deg, #7b1fa2, #9c27b0);
@@ -1721,26 +1725,9 @@ if (niftyModal) {
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
                 transition: all 0.3s ease;
             ">
-                <i class="fas fa-list-ul"></i>
+                <i class="fas fa-list-ul" title="Conditions"></i>
             </button>
 
-            <!-- Refresh Button with Enhanced Style -->
-            <button class="btn navbar-round-btn" onclick="refreshData()" style="
-                background: linear-gradient(135deg, #00796b, #009688);
-                border: none;
-                border-radius: 50%;
-                width: 48px;
-                height: 48px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.3rem;
-                color: white;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                transition: all 0.3s ease;
-            ">
-                <i class="fas fa-sync-alt"></i>
-            </button>
 
             <!-- Nifty Button with Enhanced Style -->
             <button class="btn navbar-round-btn" data-bs-toggle="modal" data-bs-target="#niftyModal" style="
@@ -1757,7 +1744,7 @@ if (niftyModal) {
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
                 transition: all 0.3s ease;
             ">
-                <i class="fas fa-chart-bar"></i>
+                <i class="fas fa-chart-bar" title="Nifty Indices"></i>
             </button>
 
 
@@ -2578,7 +2565,7 @@ async function populateUserConditions() {
     function updateTimerDisplay() {
         if (refreshTimerText) {
             const minutes = Math.floor(secondsLeft / 60);
-            const seconds = secondsLeft % 60;
+            const seconds = Math.floor(secondsLeft % 60);
             refreshTimerText.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         }
     }
@@ -2604,8 +2591,40 @@ async function populateUserConditions() {
             updateTimerDisplay();
         });
     
+    // Function to play system beep
+    function playBeep() {
+        try {
+            // Create audio context if it doesn't exist
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioContext();
+            
+            // Create oscillator for the beep
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            // Configure the oscillator
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz frequency
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); // 20% volume (softer)
+            
+            // Connect nodes
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            // Play the beep (500ms duration)
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.50);
+            
+        } catch (error) {
+            console.error('Error playing beep:', error);
+        }
+    }
+    
     // Function to handle manual refresh
     window.refreshData = function() {
+        // Play beep on manual refresh
+        playBeep();
+        
         // Show loading overlay
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) {
@@ -2622,6 +2641,11 @@ async function populateUserConditions() {
         }, 500);
     };
     function updateLinearBarFrontend() {
+        // Play beep when progress bar starts (only when it wasn't running before)
+        if (Math.abs(secondsLeft - interval) < 0.01) {  // Use a small epsilon for floating point comparison
+            playBeep();
+        }
+        
         // Don't update timer if any modal is open
         if (isAnyModalOpen) {
             return;
@@ -2653,7 +2677,7 @@ async function populateUserConditions() {
             }
             return;
         }
-        secondsLeft--;
+        secondsLeft -= 0.5; // Decrease by 0.5 seconds each update
         var percent = 100 - Math.round((secondsLeft / interval) * 100);
         if (linearBar) {
             linearBar.style.width = percent + '%';
@@ -2661,7 +2685,7 @@ async function populateUserConditions() {
         updateTimerDisplay();
     }
     linearBar.style.width = '0%';
-    setInterval(updateLinearBarFrontend, 1000);
+    setInterval(updateLinearBarFrontend, 500); // Update every 500ms for smoother progress
 
     // --- Global Dark Mode Toggle Logic with Sun/Moon Icons ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -2696,8 +2720,7 @@ async function populateUserConditions() {
     document.addEventListener('DOMContentLoaded', function() {
         const muteBtn = document.getElementById('muteToggleBtn');
         const muteIcon = document.getElementById('muteIcon');
-        const alertAudio = document.getElementById('alert-audio');
-        let isMuted = false;
+        let isMuted = localStorage.getItem('pitk-muted') === 'true';
         if (localStorage.getItem('pitk-muted') === null) {
             // Default: sound ON
             isMuted = false;
@@ -2722,32 +2745,12 @@ async function populateUserConditions() {
                 isMuted = !isMuted;
                 localStorage.setItem('pitk-muted', isMuted);
                 updateMuteIcon();
-                // Unlock audio for browsers and debug
-                alertAudio.play().then(() => {
-                    console.log('[DEBUG] Mute toggled. isMuted:', isMuted, '| alertAudio.paused:', alertAudio.paused, '| alertAudio.src:', alertAudio.src);
-                }).catch((err) => {
-                    console.log('[DEBUG] Mute toggled. isMuted:', isMuted, '| alertAudio.paused:', alertAudio.paused, '| alertAudio.src:', alertAudio.src, '| play() error:', err);
-                });
-                // Send mute state to backend for terminal logging
-                fetch('/debug-mute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isMuted })
-                });
+                // Log mute state change
+                console.log('Mute toggled. isMuted:', isMuted);
             });
         }
 
-        // Universal audio unlock logic for browser autoplay
-        let audioUnlocked = false;
-        function unlockAudio() {
-            if (!audioUnlocked) {
-                alertAudio.play().catch(()=>{});
-                audioUnlocked = true;
-            }
-        }
-        document.querySelectorAll('.navbar-round-btn').forEach(btn => {
-            btn.addEventListener('click', unlockAudio);
-        });
+
 
         // Remove focus from modal trigger buttons after modal closes
         document.querySelectorAll('.modal').forEach(modal => {
@@ -2767,12 +2770,8 @@ async function populateUserConditions() {
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 refreshTime--;
-                // When timer reaches 0, play alert ONCE if not muted
+                // When timer reaches 0, mark as played
                 if (refreshTime === 0 && !alertPlayed) {
-                    if (!isMuted) {
-                        alertAudio.currentTime = 0;
-                        alertAudio.play();
-                    }
                     alertPlayed = true;
                 }
                 // Reset logic example (if you restart the timer)
@@ -3003,7 +3002,7 @@ async function populateUserConditions() {
                 </h5>
                 <div class="modal-header-actions">
                     <button id="niftyReloadBtn" class="btn btn-outline-light me-2" title="Reload Data" onclick="fetchNiftyData()">
-                        <i class="fas fa-sync-alt"></i>
+                        <i class="fas fa-rotate-right"></i>
                     </button>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
