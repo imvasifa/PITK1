@@ -3038,8 +3038,33 @@ async function populateUserConditions() {
 </div>
 
 <!-- Nifty Indices Modal -->
+<style>
+    #niftyModal .modal-dialog {
+        min-height: 80vh;
+        max-height: 90vh;
+        width: 95%;
+        max-width: 1200px;
+        margin: 1.75rem auto;
+    }
+    #niftyModal .modal-content {
+        min-height: 80vh;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    #niftyModal .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+    }
+    #niftyModal .modal-header,
+    #niftyModal .modal-footer {
+        flex-shrink: 0;
+    }
+</style>
+
 <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content bg-dark text-light">
             <div class="modal-header">
                 <h5 class="modal-title" id="niftyModalLabel">
@@ -3055,7 +3080,7 @@ async function populateUserConditions() {
             <div class="modal-body" id="niftyModalBody">
                 <!-- Content will be dynamically loaded here -->
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer py-2">
                 <small class="text-muted" id="niftyLastUpdatedTime"></small>
             </div>
         </div>

@@ -31,6 +31,9 @@ import pygame
 import requests
 import psycopg2
 import psycopg2.extras as pg_extras
+import secrets
+import string
+from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app
 from flask_wtf import FlaskForm
 from flask_bcrypt import Bcrypt
@@ -38,7 +41,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
-from wtforms import StringField, PasswordField, SubmitField
+from wtforms import StringField, PasswordField, SubmitField, validators
 from wtforms.validators import DataRequired, Email, EqualTo
 
 # Set logging level to INFO to reduce verbosity
@@ -2097,6 +2100,20 @@ def serve_static(filename):
     return send_from_directory('static', filename)
 
 # Authentication Routes
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password_page():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        email = request.form.get('email')
+        # For now, just show a success message regardless of email existence
+        # In production, you would add logic to send a password reset email
+        flash('If an account with that email exists, a password reset link has been sent.', 'info')
+        return redirect(url_for('login'))
+        
+    return render_template('forgot_password.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

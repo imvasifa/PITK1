@@ -129,15 +129,16 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body{% if theme == 'dark' %} class="dark-theme"{% endif %}>
+    {% if request.endpoint not in ['login', 'register', 'forgot_password_page'] %}
     <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-    <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
-    <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
-</a>
-
+                <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+                <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
+            </a>
         </div>
     </nav>
+    {% endif %}
     
     <div class="container mt-2 pt-2">
         {% with messages = get_flashed_messages(with_categories=true) %}
