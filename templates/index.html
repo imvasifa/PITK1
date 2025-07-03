@@ -2859,6 +2859,14 @@ async function populateUserConditions() {
                     toastEl.classList.remove('bg-success', 'bg-warning');
                     toastEl.classList.add('bg-danger');
                     message.innerHTML = `<strong>LICENCE EXPIRED</strong> - Renew to continue using premium features.`;
+                    
+                    // Enable Generate Licence Key button if it exists
+                    const generateBtn = document.getElementById('generateLicenceBtn');
+                    if (generateBtn) {
+                        generateBtn.disabled = false;
+                        generateBtn.title = '';
+                        generateBtn.classList.remove('disabled');
+                    }
                 } else if (data.hasLicence) {
                     const expiresAt = new Date(data.expiresAt);
                     const timeLeft = Math.floor((expiresAt - new Date()) / 1000 / 60); // in minutes
@@ -2871,12 +2879,28 @@ async function populateUserConditions() {
                         <span class="ms-2 small">(${data.expiresAtIST})</span>
                     `;
                     
+                    // Disable Generate Licence Key button if it exists
+                    const generateBtn = document.getElementById('generateLicenceBtn');
+                    if (generateBtn) {
+                        generateBtn.disabled = true;
+                        generateBtn.title = 'You already have an active license';
+                        generateBtn.classList.add('disabled');
+                    }
+                    
                     // Check every minute for expiry
                     setTimeout(checkLicenceStatus, 60000);
                 } else {
                     toastEl.classList.remove('bg-success', 'bg-danger');
                     toastEl.classList.add('bg-warning');
                     message.innerHTML = 'No active licence. Enter a valid licence key for premium features.';
+                    
+                    // Enable Generate Licence Key button if it exists
+                    const generateBtn = document.getElementById('generateLicenceBtn');
+                    if (generateBtn) {
+                        generateBtn.disabled = false;
+                        generateBtn.title = '';
+                        generateBtn.classList.remove('disabled');
+                    }
                 }
                 
                 // Show the toast
@@ -2885,6 +2909,14 @@ async function populateUserConditions() {
             })
             .catch(error => {
                 console.error('Error checking licence status:', error);
+                
+                // If there's an error, enable the button just in case
+                const generateBtn = document.getElementById('generateLicenceBtn');
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                    generateBtn.title = '';
+                    generateBtn.classList.remove('disabled');
+                }
             });
     }
 </script>
@@ -3162,7 +3194,61 @@ function showCopyFeedback(btn) {
         icon.className = original;
     }, 1200);
 }
+// Function to update UI based on premium status
+function updatePremiumUI(isPremium) {
+    const generateBtn = document.getElementById('generateLicenceBtn');
+    if (generateBtn) {
+        if (isPremium) {
+            generateBtn.disabled = true;
+            generateBtn.title = 'You already have an active license';
+            generateBtn.classList.add('disabled');
+        } else {
+            generateBtn.disabled = false;
+            generateBtn.title = 'Generate License Key';
+            generateBtn.classList.remove('disabled');
+        }
+    }
+    
+    // Update user avatar to show premium status
+    const userAvatar = document.querySelector('.user-avatar-wrapper');
+    const userStatusDot = document.querySelector('.user-status-dot');
+    const userAvatarImg = document.querySelector('.user-avatar-img');
+    
+    if (userAvatar) {
+        userAvatar.classList.toggle('user-avatar-premium', isPremium);
+        userAvatar.classList.toggle('user-avatar-free', !isPremium);
+    }
+    
+    if (userStatusDot) {
+        userStatusDot.classList.toggle('user-status-dot-premium', isPremium);
+        userStatusDot.classList.toggle('user-status-dot-free', !isPremium);
+    }
+    
+    // Update the avatar image source if it's using the default image
+    if (userAvatarImg && (!userAvatarImg.getAttribute('src') || userAvatarImg.getAttribute('src').includes('default_'))) {
+        const defaultImage = isPremium ? 'default_premium.png' : 'default_free.png';
+        userAvatarImg.src = `/static/user_photos/${defaultImage}`;
+        userAvatarImg.alt = isPremium ? 'Premium User' : 'Free User';
+    }
+}
+
+// Check premium status on page load
+async function checkPremiumStatus() {
+    try {
+        const response = await fetch('/api/check-licence');
+        if (response.ok) {
+            const data = await response.json();
+            updatePremiumUI(data.is_premium === 'yes'); // Convert string to boolean
+        }
+    } catch (error) {
+        console.error('Error checking premium status:', error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Check premium status when page loads
+    checkPremiumStatus();
+    
     document.querySelectorAll('.copy-stock-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const stock = btn.getAttribute('data-stock');

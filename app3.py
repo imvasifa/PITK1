@@ -21,6 +21,144 @@ import winsound
 import redis
 from werkzeug.exceptions import HTTPException
 
+def env_bool(key, default=False):
+    """Helper function to parse boolean environment variables"""
+    return os.getenv(key, str(default)).lower() in ('1', 'true', 'yes')
+
+def test_redis_connection():
+    """Test Redis connection and return status information"""
+    try:
+        from redis.exceptions import ConnectionError, TimeoutError, AuthenticationError
+        
+        # Create a test connection
+        test_conn = redis.Redis(**REDIS_CONFIG)
+        
+        # Test connection with a simple ping
+        is_connected = test_conn.ping()
+        info = test_conn.info()
+        
+        return {
+            'status': 'success' if is_connected else 'failed',
+            'redis_version': info.get('redis_version', 'unknown'),
+            'connected_clients': info.get('connected_clients', 0),
+            'uptime_seconds': info.get('uptime_in_seconds', 0),
+            'config': {
+                'host': REDIS_CONFIG.get('host'),
+                'port': REDIS_CONFIG.get('port'),
+                'ssl': REDIS_CONFIG.get('ssl'),
+                'ssl_verify': bool(REDIS_CONFIG.get('ssl_cert_reqs'))
+            }
+        }
+        
+    except AuthenticationError as e:
+        return {'status': 'authentication_error', 'error': str(e)}
+    except TimeoutError as e:
+        return {'status': 'timeout_error', 'error': str(e)}
+    except ConnectionError as e:
+        return {'status': 'connection_error', 'error': str(e)}
+    except Exception as e:
+        return {'status': 'error', 'error': str(e), 'type': type(e).__name__}
+
+def get_redis_connection():
+    """Get a Redis connection with proper authentication"""
+    try:
+        # Parse Redis URL if provided (common in production)
+        redis_url = os.getenv('REDIS_URL')
+        if redis_url:
+            import redis
+            return redis.Redis.from_url(redis_url, decode_responses=True)
+            
+        # Fall back to individual parameters
+        redis_config = {
+            'host': os.getenv('REDIS_HOST', 'localhost'),
+            'port': int(os.getenv('REDIS_PORT', 6379)),
+            'password': os.getenv('REDIS_PASSWORD'),
+            'username': os.getenv('REDIS_USERNAME'),
+            'ssl': os.getenv('REDIS_SSL', 'false').lower() == 'true',
+            'decode_responses': True,
+            'retry_on_timeout': True,
+            'socket_connect_timeout': 5,
+            'socket_timeout': 5
+        }
+        
+        # Only include username if it's set
+        if not redis_config['username']:
+            redis_config.pop('username', None)
+            
+        # Only include password if it's set
+        if not redis_config['password']:
+            redis_config.pop('password', None)
+            
+        # SSL configuration
+        ssl_verify = os.getenv('REDIS_SSL_VERIFY', 'false').lower() == 'true'
+        if redis_config['ssl']:
+            redis_config.update({
+                'ssl_cert_reqs': 'required' if ssl_verify else None,
+                'ssl_ca_certs': os.getenv('REDIS_CA_CERTS'),
+                'ssl_certfile': os.getenv('REDIS_CERTFILE'),
+                'ssl_keyfile': os.getenv('REDIS_KEYFILE'),
+                'ssl_check_hostname': ssl_verify
+            })
+            
+        return redis.Redis(**redis_config)
+        
+    except Exception as e:
+        logger.error(f"Error creating Redis connection: {str(e)}")
+        return None
+
+# Basic logging setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Thread-safe Redis client initialization
+import threading
+redis_client = None
+redis_client_lock = threading.Lock()
+try:
+    # Redis connection details - using the exact same configuration as redis_set_key.py
+    REDIS_URL = "rediss://red-d109u7qli9vc73dkjp30:gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW@ohio-keyvalue.render.com:6379"
+    
+    # Parse the Redis URL
+    url_parts = redis.connection.parse_url(REDIS_URL)
+    
+    # Connect to Redis with the exact same parameters as redis_set_key.py
+    redis_client = redis.Redis(
+        host=url_parts['host'],
+        port=url_parts['port'],
+        username=url_parts['username'],
+        password=url_parts['password'],
+        ssl=True,
+        ssl_cert_reqs=None,  # Disable certificate verification
+        ssl_check_hostname=False,
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5
+    )
+    
+    # Test connection with a simple ping
+    if redis_client.ping():
+        logger.info("✅ Redis connected successfully")
+    else:
+        raise Exception("Redis ping failed")
+        
+except Exception as e:
+    logger.error(f"❌ Failed to connect to Redis: {str(e)}")
+    logger.error("Please check your Redis configuration and ensure the Redis server is running")
+    redis_client = None
+
+# License settings
+def parse_duration(duration_str, default):
+    try:
+        # Extract first number from string (in case there's a comment)
+        import re
+        match = re.search(r'\d+', str(duration_str).split('#')[0].strip())
+        return int(match.group(0)) if match else default
+    except (ValueError, AttributeError):
+        return default
+
+LICENSE_DURATION = parse_duration(os.getenv('LICENSE_DURATION', '240'), 240)  # 4 minutes default
+LICENSE_CHECK_INTERVAL = parse_duration(os.getenv('LICENSE_CHECK_INTERVAL', '60'), 60)  # 1 minute default
+
 class AppTemporarilyUnavailable(HTTPException):
     code = 503
     description = 'The application is currently unavailable. Please try again in a few minutes. If the problem persists, please contact our service team for assistance.'
@@ -2201,7 +2339,7 @@ def register():
         address = request.form.get('address', '')
         
         # New profile fields
-        premium = "yes"  # Default to "yes"
+        premium = "no"  # Default to "no" for new users
         dob = ""  # Default to empty string
         gender = "Prefer not to say"  # Default
         bio = "" # Default to empty string
@@ -2860,7 +2998,7 @@ def get_conditions():
 @login_required
 def validate_licence():
     """
-    Validate a user's licence key against Redis
+    Validate and activate a user's license key
     
     Request body should be JSON with format:
     {
@@ -2868,193 +3006,397 @@ def validate_licence():
     }
     
     Returns:
-        JSON response with success/error message
+        JSON response with success/error message and license details
     """
     try:
         data = request.get_json()
         if not data or 'licenceKey' not in data:
-            return jsonify({'valid': False, 'message': 'Licence key is required'}), 400
+            return jsonify({'valid': False, 'message': 'License key is required'}), 400
             
         user_key = data['licenceKey'].strip().upper()
         
-        # Connect to Redis
+        # Validate Redis connection
+        if not redis_client:
+            logger.error("Redis client not initialized")
+            return jsonify({
+                'valid': False,
+                'message': 'License validation service is currently unavailable. Please try again later.'
+            }), 503
+            
         try:
-            # Hardcoded Redis credentials from redis.txt
-            redis_url = 'ohio-keyvalue.render.com'  # From External Key Value URL
-            redis_port = 6379  # Default Redis port
-            redis_username = 'red-d109u7qli9vc73dkjp30'  # From External Key Value URL
-            redis_password = 'gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW'  # From External Key Value URL
+            # Test Redis connection
+            redis_client.ping()
+        except redis.RedisError as e:
+            logger.error(f"Redis connection error: {str(e)}")
+            return jsonify({
+                'valid': False,
+                'message': 'Unable to connect to license server. Please try again later.'
+            }), 503
             
-            # Connect to Redis with SSL
-            r = redis.Redis(
-                host=redis_url,
-                port=redis_port,
-                username=redis_username,
-                password=redis_password,
-                ssl=True,
-                ssl_cert_reqs=None,
-                ssl_ca_certs=None,
-                ssl_certfile=None,
-                ssl_keyfile=None,
-                ssl_check_hostname=False,
-                decode_responses=True
-            )
-            
-            # Check if the key exists and is not expired
-            redis_key = f'licence:key:{user_key}'
-            key_exists = r.exists(redis_key)
-            
-            if not key_exists:
-                return jsonify({
-                    'valid': False,
-                    'message': 'Invalid or expired licence key. Please check and try again.'
-                }), 400
+        # Check if user already has an active license
+        user_licence_key = f'user:licence:{current_user.username}'
+        existing_license = redis_client.get(user_licence_key)
+        
+        if existing_license:
+            try:
+                license_info = json.loads(existing_license)
+                expires_at = datetime.fromisoformat(license_info['expires_at'])
+                ist_offset = timedelta(hours=5, minutes=30)
+                expires_at_ist = expires_at + ist_offset
                 
-            # If we get here, the key is valid
-            # Store user details with the licence key and set 5-min TTL
-            user_licence_key = f'user:licence:{current_user.username}'
+                return jsonify({
+                    'valid': True,
+                    'message': f'You already have an active license until {expires_at_ist.strftime("%Y-%m-%d %H:%M:%S")} IST',
+                    'isPremium': True,
+                    'expiresAt': expires_at.isoformat(),
+                    'expiresAtIST': expires_at_ist.strftime('%d%m%y %H:%M:%S'),
+                    'user': current_user.username
+                })
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                logger.error(f"Error parsing existing license: {str(e)}")
+                # Continue with validation if there's an error with existing license
+        
+        # Check if the key exists in the license pool
+        redis_key = f'licence:key:{user_key}'
+        try:
+            key_exists = redis_client.exists(redis_key)
+        except redis.RedisError as e:
+            logger.error(f"Redis error checking key: {str(e)}")
+            return jsonify({
+                'valid': False,
+                'message': 'Error validating license key. Please try again.'
+            }), 500
+            
+        if not key_exists:
+            return jsonify({
+                'valid': False,
+                'message': 'Invalid or expired license key. Please check and try again.'
+            }), 400
+            
+        # License key is valid, proceed with activation
+        try:
+            # Calculate expiration time
+            expires_at = datetime.utcnow() + timedelta(seconds=LICENSE_DURATION)
+            
+            # Prepare user license details
             user_details = {
+                'user_id': current_user.id,
                 'username': current_user.username,
                 'email': getattr(current_user, 'email', ''),
                 'licence_key': user_key,
                 'validated_at': datetime.utcnow().isoformat(),
-                'expires_at': (datetime.utcnow() + timedelta(seconds=600)).isoformat()
+                'expires_at': expires_at.isoformat()
             }
             
-            # Store with 10-min TTL
-            r.setex(user_licence_key, 600, json.dumps(user_details))
-
-            # Delete the original licence key so it cannot be reused
-            r.delete(f'licence:key:{user_key}')
-
-            return jsonify({
-                'valid': True,
-                'message': 'Licence key validated successfully! Premium features activated for 10 minutes.',
-                'isPremium': True,
-                'expiresIn': 600,  # 10 minutes in seconds
-                'user': current_user.username,
-                'expiresAt': user_details['expires_at']
-            })
-                
-        except Exception as redis_error:
-            logger.error(f"Redis connection error: {str(redis_error)}")
+            # Start Redis transaction
+            with redis_client.pipeline() as pipe:
+                try:
+                    # Store user license with TTL
+                    pipe.setex(user_licence_key, LICENSE_DURATION, json.dumps(user_details))
+                    
+                    # Remove the license key from available pool
+                    pipe.delete(redis_key)
+                    
+                    # Execute transaction
+                    pipe.execute()
+                    
+                    # Update premium status in database
+                    if not update_user_premium_status(current_user.id, True):
+                        logger.warning(f"Failed to update premium status for user {current_user.id}")
+                    
+                    # Log successful activation
+                    logger.info(f"License activated for user {current_user.username} (ID: {current_user.id})")
+                    
+                    # Convert expiration time to IST (UTC+5:30) for display
+                    ist_offset = timedelta(hours=5, minutes=30)
+                    expires_at_ist = expires_at + ist_offset
+                    
+                    return jsonify({
+                        'valid': True,
+                        'message': f'License activated successfully! Premium features active until {expires_at_ist.strftime("%Y-%m-%d %H:%M:%S")} IST',
+                        'isPremium': True,
+                        'expiresIn': LICENSE_DURATION,
+                        'expiresAt': expires_at.isoformat(),
+                        'expiresAtIST': expires_at_ist.strftime('%d%m%y %H:%M:%S'),
+                        'user': current_user.username
+                    })
+                    
+                except redis.RedisError as e:
+                    logger.error(f"Redis transaction error: {str(e)}")
+                    pipe.reset()
+                    raise
+                    
+        except Exception as e:
+            logger.error(f"Error during license activation: {str(e)}", exc_info=True)
             return jsonify({
                 'valid': False,
-                'message': 'Error connecting to licence server. Please try again later.'
+                'message': 'An error occurred while activating your license. Please try again.'
             }), 500
             
     except Exception as e:
-        logger.error(f"Error in validate_licence: {str(e)}")
+        logger.error(f"Unexpected error in validate_licence: {str(e)}", exc_info=True)
         return jsonify({
             'valid': False,
-            'message': 'An error occurred while validating the licence key.'
+            'message': 'An unexpected error occurred. Please try again later.'
+        }), 500
+
+@app.route('/api/admin/licenses/revoke', methods=['POST'])
+@login_required
+def revoke_license():
+    """
+    Revoke a license key (admin only)
+    Request body: {'key': 'LICENSE_KEY'}
+    """
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        
+    try:
+        data = request.get_json()
+        if not data or 'key' not in data:
+            return jsonify({'success': False, 'error': 'License key is required'}), 400
+            
+        license_key = data['key'].strip().upper()
+        
+        # Remove from Redis if exists
+        if redis_client:
+            try:
+                # Remove from active licenses
+                redis_key = f'licence:key:{license_key}'
+                redis_client.delete(redis_key)
+                
+                # Remove from license keys set
+                redis_client.srem('licence:keys', license_key)
+                
+                # Find and remove any user associated with this license
+                for key in redis_client.scan_iter('user:licence:*'):
+                    try:
+                        user_data = redis_client.get(key)
+                        if user_data and license_key in user_data:
+                            redis_client.delete(key)
+                            break
+                    except Exception as e:
+                        logger.error(f"Error checking user license {key}: {str(e)}")
+                        continue
+                        
+            except Exception as e:
+                logger.error(f"Redis error revoking license: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Error revoking license from cache'
+                }), 500
+        
+        # Update database
+        cur = db.get_cursor()
+        cur.execute("""
+            UPDATE licenses 
+            SET is_used = TRUE, 
+                used_at = NOW(),
+                expires_at = NOW()
+            WHERE key = %s
+            RETURNING id
+        """, (license_key,))
+        
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': 'License not found'}), 404
+            
+        db.conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'License {license_key} has been revoked'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error revoking license: {str(e)}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to revoke license'
+        }), 500
+
+@app.route('/api/admin/licenses', methods=['GET'])
+@login_required
+def list_licenses():
+    """
+    List all licenses (admin only)
+    Returns:
+        JSON list of all licenses with their status
+    """
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        
+    try:
+        cur = db.get_cursor()
+        cur.execute("""
+            SELECT 
+                id, 
+                key, 
+                created_at, 
+                used_at, 
+                used_by,
+                expires_at,
+                CASE 
+                    WHEN used_at IS NOT NULL THEN 'used'
+                    WHEN expires_at < NOW() THEN 'expired'
+                    ELSE 'active'
+                END as status
+            FROM licenses
+            ORDER BY created_at DESC
+        """)
+        
+        licenses = []
+        for row in cur.fetchall():
+            license_data = dict(row)
+            # Convert datetime objects to string
+            for field in ['created_at', 'used_at', 'expires_at']:
+                if license_data[field]:
+                    license_data[field] = license_data[field].isoformat()
+            licenses.append(license_data)
+            
+        # Get Redis stats
+        redis_stats = {}
+        if redis_client:
+            try:
+                redis_stats = {
+                    'total_keys': redis_client.dbsize(),
+                    'active_licenses': len(redis_client.keys('licence:key:*')),
+                    'active_users': len(redis_client.keys('user:licence:*'))
+                }
+            except Exception as e:
+                logger.error(f"Error getting Redis stats: {str(e)}")
+                redis_stats = {'error': 'Failed to get Redis stats'}
+        
+        return jsonify({
+            'success': True,
+            'licenses': licenses,
+            'redis': redis_stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing licenses: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Failed to list licenses'
         }), 500
 
 @app.route('/api/check-licence', methods=['GET'])
 @login_required
 def check_licence():
     """
-    Check if the current user has a valid licence
+    Check if the current user has a valid license
     
     Returns:
-        JSON response with licence status and expiry information
+        JSON response with license status, expiry information, and premium status
     """
     if not current_user.is_authenticated:
         return jsonify({
             'hasLicence': False,
             'message': 'User not authenticated',
-            'isExpired': True
+            'isExpired': True,
+            'is_premium': 'no'
         }), 401
         
     try:
-        # Hardcoded Redis credentials from redis.txt
-        redis_url = 'ohio-keyvalue.render.com'
-        redis_port = 6379
-        redis_username = 'red-d109u7qli9vc73dkjp30'
-        redis_password = 'gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW'
-        
-        # Connect to Redis with SSL
-        r = redis.Redis(
-            host=redis_url,
-            port=redis_port,
-            username=redis_username,
-            password=redis_password,
-            ssl=True,
-            ssl_cert_reqs=None,
-            ssl_ca_certs=None,
-            ssl_certfile=None,
-            ssl_keyfile=None,
-            ssl_check_hostname=False,
-            decode_responses=True
-        )
-        
-        # Check if user has a valid licence
-        user_licence_key = f'user:licence:{current_user.username}'
-        licence_data = r.get(user_licence_key)
-        
-        if not licence_data:
-            # Try to get is_premium from DB (fallback)
+        # Get premium status from database
+        try:
+            user_data = get_user_data(current_user.id)
+            is_premium = user_data.get('account', {}).get('profile', {}).get('premium', 'no')
+        except Exception as e:
+            logger.error(f"Error getting user data: {str(e)}")
             is_premium = 'no'
-            try:
-                user_data = get_user_data(current_user.id)
-                is_premium = user_data.get('account', {}).get('profile', {}).get('premium', 'no')
-            except Exception:
-                pass
+        
+        # If Redis is not available, return database status
+        if not redis_client:
+            return jsonify({
+                'hasLicence': is_premium == 'yes',
+                'message': 'License server unavailable',
+                'isExpired': is_premium != 'yes',
+                'is_premium': is_premium
+            }), 200
+        
+        # Check Redis for active license
+        user_licence_key = f'user:licence:{current_user.username}'
+        licence_data = redis_client.get(user_licence_key)
+        
+        # If no active license in Redis but user is premium in DB, reset premium status
+        if not licence_data and is_premium == 'yes':
+            update_user_premium_status(current_user.id, False)
+            is_premium = 'no'
+            
+        if not licence_data:
             return jsonify({
                 'hasLicence': False,
-                'message': 'No active licence found',
+                'message': 'No active license found',
                 'isExpired': True,
                 'is_premium': is_premium
             })
             
-        # Parse the licence data
-        licence_info = json.loads(licence_data)
-        expires_at = datetime.fromisoformat(licence_info['expires_at'])
+        # Parse license data
+        try:
+            licence_info = json.loads(licence_data)
+            expires_at = datetime.fromisoformat(licence_info.get('expires_at', datetime.utcnow().isoformat()))
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Error parsing license data: {str(e)}")
+            return jsonify({
+                'hasLicence': False,
+                'message': 'Error reading license information',
+                'isExpired': True,
+                'is_premium': is_premium
+            }), 500
+            
         now = datetime.utcnow()
-        is_premium = 'no'
+        time_left = (expires_at - now).total_seconds()
+        is_expired = time_left <= 0
+        
+        # Convert UTC to IST (UTC+5:30)
+        ist_offset = timedelta(hours=5, minutes=30)
+        expires_at_ist = expires_at + ist_offset
+        
+        # Format dates for display
+        expires_at_ist_str = expires_at_ist.strftime('%d%m%y')
+        expires_at_ist_time = expires_at_ist.strftime('%H:%M:%S')
+        
+        # If license is expired, update status
+        if is_expired:
+            update_user_premium_status(current_user.id, False)
+            redis_client.delete(user_licence_key)
+            
+            return jsonify({
+                'hasLicence': False,
+                'message': 'LICENSE EXPIRED',
+                'isExpired': True,
+                'expiresAt': licence_info.get('expires_at'),
+                'expiresAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
+                'is_premium': 'no',
+                'timeLeft': 0
+            })
+            
+        # License is still valid
+        return jsonify({
+            'hasLicence': True,
+            'message': 'Active license found',
+            'isExpired': False,
+            'expiresAt': licence_info.get('expires_at'),
+            'expiresAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
+            'timeLeft': time_left,
+            'is_premium': 'yes'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in check_licence: {str(e)}", exc_info=True)
+        # On error, try to return the current premium status from DB
         try:
             user_data = get_user_data(current_user.id)
             is_premium = user_data.get('account', {}).get('profile', {}).get('premium', 'no')
         except Exception:
-            pass
-
-        # Convert UTC to IST (UTC+5:30)
-        from datetime import timedelta
-        ist_offset = timedelta(hours=5, minutes=30)
-        expires_at_ist = expires_at + ist_offset
-        now_ist = now + ist_offset
-
-        # Format IST date as ddmmyy and time as HH:MM:SS
-        expires_at_ist_str = expires_at_ist.strftime('%d%m%y')
-        expires_at_ist_time = expires_at_ist.strftime('%H:%M:%S')
-
-        if now > expires_at:
-            return jsonify({
-                'hasLicence': False,
-                'message': 'LICENCE EXPIRED',
-                'isExpired': True,
-                'expiredAt': licence_info['expires_at'],
-                'expiredAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
-                'is_premium': is_premium
-            })
-
-        return jsonify({
-            'hasLicence': True,
-            'message': 'Active licence found',
-            'isExpired': False,
-            'expiresAt': licence_info['expires_at'],
-            'expiresAtIST': f'{expires_at_ist_str} {expires_at_ist_time}',
-            'timeLeft': (expires_at - now).total_seconds(),
-            'is_premium': is_premium
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in check_licence: {str(e)}")
+            is_premium = 'no'
+            
         return jsonify({
             'hasLicence': False,
-            'message': 'Error checking licence status',
+            'message': f'Error checking license status: {str(e)}',
             'isExpired': True,
-            'error': str(e)
+            'is_premium': is_premium
         }), 500
 
 @app.route('/nifty-data')
@@ -3621,43 +3963,112 @@ def reset_profile():
         return jsonify({'success': False, 'error': 'Error resetting profile'}), 500
 
 # -------------------- License Key System (10-minute premium) --------------------
-# Redis connection (optional fast path)
-try:
-    redis_client = redis.Redis(
-        host=os.getenv('REDIS_HOST', 'localhost'),
-        port=int(os.getenv('REDIS_PORT', 6379)),
-        decode_responses=True,
-    )
-    redis_client.ping()
-    logger.info("✅ Connected to Redis server")
-except Exception as e:
-    logger.warning(f"⚠️  Redis connection failed: {e}. Continuing without Redis cache.")
-    redis_client = None
+# Hardcoded Redis configuration
+REDIS_URL = "rediss://red-d109u7qli9vc73dkjp30:gjyOjstc7DXWndtoFx5X8Qz7vGbia5RW@ohio-keyvalue.render.com:6379"
 
-# Ensure licenses table exists
-
-def ensure_licenses_table():
-    """Create the licenses table if it doesn't already exist"""
-    try:
-        cur = db.get_cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS licenses (
-                key TEXT PRIMARY KEY,
-                is_used BOOLEAN DEFAULT FALSE,
-                used_by INTEGER,
-                used_at TIMESTAMPTZ
+def init_redis_client():
+    """Initialize Redis client with hardcoded configuration and retry logic"""
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            # Parse the Redis URL
+            url_parts = redis.connection.parse_url(REDIS_URL)
+            
+            # Create Redis client with hardcoded configuration
+            client = redis.Redis(
+                host=url_parts['host'],
+                port=url_parts['port'],
+                username=url_parts['username'],
+                password=url_parts['password'],
+                ssl=True,
+                ssl_cert_reqs=None,  # Disable certificate verification
+                ssl_check_hostname=False,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+                max_connections=10
             )
-            """
-        )
-        if db.conn is not None:
-            db.conn.commit()
-        return True
-    except Exception as e:
-        logger.error(f"Error creating licenses table: {e}", exc_info=True)
-        if db.conn is not None:
-            db.conn.rollback()
-        return False
+            
+            # Test the connection
+            if client.ping():
+                logger.info(f"✅ Successfully connected to Redis (attempt {attempt + 1}/{max_retries})")
+                return client
+                
+        except Exception as e:
+            logger.error(f"❌ Redis connection attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+    
+    logger.error("❌ All Redis connection attempts failed")
+    return None
+
+def get_redis_client():
+    """Thread-safe Redis client getter with lazy initialization"""
+    global redis_client
+    
+    # Fast path - client already initialized
+    if redis_client is not None:
+        try:
+            redis_client.ping()
+            return redis_client
+        except:
+            # If ping fails, reinitialize
+            pass
+    
+    # Slow path - acquire lock and initialize
+    with redis_client_lock:
+        # Double-check after acquiring lock
+        if redis_client is not None:
+            try:
+                redis_client.ping()
+                return redis_client
+            except:
+                pass
+                
+        logger.info("Initializing Redis client...")
+        try:
+            # Parse the Redis URL
+            url_parts = redis.connection.parse_url(REDIS_URL)
+            
+            # Create Redis client with hardcoded configuration
+            client = redis.Redis(
+                host=url_parts['host'],
+                port=url_parts['port'],
+                username=url_parts['username'],
+                password=url_parts['password'],
+                ssl=True,
+                ssl_cert_reqs=None,  # Disable certificate verification
+                ssl_check_hostname=False,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+                max_connections=10,
+                health_check_interval=30  # Check connection every 30 seconds
+            )
+            
+            # Test the connection
+            if client.ping():
+                redis_client = client
+                logger.info("✅ Successfully connected to Redis")
+                return redis_client
+            else:
+                logger.error("❌ Redis ping failed")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Redis connection failed: {e}")
+            return None
+
+# Initialize Redis client on startup
+redis_client = get_redis_client()
+
+# License duration in seconds (10 minutes)
+LICENSE_DURATION = 240  # 4 minutes in seconds
+LICENSE_CHECK_INTERVAL = 60  # Check every minute
 
 
 def _set_premium_expiry(user_id: int, seconds: int = 600):
@@ -3691,10 +4102,33 @@ def _set_premium_expiry(user_id: int, seconds: int = 600):
 
 
 def update_user_premium_status(user_id: int, is_premium: bool):
-    """Toggle premium flag in user_data JSONB."""
-    status_json = '"yes"' if is_premium else '"no"'
+    """
+    Update user's premium status in the database.
+    
+    Args:
+        user_id: The ID of the user to update
+        is_premium: Boolean indicating if the user should have premium access
+        
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    if not isinstance(user_id, int) or user_id <= 0:
+        logger.error(f"Invalid user_id: {user_id}")
+        return False
+        
+    status = 'yes' if is_premium else 'no'
+    status_json = f'"{status}"'
+    
+    logger.info(f"Updating premium status for user {user_id} to '{status}'...")
+    
     try:
+        # Get a database cursor
         cur = db.get_cursor()
+        if not cur:
+            logger.error("Failed to get database cursor")
+            return False
+            
+        # Update the user's premium status in the database
         cur.execute(
             """
             UPDATE users
@@ -3707,35 +4141,211 @@ def update_user_premium_status(user_id: int, is_premium: bool):
             """,
             (status_json, user_id),
         )
-        if db.conn is not None:
-            db.conn.commit()
-        return cur.rowcount > 0
+        
+        # Check if the update was successful
+        updated = cur.rowcount > 0
+        
+        if updated:
+            if db.conn is not None:
+                db.conn.commit()
+            logger.info(f"Successfully updated premium status for user {user_id} to '{status}'")
+            
+            # Update Redis cache if available
+            if redis_client and is_premium:
+                try:
+                    # Set a temporary Redis key that will expire with the license
+                    redis_key = f'premium:{user_id}'
+                    redis_client.setex(redis_key, LICENSE_DURATION, '1')
+                    logger.info(f"Updated Redis cache for user {user_id}")
+                except Exception as redis_error:
+                    logger.error(f"Error updating Redis cache: {redis_error}")
+        else:
+            logger.warning(f"No rows affected when updating premium status for user {user_id}")
+            
+        return updated
+        
     except Exception as e:
-        logger.error(f"Error updating premium status: {e}", exc_info=True)
+        error_msg = f"Error updating premium status for user {user_id}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         if db.conn is not None:
             db.conn.rollback()
         return False
 
 
+def ensure_licenses_table():
+    """Ensure the licenses table exists in the database"""
+    max_attempts = 3
+    
+    for attempt in range(max_attempts):
+        cur = None
+        try:
+            # Get cursor from the database connection
+            cur = db.get_cursor()
+            if not cur:
+                logger.error("Failed to get database cursor")
+                time.sleep(1)  # Wait before retry
+                continue
+            
+            # First, check if table exists
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'licenses'
+                )
+            """)
+            table_exists = cur.fetchone()['exists']
+            
+            if not table_exists:
+                logger.info("Licenses table not found, attempting to create...")
+                # Create licenses table with minimal privileges
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS public.licenses (
+                        id SERIAL PRIMARY KEY,
+                        key VARCHAR(16) UNIQUE NOT NULL,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        used_at TIMESTAMP WITH TIME ZONE,
+                        used_by INTEGER,
+                        expires_at TIMESTAMP WITH TIME ZONE
+                    )
+                """)
+                
+                # Create index on key for faster lookups
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_licenses_key 
+                    ON public.licenses(key)
+                """)
+                
+                db.conn.commit()
+                logger.info("Successfully created licenses table")
+            
+            # Try to add foreign key constraint if users table exists (do this separately)
+            try:
+                cur.execute("""
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'users' LIMIT 1
+                """)
+                if cur.fetchone():
+                    cur.execute("""
+                        DO $$
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM pg_constraint 
+                                WHERE conname = 'fk_licenses_user'
+                            ) THEN
+                                ALTER TABLE public.licenses
+                                ADD CONSTRAINT fk_licenses_user
+                                FOREIGN KEY (used_by) 
+                                REFERENCES public.users(id)
+                                ON DELETE SET NULL;
+                            END IF;
+                        END
+                        $$
+                    """)
+                    db.conn.commit()
+            except Exception as fk_error:
+                logger.warning(f"Could not add foreign key constraint: {str(fk_error)}")
+                if hasattr(db, 'conn'):
+                    db.conn.rollback()
+            
+            # Verify table is accessible
+            cur.execute("SELECT 1 FROM public.licenses LIMIT 1")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Attempt {attempt + 1} failed: {str(e)}", exc_info=True)
+            if hasattr(db, 'conn'):
+                db.conn.rollback()
+        finally:
+            if cur:
+                cur.close()
+            
+        # Wait before retry
+        time.sleep(1)
+    
+    logger.error("All attempts to ensure licenses table failed")
+    return False
+
 @app.route('/api/generate-license', methods=['POST'])
 @login_required
 def generate_license():
-    """Dev-only: generate a random 16-char key and store unused in licenses table."""
+    """
+    Generate a new license key and store it in the database.
+    Only accessible in development/debug mode.
+    """
     # Only allow in development/debug mode
-    if not app.debug:
-        return jsonify({'success': False, 'error': 'Not allowed'}), 403
-    key = ''.join(random.choices('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', k=16))
+    if not app.debug and not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+        
     try:
+        # Ensure licenses table exists
+        if not ensure_licenses_table():
+            return jsonify({
+                'success': False,
+                'error': 'Failed to initialize license system. Please check server logs.'
+            }), 500
+            
+        # Generate a random 16-character key (excluding easily confused characters)
+        key = ''.join(random.choices('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', k=16))
+        
+        # Get database cursor
         cur = db.get_cursor()
-        cur.execute("INSERT INTO licenses(key) VALUES (%s) ON CONFLICT DO NOTHING", (key,))
+        if not cur:
+            return jsonify({
+                'success': False,
+                'error': 'Database connection error'
+            }), 500
+            
+        # Insert the new license key
+        cur.execute("""
+            INSERT INTO licenses (key)
+            VALUES (%s)
+            ON CONFLICT (key) DO NOTHING
+            RETURNING id
+        """, (key,))
+        
+        if cur.rowcount == 0:
+            # This key already exists, generate a new one
+            return generate_license()
+            
         if db.conn is not None:
             db.conn.commit()
-        return jsonify({'success': True, 'key': key})
+            
+        # Store the key in Redis if available
+        if redis_client:
+            try:
+                # Use the same key format as in the validation function (note: British spelling 'licence')
+                redis_key = f'licence:key:{key}'
+                redis_client.set(redis_key, 'active')
+                # Set expiration if needed (e.g., 30 days)
+                # redis_client.expire(redis_key, 30 * 24 * 60 * 60)
+                logger.info(f"Stored license key in Redis: {redis_key}")
+                
+                # Also store in a set of all license keys for easier management
+                redis_client.sadd('licence:keys', key)
+                
+            except Exception as e:
+                logger.error(f"Failed to store key in Redis: {str(e)}", exc_info=True)
+        
+        logger.info(f"Generated new license key: {key}")
+        return jsonify({
+            'success': True,
+            'key': key,
+            'message': 'License key generated successfully',
+            'stored_in_redis': redis_client is not None
+        })
+        
     except Exception as e:
-        logger.error(f"generate_license error: {e}")
+        logger.error(f"Error generating license: {str(e)}", exc_info=True)
         if db.conn is not None:
             db.conn.rollback()
-        return jsonify({'success': False, 'error': 'DB error'}), 500
+            
+        return jsonify({
+            'success': False,
+            'error': 'Failed to generate license key',
+            'details': str(e)
+        }), 500
 
 
 @app.route('/api/activate-license', methods=['POST'])
@@ -3862,17 +4472,131 @@ def start_threads_once():
     except Exception as e:
         logger.error(f"Error starting threads: {e}")
 
+def check_license_statuses():
+    """
+    Background task to check and update license statuses
+    Runs every LICENSE_CHECK_INTERVAL seconds
+    
+    This function:
+    1. Checks all active user licenses in Redis
+    2. Updates user premium status in the database when licenses expire
+    3. Removes expired license keys from Redis
+    4. Handles errors gracefully with appropriate logging
+    """
+    while True:
+        try:
+            logger.info("Starting license status check...")
+            
+            # Skip if Redis is not available
+            if not redis_client:
+                logger.warning("Redis client not available, skipping license check")
+                time.sleep(LICENSE_CHECK_INTERVAL)
+                continue
+                
+            try:
+                # Get all user license keys
+                user_keys = redis_client.keys('user:licence:*')
+                logger.info(f"Found {len(user_keys)} active licenses to check")
+                
+                for key in user_keys:
+                    try:
+                        # Get license data
+                        license_data = redis_client.get(key)
+                        if not license_data:
+                            logger.debug(f"No data found for key {key}, skipping")
+                            continue
+                            
+                        try:
+                            license_info = json.loads(license_data)
+                            username = key.split(':')[-1]  # Extract username from key
+                            
+                            # Check if license has expired
+                            expires_at = datetime.fromisoformat(license_info.get('expires_at', '1970-01-01T00:00:00'))
+                            now = datetime.utcnow()
+                            
+                            if now > expires_at:
+                                # License has expired, update user status
+                                logger.info(f"License expired for user {username}")
+                                
+                                # Get user ID from database
+                                try:
+                                    cur = db.get_cursor()
+                                    if not cur:
+                                        logger.error("Failed to get database cursor")
+                                        continue
+                                        
+                                    cur.execute("""
+                                        SELECT id FROM users 
+                                        WHERE user_data->'account'->>'username' = %s
+                                    """, (username,))
+                                    user_data = cur.fetchone()
+                                    
+                                    if user_data:
+                                        user_id = user_data[0]
+                                        # Update user's premium status to 'no'
+                                        if update_user_premium_status(user_id, False):
+                                            logger.info(f"Updated premium status to 'no' for user {username}")
+                                        else:
+                                            logger.error(f"Failed to update premium status for user {username}")
+                                    else:
+                                        logger.warning(f"User {username} not found in database")
+                                        
+                                except Exception as db_error:
+                                    logger.error(f"Database error processing user {username}: {str(db_error)}", exc_info=True)
+                                    continue
+                                    
+                                # Remove the expired license key
+                                try:
+                                    redis_client.delete(key)
+                                    logger.info(f"Removed expired license for user {username}")
+                                except Exception as del_error:
+                                    logger.error(f"Error removing expired license for user {username}: {str(del_error)}")
+                            
+                        except (json.JSONDecodeError, KeyError, ValueError) as parse_error:
+                            logger.error(f"Error parsing license data for key {key}: {str(parse_error)}")
+                            continue
+                            
+                    except Exception as key_error:
+                        logger.error(f"Error processing license key {key}: {str(key_error)}", exc_info=True)
+                        continue
+                        
+            except Exception as redis_error:
+                logger.error(f"Redis error in license check: {str(redis_error)}", exc_info=True)
+                
+            logger.info(f"Completed license status check. Next check in {LICENSE_CHECK_INTERVAL} seconds.")
+            
+        except Exception as e:
+            logger.error(f"Error in check_license_statuses: {str(e)}", exc_info=True)
+        
+        # Wait for the next check interval
+        time.sleep(LICENSE_CHECK_INTERVAL)
+
 def cleanup():
-    pass
+    pygame.quit()
 
 # Main execution
 if __name__ == '__main__':
     # Ensure database tables exist
     if not ensure_app_settings_table():
-        print("❌ Failed to verify/create app_settings table")
+        logger.error("Failed to ensure app_settings table exists")
     
-    # Start threads immediately when run directly
+    # Ensure licenses table exists
+    if not ensure_licenses_table():
+        logger.error("Failed to ensure licenses table exists")
+        logger.error("Failed to ensure app settings table exists")
+        
+    # Start background threads
     start_threads_once()
     
-    # Run the Flask app in standalone mode if this file is executed directly
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Start license check thread
+    license_thread = threading.Thread(target=check_license_statuses, daemon=True)
+    license_thread.start()
+    logger.info("License check thread started")
+    
+    # Start the Flask application
+    try:
+        app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    except Exception as e:
+        logger.error(f"Error starting application: {e}")
+    finally:
+        cleanup()

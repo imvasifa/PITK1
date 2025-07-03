@@ -1,6 +1,7 @@
 # Core Dependencies
 setuptools<81
 wheel
+python-dotenv>=1.0.0
 
 # Web Framework
 flask==3.0.0

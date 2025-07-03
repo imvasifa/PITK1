@@ -186,7 +186,73 @@
             var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
+            
+            // Check premium status on page load for all pages
+            checkPremiumStatus();
         });
+        
+        // Function to update UI based on premium status
+        function updatePremiumUI(isPremium) {
+            const generateBtn = document.getElementById('generateLicenceBtn');
+            if (generateBtn) {
+                if (isPremium) {
+                    generateBtn.disabled = true;
+                    generateBtn.title = 'You already have an active license';
+                    generateBtn.classList.add('disabled');
+                } else {
+                    generateBtn.disabled = false;
+                    generateBtn.title = 'Generate License Key';
+                    generateBtn.classList.remove('disabled');
+                }
+            }
+            
+            // Update user avatar to show premium status
+            const userAvatar = document.querySelector('.user-avatar-wrapper');
+            const userStatusDot = document.querySelector('.user-status-dot');
+            const userAvatarImg = document.querySelector('.user-avatar-img');
+            
+            if (userAvatar) {
+                userAvatar.classList.toggle('user-avatar-premium', isPremium);
+                userAvatar.classList.toggle('user-avatar-free', !isPremium);
+            }
+            
+            if (userStatusDot) {
+                userStatusDot.classList.toggle('user-status-dot-premium', isPremium);
+                userStatusDot.classList.toggle('user-status-dot-free', !isPremium);
+            }
+            
+            // Only update the avatar image if it's using a default image and not a user-uploaded photo
+            if (userAvatarImg) {
+                const currentSrc = userAvatarImg.getAttribute('src') || '';
+                const isDefaultImage = currentSrc.includes('default_') || 
+                                     currentSrc.includes('default_premium.png') || 
+                                     currentSrc.includes('default_free.png');
+                
+                if (isDefaultImage) {
+                    const defaultImage = isPremium ? 'default_premium.png' : 'default_free.png';
+                    userAvatarImg.src = `/static/user_photos/${defaultImage}`;
+                    userAvatarImg.alt = isPremium ? 'Premium User' : 'Free User';
+                }
+            }
+        }
+
+        // Check premium status on page load
+        async function checkPremiumStatus() {
+            try {
+                const response = await fetch('/api/check-licence');
+                if (response.ok) {
+                    const data = await response.json();
+                    updatePremiumUI(data.is_premium === 'yes');
+                    
+                    // Check again in 1 minute to keep status updated
+                    setTimeout(checkPremiumStatus, 60000);
+                }
+            } catch (error) {
+                console.error('Error checking premium status:', error);
+                // Retry after 1 minute on error
+                setTimeout(checkPremiumStatus, 60000);
+            }
+        }
     </script>
 </body>
 </html>

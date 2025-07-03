@@ -116,6 +116,11 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="licence-tab" data-bs-toggle="tab" data-bs-target="#licence" type="button" role="tab" aria-controls="licence" aria-selected="false">Licence Key</button>
                         </li>
+                        {% if current_user.is_admin %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="licence-mgmt-tab" data-bs-toggle="tab" data-bs-target="#licence-mgmt" type="button" role="tab" aria-controls="licence-mgmt" aria-selected="false">License Management</button>
+                        </li>
+                        {% endif %}
                     </ul>
                     <div class="tab-content" id="myTabContent">
                         <div class="tab-pane fade show active" id="profile" role="tabpanel" aria-labelledby="profile-tab">
@@ -225,6 +230,79 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        {% if current_user.is_admin %}
+                        <div class="tab-pane fade" id="licence-mgmt" role="tabpanel" aria-labelledby="licence-mgmt-tab">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <h5 class="card-title mb-0">License Management</h5>
+                                    <div>
+                                        <button id="refreshLicensesBtn" class="btn btn-outline-secondary btn-sm me-2">
+                                            <i class="fas fa-sync-alt"></i> Refresh
+                                        </button>
+                                        <button id="generateLicenseBtn" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-plus"></i> Generate License
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-4">
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Total Licenses</h6>
+                                                <h3 id="totalLicenses" class="card-title mb-0">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Active Licenses</h6>
+                                                <h3 id="activeLicenses" class="card-title mb-0">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h6 class="card-subtitle mb-2 text-muted">Active Users</h6>
+                                                <h3 id="activeUsers" class="card-title mb-0">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>License Key</th>
+                                                <th>Status</th>
+                                                <th>Created</th>
+                                                <th>Used By</th>
+                                                <th>Expires</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="licensesTableBody">
+                                            <tr>
+                                                <td colspan="6" class="text-center">Loading licenses...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <div class="text-muted small" id="lastUpdated">Last updated: Never</div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-secondary" id="prevPage" disabled>Previous</button>
+                                        <button class="btn btn-sm btn-outline-secondary" id="nextPage" disabled>Next</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                         
                         <div class="tab-pane fade" id="password" role="tabpanel" aria-labelledby="password-tab">
                 <div class="card-body">
@@ -688,6 +766,196 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 5000);
                 }
             });
+        }
+    });
+    
+    // License Management JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        const refreshBtn = document.getElementById('refreshLicensesBtn');
+        const generateBtn = document.getElementById('generateLicenseBtn');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const licensesTableBody = document.getElementById('licensesTableBody');
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+        
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        let totalLicenses = 0;
+        
+        // Format date to local string
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+        
+        // Format time remaining
+        function formatTimeRemaining(expiryDate) {
+            if (!expiryDate) return 'N/A';
+            const now = new Date();
+            const expiry = new Date(expiryDate);
+            const diffMs = expiry - now;
+            
+            if (diffMs <= 0) return 'Expired';
+            
+            const diffMins = Math.round(diffMs / 60000);
+            if (diffMins < 60) return `${diffMins}m`;
+            
+            const diffHours = Math.round(diffMins / 60);
+            if (diffHours < 24) return `${diffHours}h`;
+            
+            const diffDays = Math.round(diffHours / 24);
+            return `${diffDays}d`;
+        }
+        
+        // Load licenses from API
+        async function loadLicenses(page = 1) {
+            try {
+                licensesTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading licenses...</td></tr>';
+                
+                const response = await fetch('/api/admin/licenses');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load licenses');
+                }
+                
+                // Update stats
+                document.getElementById('totalLicenses').textContent = data.licenses.length;
+                document.getElementById('activeLicenses').textContent = data.redis?.active_licenses || '0';
+                document.getElementById('activeUsers').textContent = data.redis?.active_users || '0';
+                
+                // Update last updated time
+                lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleString()}`;
+                
+                // Calculate pagination
+                totalLicenses = data.licenses.length;
+                const totalPages = Math.ceil(totalLicenses / itemsPerPage);
+                const startIndex = (page - 1) * itemsPerPage;
+                const paginatedItems = data.licenses.slice(startIndex, startIndex + itemsPerPage);
+                
+                // Update pagination buttons
+                prevPageBtn.disabled = page <= 1;
+                nextPageBtn.disabled = page >= totalPages;
+                
+                // Render table rows
+                if (data.licenses.length === 0) {
+                    licensesTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No licenses found</td></tr>';
+                    return;
+                }
+                
+                licensesTableBody.innerHTML = paginatedItems.map(license => `
+                    <tr>
+                        <td><code>${license.key}</code></td>
+                        <td>
+                            <span class="badge ${license.status === 'active' ? 'bg-success' : license.status === 'used' ? 'bg-primary' : 'bg-secondary'}">
+                                ${license.status.charAt(0).toUpperCase() + license.status.slice(1)}
+                            </span>
+                        </td>
+                        <td>${formatDate(license.created_at)}</td>
+                        <td>${license.used_by || '-'}</td>
+                        <td>${formatTimeRemaining(license.expires_at)}</td>
+                        <td>
+                            ${license.status === 'active' ? `
+                                <button class="btn btn-sm btn-outline-danger revoke-btn" data-key="${license.key}">
+                                    <i class="fas fa-ban"></i> Revoke
+                                </button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+                
+                // Add event listeners to revoke buttons
+                document.querySelectorAll('.revoke-btn').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const key = this.getAttribute('data-key');
+                        if (confirm(`Are you sure you want to revoke license ${key}?`)) {
+                            try {
+                                const response = await fetch(`/api/admin/licenses/revoke`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ key })
+                                });
+                                
+                                const result = await response.json();
+                                if (result.success) {
+                                    loadLicenses(currentPage);
+                                } else {
+                                    alert(result.error || 'Failed to revoke license');
+                                }
+                            } catch (error) {
+                                console.error('Error revoking license:', error);
+                                alert('Error revoking license');
+                            }
+                        }
+                    });
+                });
+                
+            } catch (error) {
+                console.error('Error loading licenses:', error);
+                licensesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-danger">
+                            Error loading licenses: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+        
+        // Event Listeners
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => loadLicenses(currentPage));
+        }
+        
+        if (generateBtn) {
+            generateBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/generate-license', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(`License key generated: ${result.key}`);
+                        loadLicenses(1);
+                    } else {
+                        alert(result.error || 'Failed to generate license');
+                    }
+                } catch (error) {
+                    console.error('Error generating license:', error);
+                    alert('Error generating license');
+                }
+            });
+        }
+        
+        if (prevPageBtn) {
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    loadLicenses(currentPage);
+                }
+            });
+        }
+        
+        if (nextPageBtn) {
+            nextPageBtn.addEventListener('click', () => {
+                const totalPages = Math.ceil(totalLicenses / itemsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    loadLicenses(currentPage);
+                }
+            });
+        }
+        
+        // Initial load
+        if (refreshBtn) {
+            loadLicenses();
         }
     });
 </script>
