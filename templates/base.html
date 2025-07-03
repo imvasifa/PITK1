@@ -221,17 +221,26 @@
                 userStatusDot.classList.toggle('user-status-dot-free', !isPremium);
             }
             
-            // Only update the avatar image if it's using a default image and not a user-uploaded photo
+            // Update the avatar image if it's using a default image or if there's no image
             if (userAvatarImg) {
                 const currentSrc = userAvatarImg.getAttribute('src') || '';
                 const isDefaultImage = currentSrc.includes('default_') || 
                                      currentSrc.includes('default_premium.png') || 
-                                     currentSrc.includes('default_free.png');
+                                     currentSrc.includes('default_free.png') ||
+                                     !currentSrc ||
+                                     currentSrc.includes('data:image');
                 
-                if (isDefaultImage) {
+                if (isDefaultImage || !userAvatarImg.complete || userAvatarImg.naturalWidth === 0) {
                     const defaultImage = isPremium ? 'default_premium.png' : 'default_free.png';
-                    userAvatarImg.src = `/static/user_photos/${defaultImage}`;
+                    const newSrc = `/static/user_photos/${defaultImage}?t=${new Date().getTime()}`;
+                    userAvatarImg.src = newSrc;
                     userAvatarImg.alt = isPremium ? 'Premium User' : 'Free User';
+                    
+                    // Add error handler in case the image fails to load
+                    userAvatarImg.onerror = function() {
+                        this.onerror = null; // Prevent infinite loop
+                        this.src = `/static/user_photos/default_${isPremium ? 'premium' : 'free'}.png`;
+                    };
                 }
             }
         }
