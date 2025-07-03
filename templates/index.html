@@ -2116,88 +2116,97 @@ if (niftyModal) {
             {% endif %}
         </div>
         
-        <div class="container mt-4">
-            <div class="row">
-                <!-- Buy Suggestions -->
-                <div class="col-md-6 scan-card">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="mb-0"><i class="fas fa-arrow-up"></i> Buy Suggestions</h5>
-                        </div>
-                        <div class="card-body">
-                            {% if buy_suggestions %}
-                                <table class="table table-dark table-hover">
-                                    <thead>
+        <!-- Buy Suggestions -->
+        <div class="row">
+            <div class="col-12 scan-card">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0 d-flex align-items-center">
+                            <span style="color: white;">Buy Suggestions</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if buy_suggestions %}
+                            <table class="table table-dark table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Stock</th>
+                                        <th>Close</th>
+                                        <th>Change %</th>
+                                        <th class="d-none d-md-table-cell">Volume</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stock in buy_suggestions %}
                                         <tr>
-                                            <th>Stock</th>
-                                            <th>Close</th>
-                                            <th>Change %</th>
-                                            <th>Volume</th>
-                                            <th>Score</th>
+                                            <td style="white-space:nowrap;">
+                                                <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+                                            </td>
+                                            <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
+                                            <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('change_percent') }}</td>
+                                            <td class="d-none d-md-table-cell">{{ stock.volume | format_number }}</td>
+                                            <td>{{ stock.potential_score | format_number('score') }}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for stock in buy_suggestions %}
-                                            <tr>
-                                                <td style="white-space:nowrap;">
-    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
-        <i class="fas fa-copy"></i>
-    </button>
-    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
-</td>
-                                                <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
-                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('percentage') }}%</td>
-                                                <td>{{ stock.volume | format_number }}</td>
-                                                <td>{{ stock.potential_score | format_number('score') }}</td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            {% else %}
-                                <p class="text-muted">No buy suggestions available.</p>
-                            {% endif %}
-                        </div>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="alert alert-warning">No buy suggestions available.</div>
+                        {% endif %}
                     </div>
                 </div>
-            
-                <!-- Sell Suggestions -->
-                <div class="col-md-6 scan-card">
-                    <div class="card">
-                        <div class="card-header bg-danger text-white">
-                            <h5 class="mb-0"><i class="fas fa-arrow-down"></i> Sell Suggestions</h5>
-                        </div>
-                        <div class="card-body">
-                            {% if sell_suggestions %}
-                                <table class="table table-dark table-hover">
-                                    <thead>
+            </div>
+        </div>
+
+        <!-- Sell Suggestions -->
+        <div class="row">
+            <div class="col-12 scan-card">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0 d-flex align-items-center">
+                            <span style="color: white;">Sell Suggestions</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if sell_suggestions %}
+                            <table class="table table-dark table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Stock</th>
+                                        <th>Close</th>
+                                        <th>Change %</th>
+                                        <th class="d-none d-md-table-cell">Volume</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stock in sell_suggestions %}
                                         <tr>
-                                            <th>Stock</th>
-                                            <th>Close</th>
-                                            <th>Change %</th>
-                                            <th>Volume</th>
-                                            <th>Score</th>
+                                            <td style="white-space:nowrap;">
+                                                <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+                                            </td>
+                                            <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
+                                            <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('change_percent') }}</td>
+                                            <td class="d-none d-md-table-cell">{{ stock.volume | format_number }}</td>
+                                            <td>{{ stock.potential_score | format_number('score') }}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for stock in sell_suggestions %}
-                                            <tr>
-                                                <td style="white-space:nowrap;">
-    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
-        <i class="fas fa-copy"></i>
-    </button>
-    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
-</td>
-                                                <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
-                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('percentage') }}%</td>
-                                                <td>{{ stock.volume | format_number }}</td>
-                                                <td>{{ stock.potential_score | format_number('score') }}</td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            {% else %}
-                                <p class="text-muted">No sell suggestions available.</p>
-                            {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="alert alert-warning">No sell suggestions available.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
                         </div>
                     </div>
                 </div>
