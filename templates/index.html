@@ -1870,22 +1870,34 @@ if (niftyModal) {
                 <div class="user-menu-avatar-container">
                     <!-- Avatar border indicates status -->
                     <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
-    <!-- Status dot above avatar -->
-    <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
-    <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
-        {% if user_data and user_data.account.profile.photo_url and user_data.account.profile.photo_url|trim %}
-            <img src="{{ user_data.account.profile.photo_url }}" alt="Profile" class="user-avatar-img">
-        {% else %}
-            {% set is_premium = user_data and user_data.account.profile.premium == 'yes' %}
-            {% set default_image = 'default_premium.png' if is_premium else 'default_free.png' %}
-            <img src="{{ url_for('static', filename='user_photos/' ~ default_image) }}" 
-                 alt="{{ 'Premium' if is_premium else 'Free' }} User" 
-                 class="user-avatar-img"
-                 data-fallback-src="{{ url_for('static', filename='user_photos/default_free.png') }}"
-            >
-        {% endif %}
-    </button>
-</span>
+                        <!-- Status dot above avatar -->
+                        <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
+                        <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
+                            {% if user_data and user_data.account.profile.photo_url %}
+                                {% set photo_url = user_data.account.profile.photo_url %}
+                                {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
+                                {% if not is_default %}
+                                    <!-- Custom user photo -->
+                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'">
+                                {% else %}
+                                    <!-- Default photo based on premium status -->
+                                    {% set is_premium = user_data.account.profile.premium == 'yes' %}
+                                    {% set default_img = 'default_premium.png' if is_premium else 'default_free.png' %}
+                                    <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
+                                         alt="{{ 'Premium' if is_premium else 'Free' }} User" 
+                                         class="user-avatar-img"
+                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'"
+                                    >
+                                {% endif %}
+                            {% else %}
+                                <!-- Fallback to default free image if no photo_url is set -->
+                                <img src="{{ url_for('static', filename='user_photos/default_free.png') }}" 
+                                     alt="User" 
+                                     class="user-avatar-img"
+                                >
+                            {% endif %}
+                        </button>
+                    </span>
                 </div>
                 <!-- Dropdown menu -->
                 <div id="userDropdown">

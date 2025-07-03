@@ -228,17 +228,37 @@ def make_session_permanent():
 
 def get_user_data(user_id):
     """
-    Fetch user data from the database by user ID.
+    Fetch user data from the database by user ID and ensure proper structure.
     
     Args:
         user_id: The ID of the user to fetch data for
         
     Returns:
-        dict: User data if found, None otherwise
+        dict: User data with default values if not found
     """
+    # Default user data structure
+    default_user_data = {
+        'account': {
+            'profile': {
+                'name': '',
+                'email': '',
+                'phone': '',
+                'address': '',
+                'premium': 'no',  # Default to free user
+                'photo_url': url_for('static', filename='user_photos/default_free.png', _external=True),
+                'bio': '',
+                'dob': '',
+                'gender': 'Prefer not to say',
+                'theme': 'light'
+            },
+            'username': '',
+            'conditions': []
+        }
+    }
+    
     if not user_id:
-        print("❌ [get_user_data] No user_id provided")
-        return None
+        print("⚠️ [get_user_data] No user_id provided, returning default user data")
+        return default_user_data
         
     try:
         # Convert user_id to integer
@@ -246,14 +266,14 @@ def get_user_data(user_id):
             user_id_int = int(user_id)
             print(f"🔍 [get_user_data] Fetching data for user ID: {user_id_int} (type: {type(user_id_int)})")
         except (ValueError, TypeError) as e:
-            print(f"❌ [get_user_data] Invalid user_id format: {user_id} (type: {type(user_id)})")
-            return None
+            print(f"❌ [get_user_data] Invalid user_id format: {user_id} (type: {type(user_id)}), returning default user data")
+            return default_user_data
             
         # Get database cursor
         cur = db.get_cursor()
         if not cur:
-            print("❌ [get_user_data] Failed to get database cursor")
-            return None
+            print("❌ [get_user_data] Failed to get database cursor, returning default user data")
+            return default_user_data
             
         try:
             # Execute query to get user data
@@ -268,21 +288,39 @@ def get_user_data(user_id):
             
             # Check if we got a result and it has the user_data field
             if result and 'user_data' in result and result['user_data']:
+                user_data = result['user_data']
                 print(f"✅ [get_user_data] Successfully fetched data for user ID: {user_id_int}")
-                return result['user_data']
+                
+                # Ensure the user_data has the proper structure with default values
+                if 'account' not in user_data:
+                    user_data['account'] = default_user_data['account']
+                elif 'profile' not in user_data['account']:
+                    user_data['account']['profile'] = default_user_data['account']['profile']
+                
+                # Ensure photo_url exists and is properly set based on premium status
+                is_premium = user_data.get('account', {}).get('profile', {}).get('premium', 'no') == 'yes'
+                default_photo = 'default_premium.png' if is_premium else 'default_free.png'
+                
+                # Only set default photo if no custom photo is set
+                if not user_data.get('account', {}).get('profile', {}).get('photo_url'):
+                    user_data['account']['profile']['photo_url'] = url_for('static', 
+                                                                        filename=f'user_photos/{default_photo}', 
+                                                                        _external=True)
+                
+                return user_data
             else:
-                print(f"❌ [get_user_data] No data found for user ID: {user_id_int}")
-                return None
+                print(f"⚠️ [get_user_data] No data found for user ID: {user_id_int}, returning default user data")
+                return default_user_data
                 
         except Exception as query_error:
-            print(f"❌ [get_user_data] Database query failed: {query_error}")
+            print(f"❌ [get_user_data] Database query failed: {query_error}, returning default user data")
             traceback.print_exc()
-            return None
+            return default_user_data
             
     except Exception as e:
-        print(f"❌ [get_user_data] Unexpected error: {e}")
+        print(f"❌ [get_user_data] Unexpected error: {e}, returning default user data")
         traceback.print_exc()
-        return None
+        return default_user_data
 
 # Add get_user_data to template context
 @app.context_processor
@@ -2583,23 +2621,32 @@ def remove_photo():
         # Remove the photo data from the database
         update_query = """
             WITH updated AS (
-                SELECT id, user_data #- '{account,profile,photo_path}'::text[] as new_data
+                SELECT id, 
+                       user_data #- '{account,profile,photo_path}'::text[] 
+                               #- '{account,profile,photo_url}'::text[] as new_data
                 FROM users
                 WHERE id = %s
             )
             UPDATE users u
-            SET user_data = updated.new_data
+            SET user_data = updated.new_data,
+                updated_at = NOW()
             FROM updated
             WHERE u.id = updated.id
-            RETURNING u.id
+            RETURNING u.id, updated.new_data
         """
         
         cur.execute(update_query, (current_user.id,))
+        result = cur.fetchone()
         print(f'[DEBUG] DB update rowcount: {cur.rowcount}')
         
         if cur.rowcount > 0:
             if db.conn is not None:
                 db.conn.commit()
+            
+            # Update current_user's data to reflect the changes
+            if hasattr(current_user, '_user_data') and result and 'new_data' in result:
+                current_user._user_data = result['new_data']
+                
             flash('Profile picture removed successfully!', 'success')
             print('[DEBUG] DB commit successful')
         else:
@@ -4066,34 +4113,68 @@ def get_redis_client():
 # Initialize Redis client on startup
 redis_client = get_redis_client()
 
-# License duration in seconds (10 minutes)
-LICENSE_DURATION = 240  # 4 minutes in seconds
-LICENSE_CHECK_INTERVAL = 60  # Check every minute
+# License duration in seconds (2 minutes for testing later we will make 4 weeks)
+LICENSE_DURATION = 120  # 2 minutes in seconds
+LICENSE_CHECK_INTERVAL = 45  # Check every 45 seconds
 
 
 def _set_premium_expiry(user_id: int, seconds: int = 600):
-    """Set premium = 'yes' and premium_expires_at = now+seconds. Returns expiry epoch."""
+    """
+    Set premium = 'yes' and premium_expires_at = now+seconds.
+    Also updates the default image URL based on premium status.
+    Returns expiry epoch.
+    """
     expiry_epoch = int(time.time()) + seconds
     try:
         cur = db.get_cursor()
+        # First, get current user data to check if we need to update photo_url
         cur.execute(
             """
-            UPDATE users
-            SET user_data =
-                jsonb_set(
-                    jsonb_set(
-                        COALESCE(user_data, '{}'::jsonb),
-                        '{account,profile,premium}', '"yes"'::jsonb, true
-                    ),
-                    '{account,profile,premium_expires_at}', to_jsonb(%s::bigint), true
-                )
-            WHERE id = %s
-            RETURNING id
+            SELECT user_data FROM users WHERE id = %s
             """,
-            (expiry_epoch, user_id),
+            (user_id,)
         )
+        user_data = cur.fetchone()['user_data']
+        
+        # Check if user has a custom photo
+        has_custom_photo = False
+        if user_data and 'account' in user_data and 'profile' in user_data['account']:
+            profile = user_data['account']['profile']
+            has_custom_photo = bool(profile.get('photo_path') or profile.get('photo_url'))
+        
+        # Update user data with premium status and expiry
+        update_query = """
+            UPDATE users
+            SET user_data = jsonb_set(
+                jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,profile,premium}', '"yes"'::jsonb, true
+                ),
+                '{account,profile,premium_expires_at}', to_jsonb(%s::bigint), true
+            )
+        """
+        params = [expiry_epoch]
+        
+        # If user doesn't have a custom photo, set the default premium image
+        if not has_custom_photo:
+            update_query += """
+                , user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,profile,photo_url}', 
+                    to_jsonb(%s), 
+                    true
+                )
+            """
+            default_premium_img = url_for('static', filename='user_photos/default_premium.png', _external=True)
+            params.append(default_premium_img)
+        
+        update_query += " WHERE id = %s RETURNING id"
+        params.append(user_id)
+        
+        cur.execute(update_query, tuple(params))
         if db.conn is not None:
             db.conn.commit()
+            
     except Exception as e:
         logger.error(f"Failed to set premium expiry: {e}", exc_info=True)
         if db.conn is not None:
@@ -4103,11 +4184,12 @@ def _set_premium_expiry(user_id: int, seconds: int = 600):
 
 def update_user_premium_status(user_id: int, is_premium: bool):
     """
-    Update user's premium status in the database.
+    Update user's premium status in the database and handle default image URL.
     
     Args:
         user_id: The ID of the user to update
-        is_premium: Boolean indicating if the user should have premium access
+        is_premium: Boolean indicating if the user should have premium access.
+                   This will be converted to 'yes'/'no' string in the database.
         
     Returns:
         bool: True if update was successful, False otherwise
@@ -4128,19 +4210,53 @@ def update_user_premium_status(user_id: int, is_premium: bool):
             logger.error("Failed to get database cursor")
             return False
             
-        # Update the user's premium status in the database
+        # First, get current user data to check if we need to update photo_url
         cur.execute(
             """
+            SELECT user_data FROM users WHERE id = %s
+            """,
+            (user_id,)
+        )
+        user_data = cur.fetchone()['user_data']
+        
+        # Check if user has a custom photo
+        has_custom_photo = False
+        if user_data and 'account' in user_data and 'profile' in user_data['account']:
+            profile = user_data['account']['profile']
+            has_custom_photo = bool(profile.get('photo_path') or profile.get('photo_url'))
+        
+        # Prepare the base update query
+        update_query = """
             UPDATE users
             SET user_data = jsonb_set(
                 COALESCE(user_data, '{}'::jsonb),
                 '{account,profile,premium}', %s::jsonb, true
             )
-            WHERE id = %s
-            RETURNING id
-            """,
-            (status_json, user_id),
-        )
+        """
+        params = [status_json]
+        
+        # If user doesn't have a custom photo, update the default image based on premium status
+        if not has_custom_photo:
+            if is_premium:
+                default_img = url_for('static', filename='user_photos/default_premium.png', _external=True)
+            else:
+                default_img = url_for('static', filename='user_photos/default_free.png', _external=True)
+                
+            update_query += """
+                , user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,profile,photo_url}', 
+                    to_jsonb(%s), 
+                    true
+                )
+            """
+            params.append(default_img)
+        
+        # Add WHERE clause and execute
+        update_query += " WHERE id = %s RETURNING id"
+        params.append(user_id)
+        
+        cur.execute(update_query, tuple(params))
         
         # Check if the update was successful
         updated = cur.rowcount > 0
@@ -4151,12 +4267,17 @@ def update_user_premium_status(user_id: int, is_premium: bool):
             logger.info(f"Successfully updated premium status for user {user_id} to '{status}'")
             
             # Update Redis cache if available
-            if redis_client and is_premium:
+            if redis_client:
                 try:
-                    # Set a temporary Redis key that will expire with the license
                     redis_key = f'premium:{user_id}'
-                    redis_client.setex(redis_key, LICENSE_DURATION, '1')
-                    logger.info(f"Updated Redis cache for user {user_id}")
+                    if is_premium:
+                        # Set a temporary Redis key that will expire with the license
+                        redis_client.setex(redis_key, LICENSE_DURATION, '1')
+                        logger.info(f"Updated Redis cache for user {user_id}")
+                    else:
+                        # Remove the key if premium is being revoked
+                        redis_client.delete(redis_key)
+                        logger.info(f"Removed premium Redis key for user {user_id}")
                 except Exception as redis_error:
                     logger.error(f"Error updating Redis cache: {redis_error}")
         else:
