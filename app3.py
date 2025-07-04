@@ -170,12 +170,6 @@ class AppTemporarilyUnavailable(HTTPException):
 
 from bs4 import BeautifulSoup as bs
 import pandas as pd
-try:
-    import pygame
-    PYGAME_AVAILABLE = True
-except ImportError:
-    PYGAME_AVAILABLE = False
-    print("⚠️ pygame module not available (audio features will be disabled)")
 import requests
 import psycopg2
 import psycopg2.extras as pg_extras
@@ -577,12 +571,15 @@ def save_user(username, password, email=''):
             }
         }
         
-        # Insert new user with password_hash
+        # Update user_data to include the hashed password
+        user_data['account']['password'] = hashed_password
+        
+        # Insert new user with all data in user_data JSONB
         cur.execute("""
-            INSERT INTO users (username, password_hash, user_data)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (username, user_data)
+            VALUES (%s, %s)
             RETURNING id
-        """, (username, hashed_password, json.dumps(user_data)))
+        """, (username, json.dumps(user_data)))
         
         result = cur.fetchone()
         if result:
@@ -2381,17 +2378,85 @@ def logout():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    print("\n" + "="*80)
+    print("REGISTRATION PROCESS STARTED")
+    print("="*80)
+    
     if current_user.is_authenticated:
+        print("User already authenticated, redirecting to index")
         return redirect(url_for('index'))
     
     error = None
+    
+    # Debug: Check database schema and existing users
+    try:
+        print("\n[DEBUG] Checking database schema...")
+        cur = db.get_cursor()
+        
+        # 1. Check table structure
+        cur.execute("""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'users'
+        """)
+        print("\n=== Database Schema ===")
+        columns = cur.fetchall()
+        for col in columns:
+            print(f"Column: {col[0]}, Type: {col[1]}")
+        print("====================\n")
+        
+        # 2. Check for any triggers that might modify the table
+        cur.execute("""
+            SELECT trigger_name, event_manipulation, action_statement 
+            FROM information_schema.triggers 
+            WHERE event_object_table = 'users'
+        """)
+        print("\n=== Database Triggers ===")
+        triggers = cur.fetchall()
+        if triggers:
+            for trigger in triggers:
+                print(f"Trigger: {trigger[0]}, Event: {trigger[1]}")
+                print(f"Action: {trigger[2][:200]}...")
+        else:
+            print("No triggers found on users table")
+        print("====================\n")
+        
+        # Print existing users (first 5)
+        print("\n[DEBUG] Checking existing users...")
+        cur.execute("""
+            SELECT username, jsonb_pretty(user_data) as user_data 
+            FROM users 
+            LIMIT 5
+        """)
+        print("\n=== Existing Users ===")
+        for user in cur.fetchall():
+            print(f"Username: {user[0]}")
+            print(f"User Data: {user[1]}\n")
+        print("===================\n")
+        
+    except Exception as e:
+        print(f"[ERROR] Error checking schema: {e}")
+        print(traceback.format_exc())
+    
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        email = request.form.get('email', '')
-        name = request.form.get('name', username)
-        phone = request.form.get('phone', '')
-        address = request.form.get('address', '')
+        print("\n[DEBUG] Processing POST request...")
+        try:
+            email = request.form.get('email', '').strip().lower()
+            password = request.form.get('password')
+            name = request.form.get('name', email.split('@')[0])  # Use part before @ as default name
+            phone = request.form.get('phone', '')
+            address = request.form.get('address', '')
+            
+            print(f"[DEBUG] Form data - Email: {email}, Name: {name}, Phone: {phone}")
+            print(f"[DEBUG] Password provided: {'Yes' if password else 'No'}")
+            
+            # Debug: Print all form keys
+            print("[DEBUG] Form keys:", list(request.form.keys()))
+            
+        except Exception as e:
+            print(f"[ERROR] Error processing form data: {e}")
+            print(traceback.format_exc())
+            error = 'Error processing form data. Please try again.'
         
         # New profile fields
         premium = "no"  # Default to "no" for new users
@@ -2412,17 +2477,18 @@ def register():
         misc9 = []
         misc10 = []
         
-        if not username or not password:
-            error = 'Username and password are required'
+        if not email or not password:
+            error = 'Email and password are required'
+        elif not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+            error = 'Please enter a valid email address'
         else:
-            # Create user data structure
+            # Create user data structure with email as username
             user_data = {
                 'account': {
-                    'username': username,
-                    'password': password,
-                    'email': email,
+                    'username': email,  # Store email as username
+                    'email': email,     # Also store in email field for backward compatibility
                     'profile': {
-                        'name': name or username,
+                        'name': name or email.split('@')[0],  # Use part before @ as name if not provided
                         'phone': phone,
                         'address': address,
                         'premium': premium,
@@ -2449,7 +2515,7 @@ def register():
             conn = db.conn
             cur = None
             try:
-                # Start a new transaction
+                print("\n[DEBUG] Attempting to connect to database...")
                 conn = psycopg2.connect(
                     dbname="pitk",
                     user="pitk_user",
@@ -2457,17 +2523,33 @@ def register():
                     host="dpg-d1efmamuk2gs73allkt0-a.singapore-postgres.render.com",
                     port="5432"
                 )
+                print("[DEBUG] Database connection successful")
                 conn.autocommit = False
                 cur = conn.cursor()
+                print("[DEBUG] Database cursor created")
                 
-                # Check if username already exists
-                cur.execute("""
+                # Check if email already exists by querying the user_data JSONB
+                print("\n[DEBUG] Checking if email exists in database...")
+                check_email_query = """
                     SELECT id FROM users 
-                    WHERE user_data->'account'->>'username' = %s
-                """, (username,))
+                    WHERE user_data->'account'->>'email' = %s 
+                    OR user_data->'account'->>'username' = %s
+                """
+                print(f"[DEBUG] Executing query: {check_email_query}")
+                print(f"[DEBUG] With params: ({email}, {email})")
                 
-                if cur.fetchone():
-                    error = 'Username already exists'
+                try:
+                    cur.execute(check_email_query, (email, email))
+                    existing_user = cur.fetchone()
+                    if existing_user:
+                        print(f"[DEBUG] User with email/username {email} already exists")
+                        error = 'This email is already registered'
+                    else:
+                        print("[DEBUG] Email is available for registration")
+                except Exception as e:
+                    print(f"[ERROR] Error checking email existence: {e}")
+                    print(traceback.format_exc())
+                    error = 'Error checking user existence'
                 else:
                     # Hash the password before storing
                     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -2475,25 +2557,74 @@ def register():
                     # Update user_data with hashed password
                     user_data['account']['password'] = hashed_password
                     
-                    # Insert new user into PostgreSQL with hashed password
-                    cur.execute("""
-                        INSERT INTO users (username, password_hash, user_data)
-                        VALUES (%s, %s, %s)
-                        RETURNING id
-                    """, (username, hashed_password, json.dumps(user_data)))
-                    
-                    result = cur.fetchone()
-                    if result:
-                        user_id = result[0]
-                        conn.commit()
+                    try:
+                        print("\n=== Attempting to create user ===")
+                        print(f"Email: {email}")
+                        print(f"Username (same as email): {email}")
                         
-                        # Log the user in with the hashed password
-                        user = User(id=str(user_id), username=username, password=hashed_password, email=email)
-                        login_user(user)
-                        return redirect(url_for('index'))
-                    else:
-                        print("❌ Failed to get user ID after insert")
+                        # Ensure all required fields are in user_data
+                        user_data = {
+                            'account': {
+                                'username': email,
+                                'email': email,
+                                'password': hashed_password,
+                                'profile': {
+                                    'name': name or email.split('@')[0],
+                                    'email': email,
+                                    'phone': phone or '',
+                                    'address': address or '',
+                                    'premium': 'no',
+                                    'photo_url': url_for('static', filename='user_photos/default_free.png', _external=True),
+                                    'bio': '',
+                                    'dob': '',
+                                    'gender': 'Prefer not to say',
+                                    'theme': 'light'
+                                },
+                                'conditions': []
+                            }
+                        }
+                        
+                        user_data_json = json.dumps(user_data)
+                        print(f"User data to be inserted: {user_data_json[:200]}...")  # Print first 200 chars
+                        
+                        # Insert new user into PostgreSQL
+                        insert_query = """
+                            INSERT INTO users (username, user_data)
+                            VALUES (%s, %s)
+                            RETURNING id
+                        """
+                        print(f"Executing query: {insert_query}")
+                        print(f"With params: ({email}, [user_data])")
+                        
+                        cur.execute(insert_query, (email, user_data_json))
+                        print("Query executed successfully")
+                        
+                        result = cur.fetchone()
+                        if result:
+                            user_id = result[0]
+                            print(f"User created successfully with ID: {user_id}")
+                            conn.commit()
+                            
+                            # Log the user in with the hashed password
+                            user = User(id=str(user_id), username=email, password=hashed_password, email=email)
+                            login_user(user)
+                            print("User logged in successfully")
+                            return redirect(url_for('index'))
+                        else:
+                            print("❌ Failed to get user ID after insert")
+                            error = 'Error creating user. Please try again.'
+                    except Exception as e:
+                        error_msg = f"Error during user creation: {str(e)}"
+                        print("\n" + "="*50)
+                        print("ERROR DETAILS:")
+                        print(error_msg)
+                        print("\nTRACEBACK:")
+                        print(traceback.format_exc())
+                        print("="*50 + "\n")
                         error = 'Error creating user. Please try again.'
+                        if 'conn' in locals() and conn is not None:
+                            print("Rolling back transaction...")
+                            conn.rollback()
                 
             except Exception as e:
                 if 'conn' in locals() and conn is not None:
