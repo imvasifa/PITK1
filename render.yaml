@@ -8,18 +8,49 @@ services:
       version: 3.10.13
     envVars:
     envVars:
+      # Python Configuration
       - key: PYTHONUNBUFFERED
         value: "true"
       - key: PYTHONIOENCODING
         value: "utf-8"
-      - key: FLASK_APP
-        value: app3.py
-      - key: FLASK_ENV
-        value: production
-      - key: PORT
-        value: "5000"
       - key: PYTHON_VERSION
         value: "3.10"
+
+      # Flask Configuration
+      - key: FLASK_APP
+        value: "app3.py"
+      - key: FLASK_ENV
+        value: "production"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PERMANENT_SESSION_LIFETIME
+        value: "3600"
+
+      # Server Configuration
+      - key: PORT
+        value: "5000"
+
+      # Database Configuration
+      - key: DATABASE_URL
+        sync: false  # This will be provided by Render's PostgreSQL add-on
+      - key: SQLALCHEMY_DATABASE_URI
+        fromDatabase:
+          name: pitk1-db  # This should match your database service name in Render
+          property: connectionString
+
+      # Optional: File Upload Configuration
+      - key: UPLOAD_FOLDER
+        value: "/var/www/uploads"
+      - key: MAX_CONTENT_LENGTH
+        value: "16777216"  # 16MB max upload size
+
+      # Security Settings
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      - key: SESSION_COOKIE_HTTPONLY
+        value: "True"
+      - key: SESSION_COOKIE_SAMESITE
+        value: "Lax"
     plan: free
     numInstances: 1
     healthCheckPath: /
