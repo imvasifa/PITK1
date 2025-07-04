@@ -7,7 +7,6 @@ services:
     python:
       version: 3.10.13
     envVars:
-    envVars:
       # Python Configuration
       - key: PYTHONUNBUFFERED
         value: "true"
