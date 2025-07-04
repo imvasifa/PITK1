@@ -2,6 +2,7 @@
 setuptools<81
 wheel
 python-dotenv>=1.0.0
+gunicorn>=21.2.0
 
 # Web Framework
 flask==3.0.0
