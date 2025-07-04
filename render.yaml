@@ -1,12 +1,12 @@
 services:
   - type: web
     name: pitk1
-    env: docker
-    dockerContext: .
-    dockerfile: Dockerfile
-    dockerCommand: |
-      docker build --build-arg PYTHON_VERSION=3.10 -t pitk1 .
-      docker run -p 10000:5000 -e PORT=5000 pitk1
+    env: python
+    buildCommand: chmod +x ./build.sh && ./build.sh
+    startCommand: gunicorn app3:app
+    python:
+      version: 3.10.13
+    envVars:
     envVars:
       - key: PYTHONUNBUFFERED
         value: "true"
