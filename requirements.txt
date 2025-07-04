@@ -7,8 +7,8 @@ gunicorn==21.2.0
 uvicorn==0.22.0
 
 # Core packages with version pins
-pandas==1.5.3
-numpy==1.24.3
+pandas>=2.0.0,<2.1.0
+numpy>=1.24.0,<2.0.0
 
 # Web Framework
 flask==2.3.3
