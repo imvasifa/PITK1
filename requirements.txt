@@ -1,6 +1,7 @@
 # Core Dependencies
 setuptools>=65.5.1
 wheel
+build
 python-dotenv>=1.0.0
 gunicorn==21.2.0
 uvicorn==0.22.0
