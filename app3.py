@@ -170,7 +170,12 @@ class AppTemporarilyUnavailable(HTTPException):
 
 from bs4 import BeautifulSoup as bs
 import pandas as pd
-import pygame
+try:
+    import pygame
+    PYGAME_AVAILABLE = True
+except ImportError:
+    PYGAME_AVAILABLE = False
+    print("⚠️ pygame module not available (audio features will be disabled)")
 import requests
 import psycopg2
 import psycopg2.extras as pg_extras
