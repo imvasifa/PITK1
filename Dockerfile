@@ -1,6 +1,9 @@
 # Use Python 3.10 slim image for better compatibility with lxml
 FROM python:3.10-slim
 
+# Verify Python version immediately
+RUN python --version && python -c "import sys; print(f'Python version: {sys.version}')"
+
 # Set working directory
 WORKDIR /app
 
