@@ -677,6 +677,7 @@ admin_conditions = [
     },
     {
     "name": "AN Kumar NIFTY500 ✅",
+    "type": "admin",
     "link": "https://chartink.com/screener/ank-1073",
     "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
     "scan_clause": """( {57960} ( 
@@ -844,11 +845,12 @@ admin_conditions = [
     },
     {
         "name": "HARSH SELL STOCKS",
+        "type": "admin",
         "link": "https://chartink.com/screener/harsh-sell-8",
         "scan_clause": """( {57960} ( [=1] 10 minute open > [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < -2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
     },
     {
-    "name": "VOLUME SHOCKER ✅",
+    "name": "VOLUME SHOCKER ",
     "type": "admin",
     "link": "https://chartink.com/screener/p45789",
     "chart_link": "https://chartink.com/stocks-new?symbol=",
@@ -875,7 +877,7 @@ admin_conditions = [
     ) )"""
     },
     {
-        "name": "85 VOLUME SHOCK ✅",
+        "name": "85 VOLUME SHOCK ",
         "type": "admin",
         "link": "https://chartink.com/screener/copy-volume-rahim",
         "chart_link": "https://chartink.com/stocks-new?symbol=",
@@ -900,6 +902,7 @@ admin_conditions = [
     },
     {
         "name": "EMA 11 CHANU",
+        "type": "admin",
         "link": "https://chartink.com/screener/ema-22-271",
         "scan_clause": """( {57960} ( [0] 15 minute ema ( [0] 15 minute close , 11 ) > [0] 15 minute ema ( [0] 15 minute close , 22 ) and [ -1 ] 15 minute ema ( [0] 15 minute close , 11 )<= [ -1 ] 15 minute ema ( [0] 15 minute close , 22 ) and latest adx ( 14 ) >= 20 ) ) """
     },
@@ -918,6 +921,7 @@ admin_conditions = [
     },
     {
         "name": "30min Volume Spike",
+        "type": "admin",
         "link": "https://chartink.com/screener/30min-volume-spike",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:99b7045b2e7fc79cc51b0d0ae46e7fac&timeframe=30_minute&symbol=",
         "scan_clause": """( {cash} ( 
@@ -925,7 +929,7 @@ admin_conditions = [
         ) )"""
     },
     {
-    "name": "Rahim Volume Surge 🔍",
+    "name": "Rahim Volume Surge ",
     "type": "admin",
     "link": "https://chartink.com/screener/rahim-ds-80",
     "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:279b7c20292d4250387c8dbfa32ac199&timeframe=5_minute&symbol=",
@@ -977,7 +981,8 @@ admin_conditions = [
         ) )"""
     },
     {
-        "name": "Only Cash ✅",
+        "name": "Only Cash ",
+    "type": "admin",
         "link": "https://chartink.com/screener/vijay-thakkar-27107",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
         "scan_clause": """( {cash} ( 
@@ -1000,6 +1005,7 @@ admin_conditions = [
     },
     {
     "name": "MAGIC FILTER RAHIM",
+    "type": "admin",
     "link": "https://chartink.com/screener/che-68",
     "scan_clause": """({57960}([0] 5 minute close > [0] 5 minute vwap and [0] 5 minute close > [-1] 5 minute vwap and [0] 5 minute close > [-2] 5 minute vwap and [0] 5 minute close > [0] 5 minute supertrend(10,1) and [0] 5 minute close > [-1] 5 minute supertrend(10,1) and [0] 5 minute close > [-2] 5 minute supertrend(10,1) and [0] 5 minute ema([0] 5 minute close,9) > [0] 5 minute supertrend(10,1) and [0] 5 minute close > 20 and [0] 5 minute close <= 2250 and latest close > latest open * 1.02))"""
     },
@@ -1016,6 +1022,7 @@ admin_conditions = [
     },
     {
         "name": "RA Inventor BUY",
+        "type": "admin",
         "link": "https://chartink.com/screener/ra-score",
         "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:24679f454fd1690bb64e19ac0d079642&timeframe=30_minute&symbol=", 
         "scan_clause": """( {57960} ( \
@@ -3029,17 +3036,41 @@ def update_settings():
 
 @app.route('/conditions')
 def get_conditions():
-    # Combine built-in and user conditions
-    all_conditions = admin_conditions.copy()
-    
-    # Add user conditions
     try:
+        # Get admin conditions and ensure type is set to 'admin'
+        admin_conditions_with_type = []
+        for idx, condition in enumerate(admin_conditions, 1):
+            if not isinstance(condition, dict):
+                print(f"Warning: Admin condition at index {idx-1} is not a dictionary: {condition}")
+                continue
+                
+            # Create a deep copy to avoid modifying the original
+            condition_copy = dict(condition)
+            
+            # Ensure name exists and is a string
+            if 'name' not in condition_copy or not isinstance(condition_copy['name'], str):
+                print(f"Warning: Admin condition at index {idx-1} is missing or has invalid name: {condition}")
+                continue
+                
+            # Force type to be 'admin' for all admin conditions
+            condition_copy['type'] = 'admin'
+            admin_conditions_with_type.append(condition_copy)
+            
+        # Get user conditions
         user_conditions = load_user_conditions()
-        all_conditions.extend(user_conditions)
+        
+        # Debug: Log counts
+        print(f"Admin conditions: {len(admin_conditions_with_type)}")
+        print(f"User conditions: {len(user_conditions)}")
+        
+        # Combine both lists
+        all_conditions = admin_conditions_with_type + user_conditions
+        return jsonify(all_conditions)
     except Exception as e:
-        logger.error(f"Error loading user conditions: {e}")
-    
-    return jsonify(all_conditions)
+        print(f"Error in get_conditions: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([])
 
 @app.route('/api/validate-licence', methods=['POST'])
 @login_required

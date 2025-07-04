@@ -1032,6 +1032,25 @@
             cursor: pointer;
         }
         
+        /* Make conditions list scrollable */
+        #admin-conditions-list {
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        
+        /* Ensure list items are properly spaced */
+        #admin-conditions-list .list-group-item {
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Style the checkboxes */
+        #admin-conditions-list .form-check-input {
+            margin-right: 0.5rem;
+        }
+        
         .form-check-label {
             cursor: pointer;
             display: flex;
@@ -2254,6 +2273,7 @@ if (niftyModal) {
             container.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
             try {
+                console.log('Fetching settings and conditions...');
                 const [settingsRes, conditionsRes] = await Promise.all([
                     fetch('/get-settings'),
                     fetch('/conditions')
@@ -2261,25 +2281,61 @@ if (niftyModal) {
                 
                 const settings = await settingsRes.json();
                 const conditions = await conditionsRes.json();
-                const selectedConditions = settings.conditions || [];
+                const selectedConditions = (settings.conditions || []).map(c => c.trim());
 
                 container.innerHTML = '';
-                conditions.forEach(condition => {
-                    // We only want to show admin conditions here
-                    if (condition.type === 'admin') {
-                        const isChecked = selectedConditions.includes(condition.name);
-                        const conditionEl = document.createElement('label');
-                        conditionEl.className = 'list-group-item';
-                        conditionEl.innerHTML = `
-                            <input class="form-check-input me-1" type="checkbox" value="${condition.name}" ${isChecked ? 'checked' : ''}>
-                            ${condition.name}
-                        `;
-                        container.appendChild(conditionEl);
-                    }
+                
+                // Debug: Log all conditions and settings
+                console.log('All conditions from API:', conditions);
+                console.log('Selected conditions from settings:', selectedConditions);
+                
+                let addedCount = 0;
+                let skippedCount = 0;
+                
+                // First, get all admin conditions (both with type 'admin' and those without type)
+                const adminConditions = conditions.filter(condition => 
+                    condition && condition.name && (!condition.type || condition.type === 'admin')
+                );
+
+                // Log all admin conditions we found
+                console.log('Admin conditions found:', adminConditions.map(c => c.name));
+
+                // Now process only the admin conditions
+                adminConditions.forEach(condition => {
+                    const conditionName = String(condition.name).trim();
+                    const isChecked = selectedConditions.some(selected => 
+                        selected && selected.trim() === conditionName
+                    );
+                    
+                    // Create the condition element
+                    const conditionEl = document.createElement('label');
+                    conditionEl.className = 'list-group-item';
+                    conditionEl.innerHTML = `
+                        <input class="form-check-input me-1" type="checkbox" 
+                               value="${conditionName.replace(/"/g, '&quot;')}" 
+                               ${isChecked ? 'checked' : ''}>
+                        ${conditionName}
+                    `;
+                    container.appendChild(conditionEl);
+                    
+                    addedCount++;
+                    console.log(`[${addedCount}] Added condition: "${conditionName}" (Type: ${condition.type || 'none'}, Checked: ${isChecked})`);
+                
+                // Log any skipped conditions for debugging
+                const nonAdminConditions = conditions.filter(condition => 
+                    condition && condition.name && condition.type && condition.type !== 'admin'
+                );
+                
+                skippedCount = nonAdminConditions.length;
+                nonAdminConditions.forEach(condition => {
+                    console.log(`[Skipped] Not an admin condition: "${condition.name}" (Type: ${condition.type})`);
                 });
+                });
+                
+                console.log(`Conditions processed: ${addedCount} added, ${skippedCount} skipped`);
             } catch (error) {
                 console.error('Error populating admin conditions:', error);
-                container.innerHTML = '<div class="alert alert-danger">Failed to load conditions.</div>';
+                container.innerHTML = '<div class="alert alert-danger">Failed to load conditions. Check console for details.</div>';
             }
         }
 
