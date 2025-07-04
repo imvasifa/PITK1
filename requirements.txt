@@ -1,14 +1,13 @@
 # Core Dependencies
---only-binary=:all:
-setuptools<81
+setuptools>=65.5.1
 wheel
 python-dotenv>=1.0.0
 gunicorn==21.2.0
 uvicorn==0.22.0
 
 # Core packages with version pins
-pandas>=2.0.0,<2.1.0
-numpy>=1.24.0,<2.0.0
+pandas==2.0.3
+numpy==1.24.4
 
 # Web Framework
 flask==2.3.3
