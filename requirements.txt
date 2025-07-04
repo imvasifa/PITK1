@@ -7,13 +7,13 @@ gunicorn==21.2.0
 uvicorn==0.22.0
 
 # Core packages with version pins
-pandas==2.0.3
-numpy==1.24.4
+pandas==2.2.3
+numpy==1.26.4
 
 # Web Framework
 flask==2.3.3
 flask-cors==4.0.0
-flask-login==0.6.2
+flask-login==0.6.3
 flask-bcrypt==1.0.1
 flask-wtf==1.2.1
 
