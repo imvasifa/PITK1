@@ -37,8 +37,8 @@ portalocker==2.8.2
 python-dateutil==2.8.2
 pytz==2023.3
 
-# Audio
-pygame==2.5.2
+# Audio (not needed for production, moved to requirements-dev.txt)
+# pygame==2.5.2
 
 # Form Handling
 wtforms==3.0.1
