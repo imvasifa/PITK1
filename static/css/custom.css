@@ -51,6 +51,27 @@
   overflow-y: auto;
 }
 
+/* Style for 'No stocks found' message */
+/* Light Theme */
+.alert-warning {
+    background: linear-gradient(135deg, #fff3cd, #ffe69c);
+    color: #856404 !important;
+    border: 1px solid #ffeeba;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+/* Dark Theme */
+.dark-theme .alert-warning {
+    background: linear-gradient(135deg, #ffe69c, #ffd43b);
+    color: #000000 !important;
+    border: 1px solid #ffd43b;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
 /* Profile picture as a circle */
 .profile-pic {
     width: 100px;

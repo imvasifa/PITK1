@@ -1875,6 +1875,22 @@ if (niftyModal) {
             <script>
                 // Handle image loading errors
                 document.addEventListener('DOMContentLoaded', function() {
+                    // Initialize tooltips
+                    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                        return new bootstrap.Tooltip(tooltipTriggerEl);
+                    });
+
+                    // Add event listener for user conditions tab
+                    const userConditionsTab = document.getElementById('user-conditions-tab');
+                    if (userConditionsTab) {
+                        // Use shown.bs.tab to ensure the tab content is visible
+                        userConditionsTab.addEventListener('shown.bs.tab', function () {
+                            console.log('User conditions tab shown');
+                            populateUserConditions();
+                        });
+                    }
+
                     document.querySelectorAll('img[data-fallback-src]').forEach(function(img) {
                         img.addEventListener('error', function() {
                             const fallbackSrc = this.getAttribute('data-fallback-src');
@@ -1897,7 +1913,7 @@ if (niftyModal) {
                                 {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
                                 {% if not is_default %}
                                     <!-- Custom user photo -->
-                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'">
+                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';">
                                 {% else %}
                                     <!-- Default photo based on premium status -->
                                     {% set is_premium = user_data.account.profile.premium == 'yes' %}
@@ -1905,7 +1921,7 @@ if (niftyModal) {
                                     <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
                                          alt="{{ 'Premium' if is_premium else 'Free' }} User" 
                                          class="user-avatar-img"
-                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}'"
+                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';"
                                     >
                                 {% endif %}
                             {% else %}
@@ -2126,7 +2142,10 @@ if (niftyModal) {
                                 </table>
                                 {% endif %}
                             {% else %}
-                                <div class="alert alert-warning">No stocks found for this scan.</div>
+                                <div class="text-center py-2">
+                                    <i class="fas fa-search mb-1 text-muted"></i>
+                                    <p class="small mb-0 text-muted">No stocks found for this scan</p>
+                                </div>
                             {% endif %}
                         </div>
                     </div>
@@ -2400,70 +2419,125 @@ if (niftyModal) {
         }
 
         // Function to populate user conditions in the UI
-async function populateUserConditions() {
-    const container = document.getElementById('user-conditions-management');
-    if (!container) return;
-    
-    try {
-        // Show loading spinner
-        container.innerHTML = `
-            <div class="d-flex justify-content-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>`;
-        
-        // Fetch user conditions from the server
-        const response = await fetch('/api/user-conditions');
-        if (!response.ok) {
-            throw new Error('Failed to fetch conditions');
-        }
-        
-        const conditions = await response.json();
-        
-        if (conditions.length === 0) {
-            container.innerHTML = `
-                <div class="alert alert-info mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
-                    You haven't created any custom conditions yet.
-                </div>`;
-            return;
-        }
-        
-        // Create the conditions list using the new card layout
-        let html = '';
-        
-        conditions.forEach(condition => {
-            const displayName = condition.name || 'Unnamed Condition';
-            const displayClause = condition.scan_clause || 'No scan clause';
-            const fullText = `${displayName}: ${displayClause}`;
+        async function populateUserConditions() {
+            console.log('populateUserConditions called');
+            const container = document.getElementById('user-conditions-list-container');
+            if (!container) {
+                console.error('Could not find user conditions container');
+                return;
+            }
+            console.log('Found container:', container);
             
-            html += `
-                <div class="custom-condition-item" title="${fullText.replace(/"/g, '&quot;')}">
-                    <div class="custom-condition-text">
-                        <div class="condition-name">
-                            ${displayName}
+            try {
+                // Show loading spinner
+                container.innerHTML = `
+                    <div class="d-flex justify-content-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
                         </div>
-                        <div class="condition-formula">
-                            ${displayClause}
+                    </div>`;
+                
+                // Fetch user conditions and settings
+                const [conditionsRes, settingsRes] = await Promise.all([
+                    fetch('/api/user-conditions'),
+                    fetch('/get-settings')
+                ]);
+                
+                if (!conditionsRes.ok || !settingsRes.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+                
+                const conditions = await conditionsRes.json();
+                const settings = await settingsRes.json();
+                const selectedConditions = (settings.conditions || []).map(c => c.trim());
+                
+                if (conditions.length === 0) {
+                    container.innerHTML = `
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You haven't created any custom conditions yet.
+                        </div>`;
+                    return;
+                }
+                
+                // Create the conditions list with checkboxes
+                let html = `
+                    <form id="user-conditions-form" class="mb-3">
+                        <div class="list-group">`;
+                
+                conditions.forEach(condition => {
+                    const displayName = condition.name || 'Unnamed Condition';
+                    const displayClause = condition.scan_clause || 'No scan clause';
+                    const isChecked = selectedConditions.includes(displayName.trim());
+                    
+                    html += `
+                        <label class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <input class="form-check-input me-2" type="checkbox" 
+                                       name="user_condition" 
+                                       value="${displayName.replace(/"/g, '&quot;')}"
+                                       ${isChecked ? 'checked' : ''}>
+                                <div>
+                                    <div class="fw-bold">${displayName}</div>
+                                    <small class="text-muted">${displayClause}</small>
+                                </div>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" 
+                                        onclick="editUserCondition('${condition.id}')"
+                                        title="Edit condition">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" 
+                                        onclick="deleteUserCondition('${condition.id}')"
+                                        title="Delete condition">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </label>`;
+                });
+                
+                html += `
                         </div>
-                    </div>
-                    <div class="custom-condition-actions">
-                        <button class="btn btn-sm btn-primary" 
-                                onclick="editUserCondition('${condition.id}')"
-                                title="Edit condition">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-danger" 
-                                onclick="deleteUserCondition('${condition.id}')"
-                                title="Delete condition">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>`;
-        });
-        
-        container.innerHTML = html;
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Save Selections
+                            </button>
+                        </div>
+                    </form>`;
+                
+                container.innerHTML = html;
+                
+                // Add form submission handler
+                const form = document.getElementById('user-conditions-form');
+                if (form) {
+                    form.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        const checkboxes = form.querySelectorAll('input[type="checkbox"]:checked');
+                        const selectedConditions = Array.from(checkboxes).map(cb => cb.value);
+                        
+                        try {
+                            const response = await fetch('/update-settings', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    conditions: selectedConditions
+                                })
+                            });
+                            
+                            if (!response.ok) throw new Error('Failed to save settings');
+                            
+                            showToast('Settings saved successfully', 'success');
+                            // Refresh the page to apply changes
+                            setTimeout(() => window.location.reload(), 1000);
+                        } catch (error) {
+                            console.error('Error saving settings:', error);
+                            showToast('Failed to save settings', 'error');
+                        }
+                    });
+                }
         
     } catch (error) {
         console.error('Error loading user conditions:', error);

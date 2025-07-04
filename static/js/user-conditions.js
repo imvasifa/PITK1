@@ -217,9 +217,20 @@ async function populateUserConditions() {
             return;
         }
         
+        // Create a form for saving selections
+        const form = document.createElement('form');
+        form.id = 'user-conditions-form';
+        
+        // Add a save button at the top
+        const saveButton = document.createElement('button');
+        saveButton.type = 'submit';
+        saveButton.className = 'btn btn-primary mb-3';
+        saveButton.innerHTML = '<i class="fas fa-save me-1"></i> Save Selections';
+        form.appendChild(saveButton);
+        
         // Create a list group for the conditions
         const listGroup = document.createElement('div');
-        listGroup.className = 'list-group list-group-flush';
+        listGroup.className = 'list-group list-group-flush mb-3';
         
         // Add each condition to the list
         conditions.forEach(condition => {
@@ -230,12 +241,29 @@ async function populateUserConditions() {
             
             // Create condition item
             const conditionItem = document.createElement('div');
-            conditionItem.className = 'list-group-item d-flex justify-content-between align-items-center py-3';
+            conditionItem.className = 'list-group-item d-flex justify-content-between align-items-center py-2';
             conditionItem.setAttribute('data-condition-id', conditionId);
+            
+            // Create checkbox
+            const checkboxDiv = document.createElement('div');
+            checkboxDiv.className = 'form-check me-2';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input condition-checkbox me-2';
+            checkbox.id = `condition-${conditionId}`;
+            checkbox.checked = true; // Default to checked
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.htmlFor = `condition-${conditionId}`;
+            
+            checkboxDiv.appendChild(checkbox);
+            checkboxDiv.appendChild(label);
             
             // Create condition content
             const conditionContent = document.createElement('div');
-            conditionContent.className = 'flex-grow-1';
+            conditionContent.className = 'flex-grow-1 ms-2';
             
             const nameElement = document.createElement('h6');
             nameElement.className = 'mb-1';
@@ -282,6 +310,7 @@ async function populateUserConditions() {
             buttonGroup.appendChild(deleteButton);
             
             // Add elements to condition item
+            conditionItem.appendChild(checkboxDiv);
             conditionItem.appendChild(conditionContent);
             conditionItem.appendChild(buttonGroup);
             
@@ -289,8 +318,9 @@ async function populateUserConditions() {
             listGroup.appendChild(conditionItem);
         });
         
-        // Add list group to container
-        container.appendChild(listGroup);
+        // Add list group and form to container
+        form.appendChild(listGroup);
+        container.appendChild(form);
     } catch (error) {
         console.error('Error loading user conditions:', error);
         container.innerHTML = `
@@ -980,6 +1010,56 @@ function initializeUserConditions() {
         });
         userConditionsModal.dataset.listenerAdded = 'true';
     }
+}
+
+// Handle form submission for saving user conditions
+const userConditionsForm = document.getElementById('user-conditions-form');
+if (userConditionsForm) {
+    userConditionsForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Get all checked checkboxes
+        const checkboxes = document.querySelectorAll('.condition-checkbox');
+        const selectedConditions = [];
+        
+        checkboxes.forEach(checkbox => {
+            const conditionId = checkbox.id.replace('condition-', '');
+            if (checkbox.checked) {
+                selectedConditions.push(conditionId);
+            }
+        });
+        
+        try {
+            const response = await fetch('/update-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    conditions: selectedConditions,
+                    condition_type: 'user' // To distinguish from admin conditions
+                })
+            });
+            
+            if (response.ok) {
+                showToast('Conditions saved successfully', 'success');
+                // Close the modal after a short delay
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('userConditionsModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    // Refresh the dashboard to apply changes
+                    if (typeof updateDashboard === 'function') {
+                        updateDashboard();
+                    }
+                }, 1000);
+            } else {
+                throw new Error('Failed to save conditions');
+            }
+        } catch (error) {
+            console.error('Error saving conditions:', error);
+            showToast('Failed to save conditions', 'error');
+        }
+    });
 }
 
 // Initialize when DOM is ready
