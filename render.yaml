@@ -5,7 +5,7 @@ services:
     dockerContext: .
     dockerfile: Dockerfile
     dockerCommand: |
-      docker build -t pitk1 .
+      docker build --build-arg PYTHON_VERSION=3.10 -t pitk1 .
       docker run -p 10000:5000 -e PORT=5000 pitk1
     envVars:
       - key: PYTHONUNBUFFERED

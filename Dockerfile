@@ -1,5 +1,6 @@
-# Use Python 3.10 slim image for better compatibility with lxml
-FROM python:3.10-slim
+# Use Python version from build argument
+ARG PYTHON_VERSION=3.10
+FROM python:${PYTHON_VERSION}-slim
 
 # Verify Python version immediately
 RUN python --version && python -c "import sys; print(f'Python version: {sys.version}')"
