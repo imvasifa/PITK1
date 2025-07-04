@@ -17,7 +17,12 @@ import threading
 import time
 import traceback
 import uuid
-import winsound
+try:
+    import winsound
+    WINSOUND_AVAILABLE = True
+except ImportError:
+    WINSOUND_AVAILABLE = False
+    print("⚠️ winsound module not available (expected on non-Windows systems)")
 import redis
 from werkzeug.exceptions import HTTPException
 
