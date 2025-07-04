@@ -1,14 +1,14 @@
 # Core Dependencies
+--only-binary=:all:
 setuptools<81
 wheel
 python-dotenv>=1.0.0
 gunicorn>=21.2.0
 uvicorn>=0.22.0
 
-# Prefer binary distributions for these packages
-pandas==2.1.4; python_version < '3.10' and sys_platform != 'win32'
-pandas==2.1.4; python_version >= '3.10' and sys_platform != 'win32' and platform_machine != 'aarch64'
-pandas==2.1.4; python_version >= '3.10' and sys_platform != 'win32' and platform_machine == 'aarch64'
+# Core packages with version pins
+pandas==2.1.4
+numpy>=1.24.0,<2.0.0
 
 # Web Framework
 flask==3.0.0
@@ -19,11 +19,9 @@ flask-wtf>=1.2.1
 
 # Database
 psycopg2-binary==2.9.9
-python-dotenv==1.0.0
 redis==6.2.0
 
 # Data Processing
-pandas==2.1.4
 beautifulsoup4==4.12.2
 lxml==4.9.3
 requests==2.31.0
