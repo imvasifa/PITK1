@@ -9,6 +9,7 @@ uvicorn==0.22.0
 # Core packages with version pins
 pandas==2.2.3
 numpy==1.26.4
+lxml==4.9.3  # Explicitly set lxml version for Python 3.10 compatibility
 
 # Web Framework
 flask==2.3.3

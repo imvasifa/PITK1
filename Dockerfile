@@ -9,6 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=app3.py
 
+# Verify Python version
+RUN python --version && \
+    python -c "import sys; assert sys.version_info >= (3, 10) and sys.version_info < (3, 11), 'Python version must be 3.10'"
+
 # Install system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
