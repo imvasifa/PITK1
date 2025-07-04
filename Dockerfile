@@ -1,5 +1,5 @@
-# Use Python 3.12 slim image
-FROM python:3.12-slim
+# Use Python 3.10 slim image for better compatibility with lxml
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
