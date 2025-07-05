@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background Circle -->
+    <circle cx="100" cy="100" r="90" fill="#2c3e50"/>
+    
+    <!-- Stock Chart Line -->
+    <path d="M40,140 L80,100 L120,120 L160,60" stroke="#3498db" stroke-width="8" fill="none"/>
+    
+    <!-- PITK Text -->
+    <text x="100" y="110" font-family="Arial" font-size="48" font-weight="bold" fill="white" text-anchor="middle">PITK</text>
+</svg>

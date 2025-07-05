@@ -1,0 +1,3656 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Scanner - Dashboard{% endblock %}
+
+{% block extra_css %}
+    <style>
+        /* Responsive spacing below navbar for index only */
+        .index-main-container {
+    padding-top: 32px; /* default for large screens */
+}
+@media (max-width: 699.98px) {
+    .index-main-container {
+        padding-top: 10px;
+    }
+}
+@media (min-width: 700px) and (max-width: 1399.98px) {
+    .index-main-container {
+        padding-top: 80px;
+    }
+}
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Light Theme Color Scheme */
+        :root {
+            --primary-dark: #1a237e;
+            --primary-light: #534bae;
+            --secondary-dark: #303f9f;
+            --accent-color: #00bcd4;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+            --info-color: #2196f3;
+            --background-dark: #121212;
+            --card-dark: #1e1e1e;
+            --text-light: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --border-dark: #333333;
+
+            /* Light theme specific variables */
+            --background-light: #f4f4f4;
+            --text-dark: #333;
+            --card-light: #ffffff;
+            --card-header-light: #f8f9fa;
+            --border-light: #e0e0e0;
+        }
+
+        /* Light Theme Styles */
+        body {
+            background-color: var(--background-light);
+            color: var(--text-dark);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container-fluid,
+        .container {
+            background-color: transparent;
+        }
+
+        .col-12.scan-card {
+            background-color: transparent !important;
+            border: none !important;
+        }
+
+        .scan-card .card {
+            background-color: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        /* User Conditions Styling */
+        /* Unified navbar round button effect */
+        .navbar-round-btn {
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .navbar-round-btn:hover, .navbar-round-btn:focus {
+            transform: scale(1.13);
+            box-shadow: 0 0 0 0.2rem rgba(61,139,253,0.25);
+            z-index: 1;
+            filter: brightness(0.94);
+        }
+        .navbar-round-btn i {
+            color: #fff;
+        }
+        /* Remove redundant admin button rules */
+        .condition-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 12px 15px;
+            border-bottom: 1px solid #444;
+            background-color: #1e1e1e;
+            color: #fff;
+            transition: all 0.2s ease;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            border-left: 3px solid #0d6efd;
+        }
+
+        .condition-row:hover {
+            background-color: #2a2a2a;
+            transform: translateX(2px);
+        }
+
+        .condition-content {
+            flex-grow: 1;
+            overflow: hidden;
+            padding-right: 15px;
+        }
+
+        .condition-name {
+            font-weight: 600;
+            color: #e0e0e0;
+            margin-bottom: 4px;
+            font-size: 0.95rem;
+        }
+
+        .condition-formula {
+            color: #aaa;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .condition-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        /* Custom condition item styles */
+        .custom-condition-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            background-color: #fff;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            position: relative;
+            min-height: 60px;
+        }
+
+        .custom-condition-text {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            padding-right: 80px; /* Space for buttons */
+        }
+
+        .custom-condition-text .condition-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .custom-condition-text .condition-formula {
+            color: #666;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+        }
+
+        .custom-condition-actions {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        
+        .custom-condition-actions .btn {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .custom-condition-actions .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        
+        .custom-condition-actions .btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        
+        .custom-condition-actions .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Dark theme styles */
+        body.dark-theme .custom-condition-item {
+            background-color: #2c2c2c;
+            border-color: #444;
+            color: #e0e0e0;
+        }
+        
+        body.dark-theme .custom-condition-actions .btn {
+            background-color: #6c5ce7;
+            color: white;
+        }
+
+        body.dark-theme .custom-condition-text {
+            color: #e0e0e0;
+        }
+
+        /* Modal body styles */
+        .modal-body {
+            max-width: 100%;
+            overflow-x: hidden;
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        #user-conditions-list-container {
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .condition-actions .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            border-radius: 4px;
+        }
+
+        .chart-link {
+            font-size: 0.75rem;
+            color: #6ea8fe !important;
+            text-decoration: none !important;
+            display: inline-flex;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .chart-link:hover {
+            text-decoration: underline !important;
+            color: #3d8bfd !important;
+        }
+
+        .chart-link i {
+            margin-right: 4px;
+            font-size: 0.7rem;
+        }
+
+        /* Empty state styling */
+        .empty-state {
+            padding: 20px;
+            text-align: center;
+            color: #aaa;
+            background-color: #1e1e1e;
+            border-radius: 4px;
+            border: 1px dashed #444;
+        }
+
+        .scan-card .card-header {
+            background-color: #f8f9fa !important;
+            border-bottom: 1px solid #e0e0e0 !important;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            padding: 1rem 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            color: var(--text-light) !important;
+            font-size: 1.5rem;
+            text-decoration: none;
+            cursor: default;
+        }
+
+        .navbar-brand img {
+            margin-right: 10px;
+            height: 40px;
+        }
+
+        .table {
+            background-color: var(--card-light) !important;
+            color: var(--text-dark) !important;
+        }
+
+        .table thead {
+            background-color: var(--card-header-light) !important;
+            color: var(--text-dark) !important;
+        }
+
+        .table tbody tr {
+            background-color: var(--card-light) !important;
+            color: var(--text-dark) !important;
+        }
+
+        .table tbody tr:nth-child(even) {
+            background-color: #f2f2f2 !important;
+        }
+
+        /* Light Theme Scan Card Table Hover Styles */
+        .scan-card .table-hover tbody tr:hover {
+            background-color: rgba(33, 150, 243, 0.1) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        .scan-card .table-hover tbody tr:hover td {
+            color: #2196f3 !important;
+        }
+
+        /* Dark Theme Scan Card Table Hover Styles */
+        .dark-theme .scan-card .table-hover tbody tr:hover {
+            background-color: rgba(33, 150, 243, 0.2) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        .dark-theme .scan-card .table-hover tbody tr:hover td {
+            color: #64b5f6 !important;
+        }
+
+        /* Dark Theme Styles */
+        body.dark-theme {
+            background-color: var(--background-dark) !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .container-fluid,
+        .dark-theme .container {
+            background-color: transparent;
+        }
+
+        .dark-theme .col-12.scan-card {
+            background-color: transparent !important;
+            border: none !important;
+        }
+
+        .dark-theme .scan-card .card {
+            background-color: #1e1e1e !important;
+            border: 1px solid #333 !important;
+        }
+
+        .dark-theme .scan-card .card-header {
+            background-color: #2a2a2a !important;
+            border-bottom: 1px solid #444 !important;
+        }
+
+        .dark-theme .navbar {
+            background-color: var(--card-dark) !important;
+            border-bottom: 1px solid var(--border-dark) !important;
+        }
+
+        .dark-theme .navbar-brand {
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table {
+            background-color: var(--card-dark) !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table thead {
+            background-color: #2a2a2a !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table tbody tr {
+            background-color: var(--card-dark) !important;
+            color: var(--text-light) !important;
+            border-color: var(--border-dark) !important;
+        }
+
+        .dark-theme .table tbody tr:nth-child(even) {
+            background-color: #252525 !important;
+        }
+
+        /* User avatar status dot */
+        .user-status-dot {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 3;
+            box-shadow: 0 0 2px rgba(34, 34, 34, 0.2);
+            display: block;
+        }
+        .user-status-dot-premium {
+            background-color: #19d142;
+        }
+        .user-status-dot-free {
+            background-color: #28a745;
+        }
+        
+        /* Theme toggle button */
+        .theme-toggle-btn {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            color: var(--accent-color);
+        }
+
+        .navbar-buttons {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            color: var(--text-light) !important;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .navbar-brand img {
+            margin-right: 10px;
+            height: 40px;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.2));
+        }
+
+        .refresh-btn {
+    background: linear-gradient(45deg, #00c853, #64dd17);
+    color: var(--text-light);
+    border: none;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.3rem;
+}
+
+        .conditions-btn {
+            background: linear-gradient(45deg, #ff6d00, #ffd740);
+            color: var(--text-light);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .settings-btn {
+    background: linear-gradient(45deg, #2979ff, #00b0ff);
+    color: var(--text-light);
+    border: none;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.3rem;
+}
+
+        .refresh-btn:hover, .settings-btn:hover, .conditions-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+
+        .refresh-btn:hover, .settings-btn:hover {
+            transform: translateY(-2px) scale(1.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+
+        .refresh-btn:focus, .settings-btn:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
+        .refresh-btn i, .settings-btn i, .nifty-btn i {
+    margin: 0;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+        .scan-card {
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .scan-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        .card {
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            background-color: var(--card-dark);
+        }
+
+        .card:hover {
+            transform: scale(1.02);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            color: var(--primary-dark);
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--primary-light);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        /* Vibrant Gradient Card Headers */
+        .scan-card:nth-child(1) .card-header { 
+            background: linear-gradient(135deg, #8E24AA, #D81B60); 
+            color: white !important;
+        }
+        .scan-card:nth-child(2) .card-header { 
+            background: linear-gradient(135deg, #00695C, #009688); 
+            color: white !important;
+        }
+        .scan-card:nth-child(3) .card-header { 
+            background: linear-gradient(135deg, #D32F2F, #FF5722); 
+            color: white !important;
+        }
+        .scan-card:nth-child(4) .card-header { 
+            background: linear-gradient(135deg, #1976D2, #2196F3); 
+            color: white !important;
+        }
+        .scan-card:nth-child(5) .card-header { 
+            background: linear-gradient(135deg, #388E3C, #4CAF50); 
+            color: white !important;
+        }
+        .scan-card:nth-child(6) .card-header { 
+            background: linear-gradient(135deg, #00838F, #00BCD4); 
+            color: white !important;
+        }
+        .scan-card:nth-child(7) .card-header { 
+            background: linear-gradient(135deg, #C2185B, #E91E63); 
+            color: white !important;
+        }
+        .scan-card:nth-child(8) .card-header { 
+            background: linear-gradient(135deg, #FFA000, #FFC107); 
+            color: white !important;
+        }
+        .scan-card:nth-child(9) .card-header { 
+            background: linear-gradient(135deg, #2E7D32, #4CAF50); 
+            color: white !important;
+        }
+        .scan-card:nth-child(10) .card-header { 
+            background: linear-gradient(135deg, #1565C0, #2196F3); 
+            color: white !important;
+        }
+        .scan-card:nth-child(11) .card-header { 
+            background: linear-gradient(135deg, #00695C, #009688); 
+            color: white !important;
+        }
+        .scan-card:nth-child(12) .card-header { 
+            background: linear-gradient(135deg, #9C27B0, #E91E63); 
+            color: white !important;
+        }
+        .scan-card:nth-child(13) .card-header { 
+            background: linear-gradient(135deg, #512DA8, #7C4DFF); 
+            color: white !important;
+        }
+        .scan-card:nth-child(14) .card-header { 
+            background: linear-gradient(135deg, #5108fc, #7C4DFF); 
+            color: white !important;
+        }
+        .scan-card:nth-child(15) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+        .scan-card:nth-child(16) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+        .scan-card:nth-child(17) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+        .scan-card:nth-child(18) .card-header { 
+            background: linear-gradient(135deg, #0fced8, #55ca68); 
+            color: white !important;
+        }
+
+        /* Dark Theme Adjustments */
+        .dark-theme .scan-card:nth-child(1) .card-header { 
+            background: linear-gradient(135deg, #6A1B9A, #9C27B0); 
+        }
+        .dark-theme .scan-card:nth-child(2) .card-header { 
+            background: linear-gradient(135deg, #00534D, #00796B); 
+        }
+        .dark-theme .scan-card:nth-child(3) .card-header { 
+            background: linear-gradient(135deg, #B71C1C, #D32F2F); 
+        }
+        .dark-theme .scan-card:nth-child(4) .card-header { 
+            background: linear-gradient(135deg, #0D47A1, #1976D2); 
+        }
+        .dark-theme .scan-card:nth-child(5) .card-header { 
+            background: linear-gradient(135deg, #1B5E20, #2E7D32); 
+        }
+        .dark-theme .scan-card:nth-child(6) .card-header { 
+            background: linear-gradient(135deg, #006064, #00838F); 
+        }
+        .dark-theme .scan-card:nth-child(7) .card-header { 
+            background: linear-gradient(135deg, #880E4F, #AD1457); 
+        }
+        .dark-theme .scan-card:nth-child(8) .card-header { 
+            background: linear-gradient(135deg, #FF6F00, #FFA000); 
+        }
+        .dark-theme .scan-card:nth-child(9) .card-header { 
+            background: linear-gradient(135deg, #1B5E20, #2E7D32); 
+        }
+        .dark-theme .scan-card:nth-child(10) .card-header { 
+            background: linear-gradient(135deg, #0D47A1, #1976D2); 
+        }
+        .dark-theme .scan-card:nth-child(11) .card-header { 
+            background: linear-gradient(135deg, #00534D, #00796B); 
+        }
+        .dark-theme .scan-card:nth-child(12) .card-header { 
+            background: linear-gradient(135deg, #6A1B9A, #9C27B0); 
+        }
+        .dark-theme .scan-card:nth-child(13) .card-header { 
+            background: linear-gradient(135deg, #4527A0, #673AB7); 
+        }
+        .dark-theme .scan-card:nth-child(14) .card-header { 
+            background: linear-gradient(135deg, #673AB7, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(15) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(16) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(17) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+        .dark-theme .scan-card:nth-child(18) .card-header { 
+            background: linear-gradient(135deg, #3d069b, #D5006D);
+            color: white !important;
+        }
+
+
+        .card-header {
+            color: white;
+            border: none;
+            padding: 15px;
+            font-weight: 500;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .scan-card .card-header:hover {
+            transform: translateY(-1px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .scan-card .card-header {
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .scan-card {
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        .scan-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        .stock-table {
+            font-size: 0.9em;
+            margin: 0;
+            background: var(--card-dark);
+            color: var(--text-light);
+        }
+
+        .stock-table th {
+            background: var(--background-dark);
+            font-weight: 600;
+            color: var(--text-light);
+            padding: 1rem;
+            border-bottom: 2px solid var(--border-dark);
+        }
+
+        .stock-table td {
+            vertical-align: middle;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .table-responsive {
+            overflow: hidden;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .timestamp-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 0;
+            margin-bottom: 20px;
+        }
+        
+        .timestamp-container {
+            font-size: 0.95rem;
+            color: #6c757d;
+            padding: 8px 15px;
+            border-radius: 6px;
+            float: right;
+            margin-right: 15px;
+        }
+        
+        #lastUpdateTime {
+            color: #fff;
+        }
+
+        .last-update {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin: 1.5rem 0;
+            display: flex;
+            align-items: center;
+            background: var(--card-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .last-update i {
+            margin-right: 8px;
+            color: var(--accent-color);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .alert {
+            border-radius: 8px;
+            border: none;
+            padding: 1rem;
+            margin-bottom: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background: var(--card-dark);
+            color: var(--text-light);
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #0d47a1, #2196f3);
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #b71c1c, #f44336);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(5px);
+        }
+
+        .dark-theme .loading-overlay {
+            background-color: rgba(18, 18, 18, 0.9);
+        }
+
+        .loading-overlay img {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+        }
+
+        .loading-message {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #333;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .dark-theme .loading-message {
+            color: #e0e0e0;
+        }
+
+        /* Loading Text Animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .loading-message {
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 576px) {
+            .loading-overlay img {
+                width: 100px;
+                height: 100px;
+            }
+
+            .loading-message {
+                font-size: 1rem;
+            }
+        }
+
+        /* Preference Modal */
+        .preference-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preference-modal-content {
+            background: var(--card-dark);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            color: var(--text-light);
+        }
+
+        .preference-modal h3 {
+            color: var(--text-light);
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .preference-option {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--border-dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--background-dark);
+        }
+
+        .preference-option:hover {
+            border-color: var(--accent-color);
+            background: var(--card-dark);
+        }
+
+        .preference-option.selected {
+            border-color: var(--accent-color);
+            background: var(--primary-dark);
+        }
+
+        .preference-option i {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            color: var(--accent-color);
+        }
+
+        .preference-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .preference-btn {
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preference-btn-primary {
+            background: var(--accent-color);
+            color: var(--text-light);
+        }
+
+        .preference-btn-primary:hover {
+            background: #00acc1;
+            transform: translateY(-1px);
+        }
+
+        .preference-btn-secondary {
+            background: var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .preference-btn-secondary:hover {
+            background: #404040;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+            
+            .navbar-brand img {
+                height: 30px;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .stock-table th,
+            .stock-table td {
+                padding: 0.6rem;
+            }
+        }
+
+        .icon {
+            margin-left: 5px;
+        }
+        
+        .condition-checkbox {
+            width: 20px;
+            height: 20px;
+        }
+
+        .condition-link {
+            text-shadow: 1px 1px 8px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Settings Modal */
+        .settings-section {
+            background: var(--primary-dark);
+            padding: 1.5rem;
+            border-radius: 10px;
+        }
+        
+        .form-check-input {
+            cursor: pointer;
+        }
+        
+        /* Make conditions list scrollable */
+        #admin-conditions-list {
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        
+        /* Ensure list items are properly spaced */
+        #admin-conditions-list .list-group-item {
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Style the checkboxes */
+        #admin-conditions-list .form-check-input {
+            margin-right: 0.5rem;
+        }
+        
+        .form-check-label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .timestamp-container {
+            font-size: 0.9rem;
+            color: #6c757d;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 8px 15px;
+            border-radius: 6px;
+            float: right;
+            margin-right: 15px;
+        }
+        
+        #lastUpdateTime {
+            color: #fff;
+        }
+
+        .nifty-btn {
+    background: linear-gradient(45deg, #9c27b0, #e91e63);
+    color: var(--text-light);
+    border: none;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 1.3rem;
+}
+
+        .nifty-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+
+        .nifty-btn i {
+            margin-right: 8px;
+            font-size: 1.1em;
+        }
+
+        #niftyModal .table {
+            margin-bottom: 0;
+        }
+        #niftyModal .table th {
+            background-color: var(--primary-dark);
+            color: var(--text-light);
+            border-color: var(--border-dark);
+        }
+        #niftyModal .table td {
+            border-color: var(--border-dark);
+        }
+
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+        }
+
+        #niftyReloadBtn {
+            transition: transform 0.3s ease;
+        }
+
+        #niftyReloadBtn:hover {
+            transform: rotate(180deg);
+        }
+
+        #niftyLastUpdatedTime {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        
+        /* Last Update Styles */
+        .last-update {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .last-update .far.fa-clock {
+            margin-right: 0.5rem;
+            color: var(--accent-color);
+        }
+
+        .dark-theme .last-update {
+            color: var(--text-light);
+            opacity: 0.8;
+        }
+
+        .dark-theme .last-update .far.fa-clock {
+            color: var(--accent-color);
+        }
+
+        /* Dark theme styles */
+        body.dark-theme {
+            background-color: #121212 !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .navbar {
+            background-color: #1f1f1f !important;
+            border-bottom: 1px solid #333 !important;
+        }
+        
+        body.dark-theme .card {
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border: 1px solid #333 !important;
+        }
+        
+        body.dark-theme .table {
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .modal-content {
+            background-color: #2c2c2c !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .form-control {
+            background-color: #333 !important;
+            color: #e0e0e0 !important;
+            border-color: #555 !important;
+        }
+        
+        /* Theme toggle button styles */
+        .theme-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-color, inherit);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        
+        .theme-toggle-btn:hover {
+            color: var(--accent-color, #00bcd4);
+        }
+
+        /* Custom styles for the app */
+        /* Stock symbol styling - enhanced for all browsers */
+        .stock-symbol, td a, table td a, .table td a {
+            color: #00bcd4 !important; /* Bright cyan color for stock symbols */
+            font-weight: 500;
+            text-decoration: none !important;
+        }
+        
+        /* Ensure stock symbols maintain color after clicking - with higher specificity */
+        .stock-symbol:visited, .stock-symbol:active, .stock-symbol:focus, .stock-symbol:hover,
+        td a:visited, td a:active, td a:focus, td a:hover,
+        table td a:visited, table td a:active, table td a:focus, table td a:hover,
+        .table td a:visited, .table td a:active, .table td a:focus, .table td a:hover {
+            color: #00bcd4 !important;
+            text-decoration: none !important;
+            opacity: 1 !important;
+        }
+        
+        /* Fix for Brave browser specific issues with checkboxes */
+        @supports (-webkit-appearance: none) and (not (overflow: -webkit-marquee)) and (not (-ms-ime-align:auto)) {
+            .form-check-input {
+                pointer-events: auto !important;
+                opacity: 1 !important;
+                position: static !important;
+            }
+        }
+
+        /* Dark theme global styles */
+        body.dark-theme {
+            background-color: #121212 !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* Navbar */
+        body.dark-theme .navbar {
+            background-color: #1f1f1f !important;
+            border-bottom: 1px solid #333 !important;
+        }
+
+        body.dark-theme .navbar-brand {
+            color: #e0e0e0 !important;
+        }
+
+        /* Cards */
+        body.dark-theme .card {
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border: 1px solid #333 !important;
+        }
+
+        body.dark-theme .card-header {
+            background-color: #2a2a2a !important;
+            color: #e0e0e0 !important;
+            border-bottom: 1px solid #444 !important;
+        }
+
+        /* Tables */
+        body.dark-theme .table {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .table-dark {
+            background-color: #1e1e1e !important;
+        }
+
+        body.dark-theme .table thead {
+            background-color: #2a2a2a !important;
+            color: var(--text-light) !important;
+        }
+
+        /* Modals */
+        body.dark-theme .modal-content {
+            background-color: #2c2c2c !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .modal-header {
+            border-bottom: 1px solid #444 !important;
+        }
+
+        body.dark-theme .modal-footer {
+            border-top: 1px solid #444 !important;
+        }
+
+        /* Form controls */
+        body.dark-theme .form-control {
+            background-color: #333 !important;
+            color: #e0e0e0 !important;
+            border-color: #555 !important;
+        }
+
+        body.dark-theme .form-control:focus {
+            background-color: #3a3a3a !important;
+            color: #e0e0e0 !important;
+            border-color: #666 !important;
+            box-shadow: 0 0 0 0.25rem rgba(100, 100, 100, 0.25) !important;
+        }
+
+        /* Buttons */
+        body.dark-theme .btn-primary {
+            background-color: #3f51b5 !important;
+            border-color: #3f51b5 !important;
+        }
+
+        body.dark-theme .btn-secondary {
+            background-color: #555 !important;
+            border-color: #666 !important;
+        }
+
+        /* Alerts */
+        body.dark-theme .alert {
+            background-color: #2a2a2a !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+
+        /* Theme toggle button */
+        body.dark-theme .theme-toggle-btn {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .theme-toggle-btn:hover {
+            color: #00bcd4 !important;
+        }
+
+        /* Scrollbar (for webkit browsers) */
+        body.dark-theme::-webkit-scrollbar {
+            width: 12px;
+            background-color: #1e1e1e !important;
+        }
+
+        body.dark-theme::-webkit-scrollbar-thumb {
+            background-color: #555 !important;
+            border-radius: 6px !important;
+        }
+
+        /* Light Theme Table Styles */
+        .table {
+            background-color: #ffffff !important;
+            color: #333 !important;
+        }
+
+        .table thead {
+            background-color: #f8f9fa !important;
+            color: #333 !important;
+        }
+
+        .table tbody tr {
+            background-color: #ffffff !important;
+            color: #333 !important;
+        }
+
+        .table tbody tr:nth-child(even) {
+            background-color: #f2f2f2 !important;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(0,0,0,0.075) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Dark Theme Table Styles */
+        .dark-theme .table {
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+        }
+
+        .dark-theme .table thead {
+            background-color: #2a2a2a !important;
+            color: var(--text-light) !important;
+        }
+
+        .dark-theme .table tbody tr {
+            color: #e0e0e0 !important;
+            border-color: #333 !important;
+        }
+
+        .dark-theme .table tbody tr:nth-child(even) {
+            background-color: #252525 !important;
+        }
+
+        .dark-theme .table-hover tbody tr:hover {
+            background-color: rgba(255,255,255,0.1) !important;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Ensure table styles work with existing theme */
+        .table {
+            --bs-table-bg: transparent;
+            --bs-table-accent-bg: transparent;
+            --bs-table-striped-bg: rgba(0, 0, 0, 0.05);
+            --bs-table-hover-bg: rgba(0, 0, 0, 0.075);
+        }
+
+        .dark-theme .table {
+            --bs-table-bg: transparent;
+            --bs-table-accent-bg: transparent;
+            --bs-table-striped-bg: rgba(255, 255, 255, 0.1);
+            --bs-table-hover-bg: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 768px) {
+            .container {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .scan-card {
+                margin-bottom: 15px;
+            }
+
+            .navbar {
+                padding: 10px 0;
+            }
+
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+
+            .table-responsive {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .container-fluid {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+
+            .scan-card .card-header {
+                padding: 10px;
+            }
+
+            .table-responsive {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Back to Top Button */
+        .back-to-top-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .back-to-top-btn.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, #5a0ebd 0%, #1a5afc 100%);
+        }
+
+        .dark-theme .back-to-top-btn {
+            background: linear-gradient(135deg, #2196f3, #00bcd4);
+        }
+
+        .dark-theme .back-to-top-btn:hover {
+            background: linear-gradient(135deg, #1976d2, #0097a7);
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 576px) {
+            .back-to-top-btn {
+                width: 40px;
+                height: 40px;
+                bottom: 15px;
+                right: 15px;
+            }
+
+            .back-to-top-btn i {
+                font-size: 1rem;
+            }
+        }
+        
+        .copy-icon {
+            cursor: pointer;
+            margin-left: 8px;
+            color: var(--text-muted);
+            transition: color 0.2s ease;
+        }
+        
+        .copy-icon:hover {
+            color: var(--accent-color);
+        }
+        
+        .dark-theme .copy-icon {
+            color: var(--text-light);
+        }
+        
+        .dark-theme .copy-icon:hover {
+            color: var(--accent-color);
+        }
+
+        /* ...existing styles... */
+        #autoRefreshLinearBarContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 6px;
+            z-index: 2001;
+            background: transparent;
+        }
+        #autoRefreshLinearBar {
+            height: 100%;
+            width: 0%;
+            background: #2196f3;
+            transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+            border-radius: 0 2px 2px 0;
+        }
+        .progress {
+            background-color: white;
+        }
+    </style>
+    <script>
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+<script>
+function showNiftyModal() {
+    const modalBody = document.getElementById('niftyModalBody');
+    const lastUpdated = document.getElementById('niftyLastUpdatedTime');
+    if (!modalBody) return;
+    modalBody.innerHTML = `<div class="d-flex flex-column align-items-center justify-content-center" style="min-height:120px;">
+        <div class="spinner-border text-info mb-2" role="status"><span class="visually-hidden">Loading...</span></div>
+        <div class="loading-message">Fetching latest Nifty indices...</div>
+    </div>`;
+    if (lastUpdated) lastUpdated.textContent = '';
+    fetch('/get_nifty_data')
+        .then(response => response.json())
+        .then(data => {
+            if (!data || Object.keys(data).length === 0) {
+                modalBody.innerHTML = '<div class="empty-state">No Nifty data available at this time.</div>';
+                if (lastUpdated) lastUpdated.textContent = '';
+                return;
+            }
+            let table = `<div class="table-responsive"><table class="table table-dark table-striped align-middle mb-0">
+                <thead><tr>
+                    <th>Index</th>
+                    <th>Last</th>
+                    <th>Open</th>
+                    <th>Change</th>
+                    <th>% Change</th>
+                </tr></thead><tbody>`;
+            for (const [index, values] of Object.entries(data)) {
+                const change = parseFloat(values.change);
+                const pChange = parseFloat(values.pChange);
+                const changeClass = change < 0 ? 'text-danger fw-bold' : 'text-success fw-bold';
+                const pChangeClass = pChange < 0 ? 'text-danger fw-bold' : 'text-success fw-bold';
+                table += `<tr>
+                    <td>${index}</td>
+                    <td>${values.last}</td>
+                    <td>${values.open}</td>
+                    <td class="${changeClass}">${values.change}</td>
+                    <td class="${pChangeClass}">${values.pChange}%</td>
+                </tr>`;
+            }
+            table += '</tbody></table></div>';
+            modalBody.innerHTML = table;
+            const now = new Date();
+            if (lastUpdated) lastUpdated.textContent = `Last updated: ${now.toLocaleString()}`;
+        })
+        .catch(err => {
+            modalBody.innerHTML = '<div class="empty-state">Failed to load Nifty data. Please try again later.</div>';
+            if (lastUpdated) lastUpdated.textContent = '';
+        });
+}
+const niftyModal = document.getElementById('niftyModal');
+if (niftyModal) {
+    niftyModal.addEventListener('show.bs.modal', showNiftyModal);
+}
+</script>
+{% endblock %}
+
+{% block content %}
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <img src="{{ url_for('static', filename='img/loader.svg') }}" alt="Loading..." class="mb-3" style="width: 50px; height: 50px;">
+            <p class="text-light">Loading...</p>
+        </div>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                <img src="{{ url_for('static', filename='img/pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+                <span class="d-none d-sm-inline">PRICE IS THE KING</span>
+            </a>
+            
+            <div class="d-flex align-items-center">
+                <!-- Theme Toggle Button -->
+                <button id="themeToggleBtn" class="btn btn-primary navbar-round-btn me-2" title="Toggle theme">
+                    <i id="themeIcon" class="fas fa-moon"></i>
+                </button>
+                
+                <!-- Mute/Unmute Button -->
+                <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn me-2" title="Toggle sound">
+                    <i id="muteIcon" class="fas fa-volume-up"></i>
+                </button>
+                
+                {% if current_user.is_authenticated %}
+                {% set user_data = get_user_data(current_user.id) %}
+                <!-- User Menu -->
+                <div class="dropdown">
+                    <button class="btn btn-primary navbar-round-btn dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if user_data and user_data.account.profile.photo_url %}
+                            <img src="{{ user_data.account.profile.photo_url }}" alt="Profile" class="rounded-circle" width="32" height="32">
+                        {% else %}
+                            <i class="fas fa-user"></i>
+                        {% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li><h6 class="dropdown-header">Welcome, {{ current_user.username }}</h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('main.profile') }}"><i class="fas fa-user me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('main.settings') }}"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <img src="{{ url_for('static', filename='loader.svg') }}" alt="Loading..." style="width: 150px; height: 150px;">
+        <div class="loading-message">
+            <h3><center>PRICE IS THE KING</center></h3>
+            <p><center>Fetching Latest Data...</center></p>
+        </div>
+    </div>
+
+    <!-- TradingView Preference Modal -->
+    <div class="preference-modal" id="preferenceModal" style="display: none;">
+        <div class="preference-modal-content">
+            <h3>Open TradingView Charts In</h3>
+            <div class="preference-option">
+                <input type="radio" id="browserOption" name="preference" value="browser" checked onclick="selectPreference(this)">
+                <label for="browserOption">
+                    <i class="fas fa-globe"></i>
+                    <div>
+                        <h5>Web Browser</h5>
+                        <small class="text-muted">Open charts in your default web browser</small>
+                    </div>
+                </label>
+            </div>
+            <div class="preference-option">
+                <input type="radio" id="appOption" name="preference" value="app" onclick="selectPreference(this)">
+                <label for="appOption">
+                    <i class="fas fa-desktop"></i>
+                    <div>
+                        <h5>Desktop App</h5>
+                        <small class="text-muted">Open charts in TradingView desktop application</small>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h6 class="mb-3">TradingView Launch Preference</h6>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="tradingViewPreference" id="appPreference" value="app">
+                            <label class="form-check-label" for="appPreference">
+                                <i class="fas fa-desktop me-2"></i>TradingView Desktop App
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tradingViewPreference" id="browserPreference" value="browser">
+                            <label class="form-check-label" for="browserPreference">
+                                <i class="fas fa-globe me-2"></i>Web Browser
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Nifty Indices Modal -->
+    <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="niftyModalLabel">
+                        <i class="fas fa-chart-line me-2"></i>Nifty Indices
+                    </h5>
+                    <div class="modal-header-actions">
+                        <button id="niftyReloadBtn" class="btn btn-outline-light me-2" title="Reload Data" onclick="showNiftyModal()">
+                            <i class="fas fa-rotate-right"></i>
+                        </button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body" id="niftyModalBody">
+                    <!-- Content will be dynamically loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <small class="text-muted" id="niftyLastUpdatedTime"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
+            <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+            <span>PRICE IS THE KING</span>
+        </a>
+
+        <span id="next-refresh" style="font-size: 0.9em; font-weight: 500;">
+            <i class="fas fa-clock" style="font-size: 0.9em; margin-left: 35px;"></i>
+            <span style="margin-left: 5px;">Next refresh in</span>
+            <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
+        </span>
+        <div class="navbar-buttons">
+
+            <!-- Dark Mode Toggle with Sun/Moon Icons -->
+            <div class="d-inline-block align-middle ms-3" id="themeToggleContainer">
+                <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
+    <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+</button>
+            </div>
+            <!-- Mute/Unmute Button with Theme Style -->
+            <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle sound">
+                <i id="muteIcon" class="fas fa-volume-up"></i>
+            </button>
+            
+            <!-- Refresh Button with Theme Style -->
+            <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
+                <i class="fas fa-rotate-right"></i>
+            </button>
+            <!-- Admin Conditions Button with Enhanced Style -->
+            <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
+                background: linear-gradient(135deg, #7b1fa2, #9c27b0);
+                border: none;
+                border-radius: 50%;
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                color: white;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-list-ul" title="Conditions"></i>
+            </button>
+
+
+            <!-- Nifty Button with Enhanced Style -->
+            <button class="btn navbar-round-btn" data-bs-toggle="modal" data-bs-target="#niftyModal" style="
+                background: linear-gradient(135deg, #e65100, #ff6d00);
+                border: none;
+                border-radius: 50%;
+                width: 48px;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                color: white;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-chart-bar" title="Nifty Indices"></i>
+            </button>
+
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const themeToggleBtn = document.getElementById('themeToggleBtn');
+                    const themeIcon = document.getElementById('themeToggleIcon');
+                    
+                    // Check for saved theme preference or use preferred color scheme
+                    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+                    const currentTheme = localStorage.getItem('theme');
+                    
+                    // Set theme based on saved preference or system preference
+                    if (currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches)) {
+                        document.body.classList.add('dark-theme');
+                        themeIcon.classList.remove('fa-moon');
+                        themeIcon.classList.add('fa-sun');
+                    }
+                    
+                    // Toggle theme on button click
+                    themeToggleBtn.addEventListener('click', function() {
+                        document.body.classList.toggle('dark-theme');
+                        
+                        // Toggle icon
+                        themeIcon.classList.toggle('fa-moon');
+                        themeIcon.classList.toggle('fa-sun');
+                        
+                        // Save theme preference
+                        const isDark = document.body.classList.contains('dark-theme');
+                        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                    });
+                    
+                    // Listen for system theme changes
+                    prefersDarkScheme.addListener((e) => {
+                        if (!localStorage.getItem('theme')) {  // Only auto-update if no manual preference set
+                            if (e.matches) {
+                                document.body.classList.add('dark-theme');
+                                themeIcon.classList.remove('fa-moon');
+                                themeIcon.classList.add('fa-sun');
+                            } else {
+                                document.body.classList.remove('dark-theme');
+                                themeIcon.classList.remove('fa-sun');
+                                themeIcon.classList.add('fa-moon');
+                            }
+                        }
+                    });
+                });
+            </script>
+                            {% if current_user.is_authenticated %}
+                {% set user_data = get_user_data(current_user.id) %}
+            <style>
+                .user-menu {
+                    display: inline-block;
+                    margin-left: 15px;
+                    position: relative;
+                }
+                .user-menu-avatar-container {
+                    position: relative;
+                    display: inline-block;
+                }
+                .user-status-indicator {
+                    position: absolute;
+                    top: -2px;
+                    right: -2px;
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    border: 2px solid white;
+                    z-index: 1;
+                }
+                .user-status-premium { background-color: #4CAF50; }
+                .user-status-free { background-color: #FF9800; }
+                #userMenuButton {
+                    background: #1a73e8;
+                    border: none;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    color: white;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    overflow: hidden;
+                    padding: 0;
+                    position: relative;
+                }
+                .user-avatar-img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    border-radius: 50%;
+                }
+                #userDropdown {
+                    display: none;
+                    position: absolute;
+                    right: 0;
+                    background: white;
+                    min-width: 200px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    border-radius: 8px;
+                    z-index: 1000;
+                    margin-top: 5px;
+                    overflow: hidden;
+                }
+            </style>
+            <script>
+                // Handle image loading errors
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Initialize tooltips
+                    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                        return new bootstrap.Tooltip(tooltipTriggerEl);
+                    });
+
+                    // Add event listener for user conditions tab
+                    const userConditionsTab = document.getElementById('user-conditions-tab');
+                    if (userConditionsTab) {
+                        // Use shown.bs.tab to ensure the tab content is visible
+                        userConditionsTab.addEventListener('shown.bs.tab', function () {
+                            console.log('User conditions tab shown');
+                            populateUserConditions();
+                        });
+                    }
+
+                    document.querySelectorAll('img[data-fallback-src]').forEach(function(img) {
+                        img.addEventListener('error', function() {
+                            const fallbackSrc = this.getAttribute('data-fallback-src');
+                            if (this.src !== fallbackSrc) {
+                                this.src = fallbackSrc;
+                            }
+                        });
+                    });
+                });
+            </script>
+            <div class="user-menu">
+                <div class="user-menu-avatar-container">
+                    <!-- Avatar border indicates status -->
+                    <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
+                        <!-- Status dot above avatar -->
+                        <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
+                        <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
+                            {% if user_data and user_data.account.profile.photo_url %}
+                                {% set photo_url = user_data.account.profile.photo_url %}
+                                {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
+                                {% if not is_default %}
+                                    <!-- Custom user photo -->
+                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';">
+                                {% else %}
+                                    <!-- Default photo based on premium status -->
+                                    {% set is_premium = user_data.account.profile.premium == 'yes' %}
+                                    {% set default_img = 'default_premium.png' if is_premium else 'default_free.png' %}
+                                    <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
+                                         alt="{{ 'Premium' if is_premium else 'Free' }} User" 
+                                         class="user-avatar-img"
+                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';"
+                                    >
+                                {% endif %}
+                            {% else %}
+                                <!-- Fallback to default free image if no photo_url is set -->
+                                <img src="{{ url_for('static', filename='user_photos/default_free.png') }}" 
+                                     alt="User" 
+                                     class="user-avatar-img"
+                                >
+                            {% endif %}
+                        </button>
+                    </span>
+                </div>
+                <!-- Dropdown menu -->
+                <div id="userDropdown">
+                    <!-- User info in dropdown (without image) -->
+                    <div style="padding: 12px 16px; border-bottom: 1px solid #e0e0e0;">
+                        <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">{{ current_user.username }}</div>
+                        {% if current_user.email %}
+                        <div style="font-size: 0.85em; color: #5f6368;">{{ current_user.email }}</div>
+                        {% endif %}
+                    </div>
+                    <!-- Menu items -->
+                    <a href="{{ url_for('dash') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #202124; text-decoration: none; transition: background 0.2s;">
+                        <i class="fas fa-tachometer-alt" style="width: 24px; text-align: center; margin-right: 8px; color: #5f6368;"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <div style="border-top: 1px solid #e0e0e0; margin: 8px 0;"></div>
+                    <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #d93025; text-decoration: none; transition: background 0.2s;">
+                        <i class="fas fa-sign-out-alt" style="width: 24px; text-align: center; margin-right: 8px;"></i>
+                        <span>Sign out</span>
+                    </a>
+                </div>
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const menuButton = document.getElementById('userMenuButton');
+                    const dropdown = document.getElementById('userDropdown');
+                    
+                    // Toggle dropdown on button click
+                    menuButton.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const isVisible = dropdown.style.display === 'block';
+                        dropdown.style.display = isVisible ? 'none' : 'block';
+                    });
+                    
+                    // Close dropdown when clicking outside
+                    document.addEventListener('click', function() {
+                        dropdown.style.display = 'none';
+                    });
+                    
+                    // Prevent dropdown from closing when clicking inside it
+                    dropdown.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                    });
+                });
+            </script>
+            {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Timestamp Section -->
+    <!-- (Removed as per user request) -->
+
+    <!-- Conditions Modal (Admin + User) -->
+    <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="conditionsModalLabel">Manage Conditions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="conditionsTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="admin-conditions-tab" data-bs-toggle="tab" data-bs-target="#admin-conditions" type="button" role="tab" aria-controls="admin-conditions" aria-selected="true">Admin Conditions</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="user-conditions-tab" data-bs-toggle="tab" data-bs-target="#user-conditions" type="button" role="tab" aria-controls="user-conditions" aria-selected="false">Your Conditions</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="conditionsTabContent">
+                        <div class="tab-pane fade show active" id="admin-conditions" role="tabpanel" aria-labelledby="admin-conditions-tab">
+                            <div class="mt-3">
+                                <h6>Select conditions to display on the dashboard:</h6>
+                                <form id="update-settings-form">
+                                    <div id="admin-conditions-list" class="list-group mt-2">
+                                        <!-- Admin conditions will be loaded here by JavaScript -->
+                                    </div>
+                                    <button type="submit" class="btn btn-primary mt-3">Save Selections</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="user-conditions" role="tabpanel" aria-labelledby="user-conditions-tab">
+                            <div class="mt-3">
+                                <h6>Add, edit, or remove your custom conditions.</h6>
+                                <div id="user-conditions-management">
+                                    <div id="user-conditions-list-view">
+                                        <button class="btn btn-success mb-3" id="show-add-condition-form-btn">
+                                            <i class="fas fa-plus"></i> Add New Condition
+                                        </button>
+                                        <div id="user-conditions-list-container" class="list-group"></div>
+                                    </div>
+                                    <div id="user-condition-form-view" style="display: none;">
+                                        <h5 id="user-condition-form-title">Add New Condition</h5>
+                                        <form id="user-condition-form">
+                                            <input type="hidden" id="edit-condition-id">
+                                            <div class="mb-3"><label for="user-condition-name" class="form-label">Condition Name</label><input type="text" class="form-control" id="user-condition-name" required></div>
+                                            <div class="mb-3"><label for="user-condition-link" class="form-label">Chartink Link (Optional)</label><input type="url" class="form-control" id="user-condition-link"></div>
+                                            <div class="mb-3"><label for="user-condition-clause" class="form-label">Scan Clause</label><textarea class="form-control" id="user-condition-clause" rows="8" required></textarea></div>
+                                            <button type="submit" class="btn btn-primary">Save Condition</button>
+                                            <button type="button" class="btn btn-secondary" id="cancel-edit-condition-btn">Cancel</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {% if category == 'success' %}
+                        <i class="fas fa-check-circle me-2"></i>
+                    {% elif category == 'danger' %}
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                    {% elif category == 'warning' %}
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                    {% else %}
+                        <i class="fas fa-info-circle me-2"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Stock Scanner</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="refresh-timer me-3">
+                                Next refresh in: <span id="countdown">--:--</span>
+                            </div>
+                            <button id="refreshBtn" class="btn btn-primary btn-sm">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh Now
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="scanResults">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading stock scanner...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        
+        <!-- Further reduced vertical spacing below navbar for a more compact layout -->
+        <div style="height: 8px;"></div>
+        
+        <div class="row" id="scanResults">
+            {% if conditions is defined and conditions %}
+                {% for condition in conditions %}
+                    <div class="col-12 scan-card">
+                    <div class="card">
+                        <div class="card-header {% if 'buy' in condition.name|lower %}bg-success text-white{% elif 'sell' in condition.name|lower %}bg-danger text-white{% else %}bg-primary text-white{% endif %}">
+                            <h5 class="card-title mb-0 d-flex align-items-center">
+                                <span style="color: white;">{{ condition.name if condition.name is defined else 'Unnamed Condition' }}</span>
+                                <a href="{{ condition.link }}" target="_blank" class="text-light ms-2" title="Open in Chartink">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if condition.stocks is defined and condition.stocks|length > 0 %}
+                                {% if condition.name == "Buy Suggestions" or condition.name == "Sell Suggestions" %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th>Change %</th>
+                                            <th>Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in condition.stocks %}
+                                            <tr>
+                                                <td style="white-space:nowrap;">
+    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+        <i class="fas fa-copy"></i>
+    </button>
+    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+</td>
+                                                <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
+                                                <td class="d-none d-md-table-cell">{{ stock.volume|format_number }}</td>
+                                                <td>{{ stock.potential_score|format_number('score') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% else %}
+                                <table class="table table-dark table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Stock</th>
+                                            <th>Close</th>
+                                            <th class="d-none d-md-table-cell">Chartink</th>
+                                            <th>Change %</th>
+                                            <th class="d-none d-md-table-cell">Volume</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stock in condition.stocks %}
+                                            <tr>
+                                                <td style="white-space:nowrap;">
+    <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+        <i class="fas fa-copy"></i>
+    </button>
+    <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+</td>
+                                                <td class="decimal-format">{{ stock.close|format_number('close') }}</td>
+                                                <td class="d-none d-md-table-cell">
+    <!-- Screener link (scan definition) -->
+    {% if condition.link %}
+    <a href="{{ condition.link }}" target="_blank" class="text-success me-2" title="Open Screener">
+    <span class="text-secondary" title="Chart link not available">
+        <i class="fas fa-chart-line"></i>
+    </span>
+    {% endif %}
+</td>
+                                                <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg|format_number('change_percent') }}</td>
+                                                <td class="d-none d-md-table-cell">{{ stock.volume|format_number }}</td>
+                                                <td>{{ stock.potential_score|format_number('score') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endif %}
+                            {% else %}
+                                <div class="text-center py-2">
+                                    <i class="fas fa-search mb-1 text-muted"></i>
+                                    <p class="small mb-0 text-muted">No stocks found for this scan</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <!-- Buy Suggestions -->
+        <div class="row">
+            <div class="col-12 scan-card">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0 d-flex align-items-center">
+                            <span style="color: white;">Buy Suggestions</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if buy_suggestions %}
+                            <table class="table table-dark table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Stock</th>
+                                        <th>Close</th>
+                                        <th>Change %</th>
+                                        <th class="d-none d-md-table-cell">Volume</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stock in buy_suggestions %}
+                                        <tr>
+                                            <td style="white-space:nowrap;">
+                                                <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+                                            </td>
+                                            <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
+                                            <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('change_percent') }}</td>
+                                            <td class="d-none d-md-table-cell">{{ stock.volume | format_number }}</td>
+                                            <td>{{ stock.potential_score | format_number('score') }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="alert alert-warning">No buy suggestions available.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sell Suggestions -->
+        <div class="row">
+            <div class="col-12 scan-card">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0 d-flex align-items-center">
+                            <span style="color: white;">Sell Suggestions</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if sell_suggestions %}
+                            <table class="table table-dark table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Stock</th>
+                                        <th>Close</th>
+                                        <th>Change %</th>
+                                        <th class="d-none d-md-table-cell">Volume</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stock in sell_suggestions %}
+                                        <tr>
+                                            <td style="white-space:nowrap;">
+                                                <button type="button" class="btn btn-link btn-sm copy-stock-btn" title="Copy Stock Name" data-stock="{{ stock.nsecode }}" style="padding:0 0.3em;vertical-align:middle;">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <a href="https://www.tradingview.com/chart?symbol={{ stock.nsecode }}" target="_blank">{{ stock.nsecode }}</a>
+                                            </td>
+                                            <td class="decimal-format">{{ stock.close | format_number('close') }}</td>
+                                            <td class="{% if stock.per_chg >= 0 %}text-success{% else %}text-danger{% endif %}">{{ stock.per_chg | format_number('change_percent') }}</td>
+                                            <td class="d-none d-md-table-cell">{{ stock.volume | format_number }}</td>
+                                            <td>{{ stock.potential_score | format_number('score') }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="alert alert-warning">No sell suggestions available.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="back-to-top-btn" onclick="scrollToTop()" title="Back to Top">
+        <i class="fas fa-arrow-up"></i>
+    </div>
+
+    <div id="filterModal" class="modal" tabindex="-1" role="dialog" style="display:none;">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Filter Stocks by Potential Score</h5>
+                    <button type="button" class="close" onclick="document.getElementById('filterModal').style.display='none';">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="number" id="scoreInput" placeholder="Enter potential score" />
+                </div>
+                <div class="modal-footer">
+                    <button id="applyFilter" class="btn btn-primary">Apply</button>
+                    <button id="cancelFilter" class="btn btn-secondary" onclick="document.getElementById('filterModal').style.display='none';">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="autoRefreshLinearBarContainer">
+        <div id="autoRefreshLinearBar"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script>
+        // Functions to manage the Conditions Modal
+        async function populateAdminConditions() {
+            const container = document.getElementById('admin-conditions-list');
+            container.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+            try {
+                console.log('Fetching settings and conditions...');
+                const [settingsRes, conditionsRes] = await Promise.all([
+                    fetch('/get-settings'),
+                    fetch('/conditions')
+                ]);
+                
+                const settings = await settingsRes.json();
+                const conditions = await conditionsRes.json();
+                const selectedConditions = (settings.conditions || []).map(c => c.trim());
+
+                container.innerHTML = '';
+                
+                // Debug: Log all conditions and settings
+                console.log('All conditions from API:', conditions);
+                console.log('Selected conditions from settings:', selectedConditions);
+                
+                let addedCount = 0;
+                let skippedCount = 0;
+                
+                // First, get all admin conditions (both with type 'admin' and those without type)
+                const adminConditions = conditions.filter(condition => 
+                    condition && condition.name && (!condition.type || condition.type === 'admin')
+                );
+
+                // Log all admin conditions we found
+                console.log('Admin conditions found:', adminConditions.map(c => c.name));
+
+                // Now process only the admin conditions
+                adminConditions.forEach(condition => {
+                    const conditionName = String(condition.name).trim();
+                    const isChecked = selectedConditions.some(selected => 
+                        selected && selected.trim() === conditionName
+                    );
+                    
+                    // Create the condition element
+                    const conditionEl = document.createElement('label');
+                    conditionEl.className = 'list-group-item';
+                    conditionEl.innerHTML = `
+                        <input class="form-check-input me-1" type="checkbox" 
+                               value="${conditionName.replace(/"/g, '&quot;')}" 
+                               ${isChecked ? 'checked' : ''}>
+                        ${conditionName}
+                    `;
+                    container.appendChild(conditionEl);
+                    
+                    addedCount++;
+                    console.log(`[${addedCount}] Added condition: "${conditionName}" (Type: ${condition.type || 'none'}, Checked: ${isChecked})`);
+                
+                // Log any skipped conditions for debugging
+                const nonAdminConditions = conditions.filter(condition => 
+                    condition && condition.name && condition.type && condition.type !== 'admin'
+                );
+                
+                skippedCount = nonAdminConditions.length;
+                nonAdminConditions.forEach(condition => {
+                    console.log(`[Skipped] Not an admin condition: "${condition.name}" (Type: ${condition.type})`);
+                });
+                });
+                
+                console.log(`Conditions processed: ${addedCount} added, ${skippedCount} skipped`);
+            } catch (error) {
+                console.error('Error populating admin conditions:', error);
+                container.innerHTML = '<div class="alert alert-danger">Failed to load conditions. Check console for details.</div>';
+            }
+        }
+
+        // Function to delete a user condition
+        async function deleteUserConditionInlineDeprecated(...args) { // deprecated, use global deleteUserCondition in main.js
+            if (!confirm('Are you sure you want to delete this condition? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/user-conditions/${conditionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Show success message
+                showToast('Condition deleted successfully', 'success');
+                
+                // Refresh the conditions list
+                await populateUserConditions();
+                
+            } catch (error) {
+                console.error('Error deleting condition:', error);
+                showToast('Failed to delete condition', 'error');
+            }
+        }
+
+        // Function to show toast notifications
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) return;
+            
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0 show`;
+            toast.role = 'alert';
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2"></i>
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Auto-remove the toast after 5 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        // Function to populate user conditions in the UI
+        async function populateUserConditions() {
+            console.log('populateUserConditions called');
+            const container = document.getElementById('user-conditions-list-container');
+            if (!container) {
+                console.error('Could not find user conditions container');
+                return;
+            }
+            console.log('Found container:', container);
+            
+            try {
+                // Show loading spinner
+                container.innerHTML = `
+                    <div class="d-flex justify-content-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>`;
+                
+                // Fetch user conditions and settings
+                const [conditionsRes, settingsRes] = await Promise.all([
+                    fetch('/api/user-conditions'),
+                    fetch('/get-settings')
+                ]);
+                
+                if (!conditionsRes.ok || !settingsRes.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+                
+                const conditions = await conditionsRes.json();
+                const settings = await settingsRes.json();
+                const selectedConditions = (settings.conditions || []).map(c => c.trim());
+                
+                if (conditions.length === 0) {
+                    container.innerHTML = `
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You haven't created any custom conditions yet.
+                        </div>`;
+                    return;
+                }
+                
+                // Create the conditions list with checkboxes
+                let html = `
+                    <form id="user-conditions-form" class="mb-3">
+                        <div class="list-group">`;
+                
+                conditions.forEach(condition => {
+                    const displayName = condition.name || 'Unnamed Condition';
+                    const displayClause = condition.scan_clause || 'No scan clause';
+                    const isChecked = selectedConditions.includes(displayName.trim());
+                    
+                    html += `
+                        <label class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <input class="form-check-input me-2" type="checkbox" 
+                                       name="user_condition" 
+                                       value="${displayName.replace(/"/g, '&quot;')}"
+                                       ${isChecked ? 'checked' : ''}>
+                                <div>
+                                    <div class="fw-bold">${displayName}</div>
+                                    <small class="text-muted">${displayClause}</small>
+                                </div>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" 
+                                        onclick="editUserCondition('${condition.id}')"
+                                        title="Edit condition">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" 
+                                        onclick="deleteUserCondition('${condition.id}')"
+                                        title="Delete condition">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </label>`;
+                });
+                
+                html += `
+                        </div>
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Save Selections
+                            </button>
+                        </div>
+                    </form>`;
+                
+                container.innerHTML = html;
+                
+                // Add form submission handler
+                const form = document.getElementById('user-conditions-form');
+                if (form) {
+                    form.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        const checkboxes = form.querySelectorAll('input[type="checkbox"]:checked');
+                        const selectedConditions = Array.from(checkboxes).map(cb => cb.value);
+                        
+                        try {
+                            const response = await fetch('/update-settings', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    conditions: selectedConditions
+                                })
+                            });
+                            
+                            if (!response.ok) throw new Error('Failed to save settings');
+                            
+                            showToast('Settings saved successfully', 'success');
+                            // Refresh the page to apply changes
+                            setTimeout(() => window.location.reload(), 1000);
+                        } catch (error) {
+                            console.error('Error saving settings:', error);
+                            showToast('Failed to save settings', 'error');
+                        }
+                    });
+                }
+        
+    } catch (error) {
+        console.error('Error loading user conditions:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load conditions. 
+                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="populateUserConditions()">
+                    <i class="fas fa-sync-alt me-1"></i>Retry
+                </button>
+            </div>`;
+    }
+}
+
+        document.getElementById('conditionsModal').addEventListener('show.bs.modal', function () {
+            populateAdminConditions();
+            populateUserConditions();
+        });
+
+        document.getElementById('update-settings-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const selected = Array.from(document.querySelectorAll('#admin-conditions-list input:checked')).map(el => el.value);
+            
+            try {
+                const response = await fetch('/update-settings', {
+                method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conditions: selected })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('conditionsModal'));
+                    modal.hide();
+                    window.location.reload(); // Reload to apply changes
+            } else {
+                    alert('Failed to save settings.');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                alert('An error occurred while saving settings.');
+            }
+        });
+    </script>
+
+    <script>
+    // --- Linear auto-refresh progress bar logic (frontend only) ---
+    function getRandomInterval(baseInterval) {
+        // If baseInterval is provided, return a value within ±10 seconds of it
+        if (baseInterval) {
+            const min = Math.max(30, baseInterval - 10); // Ensure minimum 30 seconds
+            const max = baseInterval + 10;
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        // Default random interval between 110-130 seconds
+        return Math.floor(Math.random() * (130 - 110 + 1)) + 110;
+    }
+
+    // Track if any modal is currently open
+    let isAnyModalOpen = false;
+    let pausedTimer = false;
+    let pausedSecondsLeft = 0;
+    
+    // Function to check if any modal is open using multiple detection methods
+    function checkForOpenModals() {
+        // Method 1: Check for Bootstrap modals with .show class
+        const bootstrapModals = document.querySelectorAll('.modal.show');
+        if (bootstrapModals.length > 0) return true;
+        
+        // Method 2: Check for modals with inline style display:block
+        const visibleModals = document.querySelectorAll('.modal[style*="display: block"]');
+        if (visibleModals.length > 0) return true;
+        
+        // Method 3: Check for specific known modals by ID
+        const knownModalIds = [
+            'conditionsModal',  // Conditions modal
+            'settingsModal',   // Settings modal
+            'niftyModal',      // Nifty modal
+            'userConditionModal', // User condition modal if exists
+            'adminConditionModal', // Admin condition modal if exists
+            'chartModal'       // Any chart modal
+        ];
+        
+        for (const modalId of knownModalIds) {
+            const modal = document.getElementById(modalId);
+            if (modal && (
+                modal.classList.contains('show') || 
+                modal.style.display === 'block' || 
+                getComputedStyle(modal).display !== 'none' ||
+                modal.getAttribute('aria-hidden') === 'false'
+            )) {
+                return true;
+            }
+        }
+        
+        // Method 4: Check for any element with modal-backdrop
+        const modalBackdrops = document.querySelectorAll('.modal-backdrop');
+        if (modalBackdrops.length > 0) return true;
+        
+        // Method 5: Check for any element with modal open class on body
+        if (document.body.classList.contains('modal-open')) return true;
+        
+        return false;
+    }
+    
+    // Comprehensive modal detection that runs frequently
+    const modalCheckInterval = setInterval(function() {
+        const modalOpen = checkForOpenModals();
+        
+        if (modalOpen && !isAnyModalOpen) {
+            // Modal just opened
+            isAnyModalOpen = true;
+            if (!pausedTimer) {
+                pausedSecondsLeft = secondsLeft;
+                pausedTimer = true;
+                console.log('Timer paused - modal detected');
+            }
+        } else if (!modalOpen && isAnyModalOpen) {
+            // All modals just closed
+            isAnyModalOpen = false;
+            if (pausedTimer) {
+                secondsLeft = pausedSecondsLeft;
+                pausedTimer = false;
+                console.log('Timer resumed - all modals closed');
+            }
+        }
+    }, 500); // Check every 500ms for better responsiveness
+    
+    // Standard Bootstrap modal events as additional detection
+    document.addEventListener('shown.bs.modal', function(event) {
+        console.log('Modal shown:', event.target.id);
+        isAnyModalOpen = true;
+        if (!pausedTimer) {
+            pausedSecondsLeft = secondsLeft;
+            pausedTimer = true;
+            console.log('Timer paused - modal shown event');
+        }
+    });
+    
+    document.addEventListener('hidden.bs.modal', function(event) {
+        console.log('Modal hidden:', event.target.id);
+        // Check if there are still other modals open
+        setTimeout(() => {
+            if (!checkForOpenModals()) {
+                isAnyModalOpen = false;
+                if (pausedTimer) {
+                    secondsLeft = pausedSecondsLeft;
+                    pausedTimer = false;
+                    console.log('Timer resumed - modal hidden event');
+                }
+            }
+        }, 100); // Small delay to ensure DOM is updated
+    });
+    
+    // Initialize timer variables
+    var linearBar = document.getElementById('autoRefreshLinearBar');
+    var refreshTimerText = document.getElementById('refresh-timer');
+    var baseInterval = null; // Will be set after fetching user's preference
+    var interval = getRandomInterval(110); // Default to 110-130 range initially
+    var secondsLeft = interval;
+    
+    // Function to update the timer display
+    function updateTimerDisplay() {
+        if (refreshTimerText) {
+            const minutes = Math.floor(secondsLeft / 60);
+            const seconds = Math.floor(secondsLeft % 60);
+            refreshTimerText.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+    }
+    
+    // Initialize the timer display
+    updateTimerDisplay();
+    
+    // Fetch user's custom refresh interval
+    fetch('/get-refresh-interval')
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_custom && data.interval) {
+                baseInterval = parseInt(data.interval);
+                // Reset the interval with the custom base
+                interval = getRandomInterval(baseInterval);
+                secondsLeft = interval;
+                updateTimerDisplay();
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching refresh interval:', error);
+            // Continue with default interval
+            updateTimerDisplay();
+        });
+    
+    // Global audio context and beep state variables
+    let audioCtx = null;
+    let isBeeping = false;
+    let lastBeepTime = 0;
+    
+    // Function to initialize audio context on user interaction
+    function initAudioContext() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            // Resume the audio context in case it was suspended
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+        return audioCtx;
+    }
+    
+    // Function to play system beep
+    function playBeep() {
+        // Prevent multiple beeps from overlapping
+        const now = Date.now();
+        if (isBeeping || (now - lastBeepTime < 1000)) {
+            return; // Skip if already beeping or beeped recently
+        }
+        
+        isBeeping = true;
+        lastBeepTime = now;
+        
+        try {
+            // Initialize audio context on first interaction
+            const audioCtx = initAudioContext();
+            
+            // Create oscillator for the beep
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            // Configure the oscillator
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            
+            // Configure gain (volume)
+            gainNode.gain.value = 0.2;
+            
+            // Connect nodes
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            // Play the beep (500ms duration)
+            const audioNow = audioCtx.currentTime;
+            oscillator.start(audioNow);
+            oscillator.stop(audioNow + 0.5);
+            
+            // Schedule gain to ramp down for clean stop
+            gainNode.gain.setValueAtTime(0.2, audioNow);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioNow + 0.48);
+            
+            // Clean up after the beep is done
+            setTimeout(() => {
+                try {
+                    oscillator.disconnect();
+                    gainNode.disconnect();
+                    isBeeping = false;
+                } catch (e) {
+                    console.log('Cleanup error (can be ignored):', e);
+                    isBeeping = false;
+                }
+            }, 600);
+            
+        } catch (error) {
+            console.error('Error playing beep:', error);
+            // Fallback to browser's built-in beep if Web Audio API fails
+            try {
+                const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU' + 
+                    'A'.repeat(1000));
+                beep.volume = 0.2;
+                beep.play().catch(e => console.error('Fallback beep failed:', e));
+            } catch (fallbackError) {
+                console.error('Fallback beep also failed:', fallbackError);
+            }
+        }
+    }
+    
+    // Initialize audio context on any user interaction
+    document.addEventListener('click', initAudioContext, { once: true });
+    
+    // Function to handle manual refresh
+    window.refreshData = function() {
+        // Play beep on manual refresh
+        playBeep();
+        
+        // Show loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'flex';
+        }
+        
+        // Reset the timer
+        secondsLeft = 0;
+        updateLinearBarFrontend();
+        
+        // Force page reload after a short delay to show loading state
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+    };
+    function updateLinearBarFrontend() {
+        // Play beep when progress bar starts (only when it wasn't running before)
+        if (Math.abs(secondsLeft - interval) < 0.01) {  // Use a small epsilon for floating point comparison
+            playBeep();
+        } else if (secondsLeft <= 0.5 && secondsLeft > 0.4) {  // Only play once when crossing 0.5s
+            playBeep();
+        }
+        
+        // Don't update timer if any modal is open
+        if (isAnyModalOpen) {
+            return;
+        }
+        
+        if (secondsLeft <= 0) {
+            // Prevent further decrements and reload only once
+            if (!window.__refreshing) {
+                // Double-check no modals are open before refreshing
+                if (checkForOpenModals()) {
+                    console.log('Refresh prevented due to open modal');
+                    secondsLeft = 5; // Give a small buffer before checking again
+                    return;
+                }
+                
+                window.__refreshing = true;
+                // Show loading overlay if it exists
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'flex';
+                    // Show for minimal time before reload
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 10);
+                } else {
+                    // If no overlay, reload immediately
+                    window.location.reload();
+                }
+            }
+            return;
+        }
+        secondsLeft -= 0.5; // Decrease by 0.5 seconds each update
+        var percent = 100 - Math.round((secondsLeft / interval) * 100);
+        if (linearBar) {
+            linearBar.style.width = percent + '%';
+        }
+        updateTimerDisplay();
+    }
+    linearBar.style.width = '0%';
+    setInterval(updateLinearBarFrontend, 500); // Update every 500ms for smoother progress
+
+    // --- Global Dark Mode Toggle Logic with Sun/Moon Icons ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const themeSwitchBtn = document.getElementById('themeSwitchBtn');
+        const themeIcon = document.getElementById('themeIcon');
+        function setThemeIcon(isDark) {
+            if (isDark) {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            } else {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            }
+        }
+        if (themeSwitchBtn && themeIcon) {
+            // Set icon on load
+            setThemeIcon(document.body.classList.contains('dark-theme'));
+            themeSwitchBtn.addEventListener('click', function() {
+                const isDark = !document.body.classList.contains('dark-theme');
+                document.body.classList.toggle('dark-theme', isDark);
+                setThemeIcon(isDark);
+                fetch('/update-theme', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: isDark ? 'dark' : 'light' })
+                });
+            });
+        }
+    });
+
+    // Mute/unmute logic (ensure DOM is loaded)
+    document.addEventListener('DOMContentLoaded', function() {
+        const muteBtn = document.getElementById('muteToggleBtn');
+        const muteIcon = document.getElementById('muteIcon');
+        let isMuted = localStorage.getItem('pitk-muted') === 'true';
+        if (localStorage.getItem('pitk-muted') === null) {
+            // Default: sound ON
+            isMuted = false;
+            localStorage.setItem('pitk-muted', 'false');
+        } else {
+            isMuted = localStorage.getItem('pitk-muted') === 'true';
+        }
+        let alertPlayed = false;
+
+        function updateMuteIcon() {
+            if (isMuted) {
+                muteIcon.classList.remove('fa-volume-up');
+                muteIcon.classList.add('fa-volume-mute');
+            } else {
+                muteIcon.classList.remove('fa-volume-mute');
+                muteIcon.classList.add('fa-volume-up');
+            }
+        }
+        updateMuteIcon();
+        if (muteBtn) {
+            muteBtn.addEventListener('click', function() {
+                isMuted = !isMuted;
+                localStorage.setItem('pitk-muted', isMuted);
+                updateMuteIcon();
+                // Log mute state change
+                console.log('Mute toggled. isMuted:', isMuted);
+            });
+        }
+
+
+
+        // Remove focus from modal trigger buttons after modal closes
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('hidden.bs.modal', function() {
+                document.querySelectorAll('.navbar-round-btn:focus').forEach(btn => btn.blur());
+            });
+        });
+
+        // Example: Hook into your auto-refresh timer logic
+        // Replace this with your actual timer variable and logic
+        let timerInterval = null;
+        let refreshTime = 60; // Example starting value
+
+        function startAutoRefreshTimer() {
+            refreshTime = 60; // or whatever your timer starts at
+            alertPlayed = false;
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                refreshTime--;
+                // When timer reaches 0, mark as played
+                if (refreshTime === 0 && !alertPlayed) {
+                    alertPlayed = true;
+                }
+                // Reset logic example (if you restart the timer)
+                // if (refreshTime < 0) {
+                //     refreshTime = 60; alertPlayed = false;
+                // }
+            }, 1000);
+        }
+        // Uncomment the next line to simulate the timer for demo:
+        // startAutoRefreshTimer();
+        
+        // Add close button handler for licence banner
+        const closeBtn = document.getElementById('closeLicenceBanner');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                const banner = document.getElementById('licenceStatusBanner');
+                if (banner) banner.classList.add('d-none');
+            });
+        }
+    });
+    
+    // Check licence status when page loads
+    function checkLicenceStatus() {
+        fetch('/api/check-licence')
+            .then(response => response.json())
+            .then(data => {
+                const toastEl = document.getElementById('licenceStatusToast');
+                const message = document.getElementById('licenceStatusMessage');
+                
+                if (!toastEl || !message) return;
+                
+                // Initialize Bootstrap Toast
+                const toast = new bootstrap.Toast(toastEl, {
+                    autohide: true,
+                    delay: 5000 // Auto-hide after 5 seconds
+                });
+                
+                // Set toast content and style based on licence status
+                if (data.isExpired) {
+                    toastEl.classList.remove('bg-success', 'bg-warning');
+                    toastEl.classList.add('bg-danger');
+                    message.innerHTML = `<strong>LICENCE EXPIRED</strong> - Renew to continue using premium features.`;
+                    
+                    // Enable Generate Licence Key button if it exists
+                    const generateBtn = document.getElementById('generateLicenceBtn');
+                    if (generateBtn) {
+                        generateBtn.disabled = false;
+                        generateBtn.title = '';
+                        generateBtn.classList.remove('disabled');
+                    }
+                } else if (data.hasLicence) {
+                    const expiresAt = new Date(data.expiresAt);
+                    const timeLeft = Math.floor((expiresAt - new Date()) / 1000 / 60); // in minutes
+                    
+                    toastEl.classList.remove('bg-danger', 'bg-warning');
+                    toastEl.classList.add('bg-success');
+                    message.innerHTML = `
+                        <strong>Premium Active</strong> - 
+                        Expires in ${timeLeft} minute${timeLeft !== 1 ? 's' : ''}
+                        <span class="ms-2 small">(${data.expiresAtIST})</span>
+                    `;
+                    
+                    // Disable Generate Licence Key button if it exists
+                    const generateBtn = document.getElementById('generateLicenceBtn');
+                    if (generateBtn) {
+                        generateBtn.disabled = true;
+                        generateBtn.title = 'You already have an active license';
+                        generateBtn.classList.add('disabled');
+                    }
+                    
+                    // Check every minute for expiry
+                    setTimeout(checkLicenceStatus, 60000);
+                } else {
+                    toastEl.classList.remove('bg-success', 'bg-danger');
+                    toastEl.classList.add('bg-warning');
+                    message.innerHTML = 'No active licence. Enter a valid licence key for premium features.';
+                    
+                    // Enable Generate Licence Key button if it exists
+                    const generateBtn = document.getElementById('generateLicenceBtn');
+                    if (generateBtn) {
+                        generateBtn.disabled = false;
+                        generateBtn.title = '';
+                        generateBtn.classList.remove('disabled');
+                    }
+                }
+                
+                // Show the toast
+                toastEl.classList.remove('d-none');
+                toast.show();
+            })
+            .catch(error => {
+                console.error('Error checking licence status:', error);
+                
+                // If there's an error, enable the button just in case
+                const generateBtn = document.getElementById('generateLicenceBtn');
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                    generateBtn.title = '';
+                    generateBtn.classList.remove('disabled');
+                }
+            });
+    }
+</script>
+{% endblock %}
+
+{% block modals %}
+<!-- Conditions Modal (Admin) -->
+<div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="conditionsModalLabel">Manage Conditions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="conditionsTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="admin-conditions-tab" data-bs-toggle="tab" data-bs-target="#admin-conditions" type="button" role="tab" aria-controls="admin-conditions" aria-selected="true">Admin Conditions</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="user-conditions-tab" data-bs-toggle="tab" data-bs-target="#user-conditions" type="button" role="tab" aria-controls="user-conditions" aria-selected="false">Your Conditions</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="conditionsTabContent">
+                    <div class="tab-pane fade show active" id="admin-conditions" role="tabpanel" aria-labelledby="admin-conditions-tab">
+                        <div class="mt-3">
+                            <h6>Select conditions to display on the dashboard:</h6>
+                            <form id="update-settings-form">
+                                <div id="admin-conditions-list" class="list-group mt-2">
+                                    <!-- Admin conditions will be loaded here by JavaScript -->
+                                                </div>
+                                <button type="submit" class="btn btn-primary mt-3">Save Selections</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="user-conditions" role="tabpanel" aria-labelledby="user-conditions-tab">
+                        <div class="mt-3">
+                            <h6>Add, edit, or remove your custom conditions.</h6>
+                            <div id="user-conditions-management">
+                                <div id="user-conditions-list-view">
+                                    <button class="btn btn-success mb-3" id="show-add-condition-form-btn">
+                                        <i class="fas fa-plus"></i> Add New Condition
+                                    </button>
+                                    <div id="user-conditions-list-container" class="list-group"></div>
+                                </div>
+                                <div id="user-condition-form-view" style="display: none;">
+                                    <h5 id="user-condition-form-title">Add New Condition</h5>
+                                    <form id="user-condition-form">
+                                        <input type="hidden" id="edit-condition-id">
+                                        <div class="mb-3"><label for="user-condition-name" class="form-label">Condition Name</label><input type="text" class="form-control" id="user-condition-name" required></div>
+                                        <div class="mb-3"><label for="user-condition-link" class="form-label">Chartink Link (Optional)</label><input type="url" class="form-control" id="user-condition-link"></div>
+                                        <div class="mb-3"><label for="user-condition-clause" class="form-label">Scan Clause</label><textarea class="form-control" id="user-condition-clause" rows="8" required></textarea></div>
+                                        <button type="submit" class="btn btn-primary">Save Condition</button>
+                                        <button type="button" class="btn btn-secondary" id="cancel-edit-condition-btn">Cancel</button>
+                                    </form>
+                    </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Conditions Modal -->
+<div class="modal fade" id="userConditionsModal" tabindex="-1" aria-labelledby="userConditionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Your Conditions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Form View (initially hidden) -->
+                <div id="user-condition-form-view" style="display: none;">
+                    <form id="user-condition-form" onsubmit="handleUserConditionSubmit(event)">
+                        <input type="hidden" id="edit-condition-id" value="">
+                        <div class="mb-3">
+                            <label for="condition-name" class="form-label">Condition Name</label>
+                            <input type="text" class="form-control" id="condition-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="condition-link" class="form-label">Link (Optional)</label>
+                            <input type="url" class="form-control" id="condition-link">
+                        </div>
+                        <div class="mb-3">
+                            <label for="chart-link" class="form-label">Chart Link (Optional)</label>
+                            <input type="url" class="form-control" id="chart-link">
+                        </div>
+                        <div class="mb-3">
+                            <label for="scan-clause" class="form-label">Scan Clause</label>
+                            <textarea class="form-control" id="scan-clause" rows="4" required></textarea>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" onclick="hideConditionForm()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Condition</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- List View -->
+                <div id="user-conditions-list-view">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Your Custom Conditions</h6>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="showConditionForm()">
+                            <i class="fas fa-plus me-1"></i> Add New Condition
+                        </button>
+                    </div>
+                    <div id="user-conditions-list-container" class="list-group"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h6 class="mb-3">TradingView Launch Preference</h6>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="tradingViewPreference" id="appPreference" value="app">
+                        <label class="form-check-label" for="appPreference">
+                            <i class="fas fa-desktop me-2"></i>TradingView Desktop App
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="tradingViewPreference" id="browserPreference" value="browser">
+                        <label class="form-check-label" for="browserPreference">
+                            <i class="fas fa-globe me-2"></i>Web Browser
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Nifty Indices Modal -->
+<style>
+    #niftyModal .modal-dialog {
+        min-height: 80vh;
+        max-height: 90vh;
+        width: 95%;
+        max-width: 1200px;
+        margin: 1.75rem auto;
+    }
+    #niftyModal .modal-content {
+        min-height: 80vh;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+    }
+    #niftyModal .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+    }
+    #niftyModal .modal-header,
+    #niftyModal .modal-footer {
+        flex-shrink: 0;
+    }
+</style>
+
+<div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="niftyModalLabel">
+                    <i class="fas fa-chart-line me-2"></i>Nifty Indices
+                </h5>
+                <div class="modal-header-actions">
+                    <button id="niftyReloadBtn" class="btn btn-outline-light me-2" title="Reload Data" onclick="fetchNiftyData()">
+                        <i class="fas fa-rotate-right"></i>
+                    </button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body" id="niftyModalBody">
+                <!-- Content will be dynamically loaded here -->
+            </div>
+            <div class="modal-footer py-2">
+                <small class="text-muted" id="niftyLastUpdatedTime"></small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/user-conditions.js') }}"></script>
+<!-- Removed old fetch-based auto-refresh progress bar logic. Only frontend timer/progress bar remains. -->
+<script>
+// Licence key validation
+document.addEventListener('DOMContentLoaded', function() {
+    const validateBtn = document.getElementById('validateLicenceKey');
+    const licenceInput = document.getElementById('licenceKeyInput');
+    const messageElement = document.getElementById('licenceKeyMessage');
+    
+    if (validateBtn && licenceInput && messageElement) {
+        validateBtn.addEventListener('click', async function() {
+            const licenceKey = licenceInput.value.trim();
+            
+            if (!licenceKey) {
+                showMessage('Please enter a licence key', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/validate-licence', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ licenceKey })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(data.message || 'Licence key validated successfully!', 'success');
+                    // Reload the page after 1.5 seconds to apply any premium features
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showMessage(data.error || 'Invalid licence key', 'danger');
+                }
+            } catch (error) {
+                console.error('Error validating licence key:', error);
+                showMessage('Error validating licence key. Please try again.', 'danger');
+            }
+        });
+    }
+    
+    function showMessage(message, type) {
+        if (!messageElement) return;
+        
+        messageElement.textContent = message;
+        messageElement.className = `alert alert-${type}`;
+        messageElement.classList.remove('d-none');
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            messageElement.classList.add('d-none');
+        }, 5000);
+    }
+});
+
+// Global variables
+let countdownInterval;
+let secondsLeft = 0;
+let isRefreshing = false;
+
+// Function to show loading overlay
+function showLoading(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = show ? 'flex' : 'none';
+    }
+}
+
+// Function to update the countdown timer
+function updateCountdown(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    const countdownElement = document.getElementById('countdown');
+    if (countdownElement) {
+        countdownElement.textContent = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+}
+
+// Function to start the countdown timer
+function startCountdown(seconds) {
+    // Clear any existing interval
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+    
+    secondsLeft = seconds;
+    updateCountdown(secondsLeft);
+    
+    countdownInterval = setInterval(() => {
+        secondsLeft--;
+        updateCountdown(secondsLeft);
+        
+        if (secondsLeft <= 0) {
+            clearInterval(countdownInterval);
+            refreshData();
+        }
+    }, 1000);
+}
+
+// Function to fetch scan data
+async function fetchScanData() {
+    try {
+        showLoading(true);
+        isRefreshing = true;
+        
+        // Check license status first
+        const licenseResponse = await fetch('/api/check-licence');
+        const licenseData = await licenseResponse.json();
+        
+        if (!licenseResponse.ok || !licenseData.hasLicence || licenseData.isExpired) {
+            showError('License check failed or expired. Please contact support.');
+            return;
+        }
+        
+        // For now, show a message as the scan results endpoint is not implemented
+        showInfo('Stock scanner is loading. Full functionality will be available soon.');
+        
+        // Start a new countdown (110-130 seconds)
+        const randomSeconds = Math.floor(Math.random() * 21) + 110; // 110-130 seconds
+        startCountdown(randomSeconds);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error loading data. Please try again.');
+    } finally {
+        showLoading(false);
+        isRefreshing = false;
+    }
+}
+
+// Function to show error message
+function showError(message) {
+    const scanResults = document.getElementById('scanResults');
+    if (scanResults) {
+        scanResults.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+}
+
+// Function to show info message
+function showInfo(message) {
+    const scanResults = document.getElementById('scanResults');
+    if (scanResults) {
+        scanResults.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+}
+
+// Function to handle manual refresh
+function refreshData() {
+    if (isRefreshing) return;
+    
+    // Clear any existing countdown
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+    
+    // Start a new countdown
+    const randomSeconds = Math.floor(Math.random() * 21) + 110; // 110-130 seconds
+    startCountdown(randomSeconds);
+    
+    // Fetch new data
+    fetchScanData();
+}
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up refresh button
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshData);
+    }
+    
+    // Initial data load
+    refreshData();
+    
+    // Hide loading overlay when everything is loaded
+    window.addEventListener('load', function() {
+        showLoading(false);
+    });
+});
+
+// Function to show copy feedback
+function showCopyFeedback(btn) {
+    const icon = btn.querySelector('i');
+    if (!icon) return;
+    const original = icon.className;
+    icon.classList.remove('fa-copy');
+    icon.classList.add('fa-check', 'text-success');
+    setTimeout(() => {
+        icon.classList.remove('fa-check', 'text-success');
+        icon.className = original;
+    }, 1200);
+}
+// Function to update UI based on premium status
+function updatePremiumUI(isPremium) {
+    const generateBtn = document.getElementById('generateLicenceBtn');
+    if (generateBtn) {
+        if (isPremium) {
+            generateBtn.disabled = true;
+            generateBtn.title = 'You already have an active license';
+            generateBtn.classList.add('disabled');
+        } else {
+            generateBtn.disabled = false;
+            generateBtn.title = 'Generate License Key';
+            generateBtn.classList.remove('disabled');
+        }
+    }
+    
+    // Update user avatar to show premium status
+    const userAvatar = document.querySelector('.user-avatar-wrapper');
+    const userStatusDot = document.querySelector('.user-status-dot');
+    const userAvatarImg = document.querySelector('.user-avatar-img');
+    
+    if (userAvatar) {
+        userAvatar.classList.toggle('user-avatar-premium', isPremium);
+        userAvatar.classList.toggle('user-avatar-free', !isPremium);
+    }
+    
+    if (userStatusDot) {
+        userStatusDot.classList.toggle('user-status-dot-premium', isPremium);
+        userStatusDot.classList.toggle('user-status-dot-free', !isPremium);
+    }
+    
+    // Update the avatar image source if it's using the default image
+    if (userAvatarImg && (!userAvatarImg.getAttribute('src') || userAvatarImg.getAttribute('src').includes('default_'))) {
+        const defaultImage = isPremium ? 'default_premium.png' : 'default_free.png';
+        userAvatarImg.src = `/static/user_photos/${defaultImage}`;
+        userAvatarImg.alt = isPremium ? 'Premium User' : 'Free User';
+    }
+}
+
+// Check premium status on page load
+async function checkPremiumStatus() {
+    try {
+        const response = await fetch('/api/check-licence');
+        if (response.ok) {
+            const data = await response.json();
+            updatePremiumUI(data.is_premium === 'yes'); // Convert string to boolean
+        }
+    } catch (error) {
+        console.error('Error checking premium status:', error);
+    }
+}
+
+// Hide loading overlay when page is fully loaded
+window.addEventListener('load', function() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.style.display = 'none';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Check premium status when page loads
+    checkPremiumStatus();
+    
+    document.querySelectorAll('.copy-stock-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const stock = btn.getAttribute('data-stock');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(stock);
+                showCopyFeedback(btn);
+            } else {
+                // fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = stock;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showCopyFeedback(btn);
+            }
+        });
+    });
+});
+</script>
+<script src="{{ url_for('static', filename='js/nifty_modal.js') }}"></script>
+{% endblock %}

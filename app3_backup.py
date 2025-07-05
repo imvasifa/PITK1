@@ -17,6 +17,11 @@ import threading
 import time
 import traceback
 import uuid
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Mail, Message
+import secrets
+import string
+from functools import wraps
 try:
     import winsound
     WINSOUND_AVAILABLE = True
@@ -222,8 +227,68 @@ bcrypt = Bcrypt(app)
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-
 login_manager.login_view = 'login'  # type: ignore
+
+# Email configuration
+app.config.update(
+    MAIL_SERVER=os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
+    MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
+    MAIL_USE_TLS=os.getenv('MAIL_USE_TLS', '1').lower() in ('1', 'true', 'yes'),
+    MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
+    MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
+    MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
+)
+
+# Initialize Flask-Mail
+mail = Mail(app)
+
+def generate_verification_token(email):
+    """Generate a secure token for email verification."""
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.dumps(email, salt='email-verification-salt')
+
+def confirm_verification_token(token, expiration=86400):  # 24 hours
+    """Verify the token and return the email if valid."""
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    try:
+        email = serializer.loads(
+            token,
+            salt='email-verification-salt',
+            max_age=expiration
+        )
+        return email
+    except Exception as e:
+        logger.error(f"Token verification failed: {str(e)}")
+        return False
+
+def send_verification_email(user_email, username):
+    """Send a verification email to the user with a verification link."""
+    try:
+        token = generate_verification_token(user_email)
+        verify_url = url_for('verify_email', token=token, _external=True)
+        
+        msg = Message(
+            'Verify Your Email',
+            recipients=[user_email],
+            sender=app.config['MAIL_DEFAULT_SENDER']
+        )
+        
+        msg.body = f'''Welcome {username}!
+
+Please click the following link to verify your email:
+{verify_url}
+
+This link will expire in 24 hours.
+
+If you did not create an account, please ignore this email.
+'''
+        
+        mail.send(msg)
+        logger.info(f"Verification email sent to {user_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {user_email}: {str(e)}")
+        return False
 
 @app.before_request
 def make_session_permanent():
@@ -453,91 +518,145 @@ def load_user(user_id):
         return None
 
 def authenticate_user(username, password):
+    """
+    Authenticate a user with the given username/email and password.
+    
+    Args:
+        username: The username or email to authenticate with
+        password: The plain text password to verify
+        
+    Returns:
+        User object if authentication succeeds, None otherwise
+    """
+    logger = logging.getLogger(__name__)
+    
     try:
-        print(f"🔍 Attempting to authenticate user: {username}")
+        logger.info("\n" + "="*80)
+        logger.info(f"🔑 AUTHENTICATION STARTED for: {username}")
+        logger.info(f"🔑 Input - Username: '{username}', Password provided: {'*' * len(password) if password else 'None'}")
         
-        # Proceed with database authentication for non-hardcoded users
-        cur = db.get_cursor()
-        if not cur:
-            print("❌ Database connection error")
-            return None
-        
-        # First, let's check if the user exists and get their data
-        cur.execute("""
-            SELECT 
-                id, 
-                user_data->'account'->>'username' as username,
-                user_data->'account'->>'password' as password_hash,
-                COALESCE(
-                    user_data->'account'->'profile'->>'email', 
-                    user_data->'account'->>'email', 
-                    ''
-                ) as email,
-                user_data->'account' as account_data
-            FROM users 
-            WHERE user_data->'account'->>'username' = %s
-        """, (username,))
-        
-        user_data = cur.fetchone()
-        
-        if not user_data:
-            print(f"❌ User '{username}' not found in database")
+        if not username or not password:
+            logger.warning("❌ Authentication failed: Empty username or password")
             return None
             
-        # Convert to dictionary if it's not already
-        if not isinstance(user_data, dict):
-            if cur.description:  # Add null check
-                columns = [desc[0] for desc in cur.description]
-                user_data = dict(zip(columns, user_data))
+        logger.info("\n🔍 DATABASE CONNECTION")
+        logger.info("Connecting to database...")
+        start_time = time.time()
         
-        # Debug print user data (without password hash for security)
-        print(f"✅ Found user: {user_data.get('username')} (ID: {user_data.get('id')})")
-        
-        # Get password hash
-        password_hash = user_data.get('password_hash')
-        if not password_hash:
-            print("❌ No password found for user")
-            return None
-            
-        # For all users, check bcrypt hash
-        print(f"🔑 User ID: {user_data.get('id')}, Username: {user_data.get('username')}")
         try:
-            # Verify the password using the existing bcrypt instance
-            password_matches = bcrypt.check_password_hash(password_hash, password)
-            print(f"🔑 Password check result: {password_matches}")
+            cur = db.get_cursor()
+            logger.info(f"✅ Database connection established in {time.time() - start_time:.4f}s")
             
-            if not password_matches:
-                print("❌ Incorrect password")
+            if not cur:
+                logger.error("❌ Database connection error: Could not get cursor")
                 return None
                 
-            # If we get here, password is correct
-            print(f"✅ Password verified for user: {username}")
+            logger.info("\n🔍 EXECUTING USER QUERY")
+            query = """
+                SELECT 
+                    id, 
+                    user_data->'account'->>'username' as username,
+                    user_data->'account'->>'password' as password_hash,
+                    COALESCE(
+                        user_data->'account'->'profile'->>'email', 
+                        user_data->'account'->>'email', 
+                        ''
+                    ) as email,
+                    user_data->'account' as account_data
+                FROM users 
+                WHERE user_data->'account'->>'email' = %s OR user_data->'account'->>'username' = %s
+                LIMIT 1
+            """
+            logger.debug(f"📝 SQL Query:\n{query}")
+            logger.debug(f"📝 Query params: username='{username}', email='{username}'")
+            
+            query_start = time.time()
+            cur.execute(query, (username, username))
+            user_data = cur.fetchone()
+            logger.info(f"✅ Query executed in {time.time() - query_start:.4f}s")
+            
+            if not user_data:
+                logger.warning(f"❌ User '{username}' not found in database")
+                return None
+                
+            # Convert to dictionary if it's not already
+            if not isinstance(user_data, dict):
+                if cur and hasattr(cur, 'description') and cur.description:
+                    columns = [desc[0] for desc in cur.description]
+                    user_data = dict(zip(columns, user_data))
+            
+            logger.info("\n🔍 USER DATA RETRIEVED")
+            logger.info(f"✅ Found user record - ID: {user_data.get('id')}")
+            logger.info(f"✅ Username: {user_data.get('username')}")
+            logger.info(f"✅ Email: {user_data.get('email')}")
+            logger.debug(f"📝 All user data keys: {list(user_data.keys())}")
+            
+            # Get password hash
+            password_hash = user_data.get('password_hash')
+            if not password_hash:
+                logger.error("❌ No password hash found in user data")
+                return None
+                
+            logger.info("\n🔑 PASSWORD VERIFICATION")
+            logger.debug(f"Stored hash: {password_hash[:15]}...")
+            
+            try:
+                # Verify the password using bcrypt
+                verify_start = time.time()
+                password_matches = bcrypt.check_password_hash(password_hash, password)
+                logger.info(f"Password verification took: {(time.time() - verify_start) * 1000:.2f}ms")
+                
+                if not password_matches:
+                    logger.warning("❌ Password verification failed")
+                    logger.debug("Possible reasons: Incorrect password or hash mismatch")
+                    return None
+                    
+                logger.info("✅ Password verified successfully")
+                
+                # Check if email is verified
+                account_data = user_data.get('account_data')
+                if isinstance(account_data, str):
+                    try:
+                        account_data = json.loads(account_data)
+                    except json.JSONDecodeError:
+                        logger.error("❌ Failed to parse account_data JSON")
+                        return None
+                
+                email_verified = account_data.get('email_verified', False) if account_data else False
+                
+                if not email_verified:
+                    logger.warning("❌ Email not verified")
+                    return None
+                    
+                logger.info("✅ Email verified")
+                
+                # Create and return user object
+                user = User(
+                    id=user_data.get('id'),
+                    username=user_data.get('username'),
+                    password=password_hash,
+                    email=user_data.get('email', '')
+                )
+                
+                logger.info("\n✅ AUTHENTICATION SUCCESSFUL")
+                logger.info(f"User authenticated: ID={user.id}, Username={user.username}")
+                logger.info("="*80 + "\n")
+                return user
+                    
+            except Exception as e:
+                logger.error(f"❌ Error during password verification: {str(e)}")
+                logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+                return None
                 
         except Exception as e:
-            print(f"❌ Error verifying password: {str(e)}")
-            traceback.print_exc()
-            return None
-                
-        if password_matches:
-            print(f"✅ Authentication successful for user: {username}")
-            return User(
-                id=user_data.get('id'),
-                username=user_data.get('username'),
-                password=password_hash,
-                email=user_data.get('email', '')
-            )
-        else:
-            print("❌ Password does not match")
+            logger.error(f"❌ Database error: {str(e)}")
+            logger.debug(f"Stack trace:\n{traceback.format_exc()}")
             return None
             
     except Exception as e:
-        print(f"❌ Error authenticating user: {e}")
-        traceback.print_exc()
+        logger.error(f"❌ Unexpected error during authentication: {str(e)}")
+        logger.debug(f"Stack trace:\n{traceback.format_exc()}")
         return None
-        print(f"❌ Error authenticating user: {str(e)}")
-        print("Stack trace:")
-        traceback.print_exc()
-    return None
 
 def save_user(username, password, email=''):
     try:
@@ -2305,14 +2424,147 @@ def forgot_password_page():
         
     return render_template('forgot_password.html')
 
+@app.route('/verify-email/<token>')
+def verify_email(token):
+    """Verify the user's email address using the token."""
+    logger.info(f"\n{'='*80}")
+    logger.info(f"🔍 VERIFYING EMAIL TOKEN: {token[:10]}...")
+    
+    try:
+        email = confirm_verification_token(token)
+        if not email:
+            logger.error("❌ Invalid or expired verification token")
+            flash('The verification link is invalid or has expired.', 'error')
+            return redirect(url_for('login'))
+            
+        logger.info(f"✅ Token validated for email: {email}")
+        
+        # Update the user's email verification status in the database
+        try:
+            cur = db.get_cursor()
+            if not cur:
+                logger.error("❌ Database connection error")
+                flash('Database error. Please try again later.', 'error')
+                return redirect(url_for('login'))
+                
+            # Update the user's email_verified status in the JSONB data
+            update_query = """
+                UPDATE users 
+                SET user_data = jsonb_set(
+                    user_data,
+                    '{account,email_verified}',
+                    'true'::jsonb,
+                    true
+                )
+                WHERE user_data->'account'->>'email' = %s
+                RETURNING id, user_data->'account'->>'username' as username;
+            """
+            
+            logger.debug(f"Executing query: {update_query}")
+            logger.debug(f"With email: {email}")
+            
+            cur.execute(update_query, (email,))
+            result = cur.fetchone()
+            
+            if not result:
+                logger.error(f"❌ No user found with email: {email}")
+                flash('User not found.', 'error')
+                return redirect(url_for('login'))
+                
+            logger.info(f"✅ Email verified for user: {result['username']} (ID: {result['id']})")
+            flash('Your email has been verified! You can now log in.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            logger.error(f"❌ Database error during email verification: {str(e)}")
+            logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+            flash('An error occurred while verifying your email. Please try again.', 'error')
+            return redirect(url_for('login'))
+            
+    except Exception as e:
+        logger.error(f"❌ Error during email verification: {str(e)}")
+        logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+        flash('An error occurred while verifying your email. Please try again.', 'error')
+        return redirect(url_for('login'))
+
+@app.route('/verification-pending')
+def verification_pending():
+    """Show the verification pending page after registration."""
+    email = request.args.get('email', '')
+    error = request.args.get('error')
+    
+    if not email:
+        logger.warning("No email provided for verification pending page")
+        return redirect(url_for('register'))
+        
+    logger.info(f"Showing verification pending page for: {email}")
+    return render_template('verification_pending.html', email=email, error=error)
+
+@app.route('/resend-verification')
+def resend_verification():
+    """Resend the verification email to the user."""
+    email = request.args.get('email', '').strip()
+    if not email:
+        flash('No email address provided.', 'error')
+        return redirect(url_for('login'))
+    
+    logger.info(f"Resending verification email to: {email}")
+    
+    try:
+        # Get the user's name for the email
+        cur = db.get_cursor()
+        if not cur:
+            logger.error("❌ Database connection error")
+            flash('Database error. Please try again later.', 'error')
+            return redirect(url_for('verification_pending', email=email, error='db_error'))
+            
+        # Get user's name from the database
+        cur.execute("""
+            SELECT user_data->'account'->'profile'->>'name' as name
+            FROM users 
+            WHERE user_data->'account'->>'email' = %s
+            LIMIT 1
+        """, (email,))
+        
+        user = cur.fetchone()
+        if not user:
+            logger.error(f"❌ No user found with email: {email}")
+            flash('User not found. Please register again.', 'error')
+            return redirect(url_for('register'))
+            
+        # Send the verification email
+        username = user.get('name') or email.split('@')[0]
+        send_verification_email(email, username)
+        
+        logger.info(f"✅ Verification email resent to: {email}")
+        flash('A new verification email has been sent. Please check your inbox.', 'success')
+        return redirect(url_for('verification_pending', email=email))
+        
+    except Exception as e:
+        logger.error(f"❌ Error resending verification email: {str(e)}")
+        logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+        flash('An error occurred while resending the verification email. Please try again.', 'error')
+        return redirect(url_for('verification_pending', email=email, error='email_failed')) 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Handle user login with proper session management."""
-    logger.info("Login endpoint called")
+    logger.info("\n" + "="*80)
+    logger.info("🔐 LOGIN PROCESS STARTED")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Remote IP: {request.remote_addr}")
+    logger.info(f"User-Agent: {request.headers.get('User-Agent')}")
+    logger.debug(f"Full request headers: {dict(request.headers)}")
+    
+    # Log form data for POST requests
+    if request.method == 'POST':
+        logger.info("\n📝 FORM DATA")
+        form_data = {k: v if k != 'password' else '***' for k, v in request.form.items()}
+        logger.info(f"Received form data: {form_data}")
     
     # Redirect if already logged in
     if current_user.is_authenticated:
-        logger.info(f"User {current_user.username} already authenticated, redirecting to index")
+        logger.warning(f"⚠️ User {current_user.username} already authenticated, redirecting to index")
         return redirect(url_for('index'))
     
     error = None
@@ -2323,14 +2575,29 @@ def login():
         password = request.form.get('password', '')
         remember = request.form.get('remember', 'true').lower() == 'true'
         
-        logger.info(f"Login attempt for user: {username}, remember_me: {remember}")
+        logger.info("\n🔍 LOGIN ATTEMPT")
+        logger.info(f"Username: '{username}'")
+        logger.info(f"Remember me: {remember}")
+        logger.debug(f"Raw password length: {len(password)} characters")
+        
+        if not username or not password:
+            error = 'Username and password are required'
+            logger.warning(f"❌ Missing credentials - Username: {'empty' if not username else 'provided'}, "
+                         f"Password: {'empty' if not password else 'provided (hidden)'}")
+            return render_template('login.html', error=error)
         
         try:
-            # Authenticate user
+            logger.info("\n🔐 AUTHENTICATING USER")
+            start_time = time.time()
             user = authenticate_user(username, password)
+            auth_time = time.time() - start_time
             
             if user and user.id is not None:
+                logger.info(f"✅ User authenticated in {auth_time:.2f}s")
+                logger.info(f"User ID: {user.id}, Username: {user.username}")
+                
                 # Log in the user using Flask-Login with remember me
+                logger.info("\n🔐 LOGGING IN USER")
                 login_success = login_user(user, remember=remember)
                 
                 if login_success:
@@ -2338,14 +2605,21 @@ def login():
                     session.permanent = True  # type: ignore
                     app.permanent_session_lifetime = timedelta(minutes=7)
                     
-                    logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
+                    logger.info(f"✅ Login successful for user: {user.username} (ID: {user.id})")
+                    
+                    # Get next URL for redirect
+                    next_url = request.args.get('next')
+                    logger.info(f"🔀 Redirecting to: {next_url or 'index'}")
                     
                     # Create response
-                    response = make_response(redirect(request.args.get('next') or url_for('index')))
+                    response = make_response(redirect(next_url or url_for('index')))
                     
                     # Set remember me cookie if requested
                     if remember:
+                        logger.info("🔐 Setting remember me cookie")
                         token = user.get_auth_token()
+                        logger.debug(f"Remember token: {token[:15]}...")
+                        
                         response.set_cookie(
                             'remember_token',
                             value=token,
@@ -2354,19 +2628,29 @@ def login():
                             samesite='Lax',
                             secure=app.config['SESSION_COOKIE_SECURE']
                         )
-                        logger.debug(f"Set remember_token cookie for user {user.id}")
                     
+                    logger.info("✅ LOGIN PROCESS COMPLETED SUCCESSFULLY")
+                    logger.info("="*80 + "\n")
                     return response
                 else:
                     error = 'Login failed. Please try again.'
-                    logger.warning(f"Login failed for user: {username}")
+                    logger.error(f"❌ Login failed for user: {username} - login_user returned False")
             else:
                 error = 'Invalid username or password'
-                logger.warning(f"Invalid credentials for user: {username}")
+                logger.warning(f"❌ Authentication failed for user: {username}")
+                logger.debug(f"User object: {user}")
                 
         except Exception as e:
             error = 'An error occurred during login. Please try again.'
-            logger.error(f"Error during login for user {username}: {str(e)}", exc_info=True)
+            logger.error(f"❌ EXCEPTION during login for user {username}: {str(e)}")
+            logger.debug(f"Stack trace:\n{traceback.format_exc()}")
+    
+    logger.info(f"\n🔄 RENDERING LOGIN PAGE")
+    if error:
+        logger.warning(f"⚠️ Showing error to user: {error}")
+    logger.info("="*80 + "\n")
+    
+    return render_template('login.html', error=error)
     
     return render_template('login.html', error=error)
 
@@ -2375,6 +2659,83 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+@app.route('/debug/schema')
+def debug_schema():
+    """Debug endpoint to check database schema"""
+    try:
+        # Connect directly to get fresh connection
+        conn = psycopg2.connect(
+            dbname="pitk",
+            user="pitk_user",
+            password="N63uWAQkpdSDg8SFvoggKxCDw5OY1aPx",
+            host="dpg-d1efmamuk2gs73allkt0-a.singapore-postgres.render.com",
+            port="5432"
+        )
+        cur = conn.cursor()
+        
+        # Get table structure
+        cur.execute("""
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns 
+            WHERE table_name = 'users'
+            ORDER BY ordinal_position
+        """)
+        
+        schema = []
+        for col in cur.fetchall():
+            schema.append({
+                "column": col[0], 
+                "type": col[1],
+                "nullable": col[2] == 'YES',
+                "default": col[3]
+            })
+        
+        # Get any constraints
+        cur.execute("""
+            SELECT conname, contype, conkey, pg_get_constraintdef(oid)
+            FROM pg_constraint
+            WHERE conrelid = 'users'::regclass
+        """)
+        
+        constraints = []
+        for con in cur.fetchall():
+            constraints.append({
+                "name": con[0],
+                "type": con[1],  # p=primary key, u=unique, c=check, f=foreign key
+                "columns": con[2],
+                "definition": con[3]
+            })
+        
+        # Get any triggers
+        cur.execute("""
+            SELECT trigger_name, event_manipulation, action_statement 
+            FROM information_schema.triggers 
+            WHERE event_object_table = 'users'
+        """)
+        
+        triggers = [{
+            "name": t[0], 
+            "event": t[1], 
+            "action": t[2][:200] + "..." if t[2] else None
+        } for t in cur.fetchall()]
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "schema": schema,
+            "constraints": constraints,
+            "triggers": triggers
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -2528,92 +2889,120 @@ def register():
                 cur = conn.cursor()
                 print("[DEBUG] Database cursor created")
                 
-                # Check if email already exists by querying the user_data JSONB
-                print("\n[DEBUG] Checking if email exists in database...")
-                check_email_query = """
-                    SELECT id FROM users 
-                    WHERE user_data->'account'->>'email' = %s 
-                    OR user_data->'account'->>'username' = %s
-                """
-                print(f"[DEBUG] Executing query: {check_email_query}")
-                print(f"[DEBUG] With params: ({email}, {email})")
-                
                 try:
-                    cur.execute(check_email_query, (email, email))
+                    # First, check if username/email already exists
+                    # Check in username column
+                    cur.execute("SELECT id FROM users WHERE username = %s", (email,))
+                    if cur.fetchone():
+                        error = 'This email is already registered. Please use a different email or try logging in.'
+                        print(f"[DEBUG] Username {email} already exists in username column")
+                        return render_template('register.html', error=error)
+                        
+                    # Check in user_data JSONB
+                    cur.execute("""
+                        SELECT id FROM users 
+                        WHERE user_data->'account'->>'email' = %s 
+                        OR user_data->'account'->>'username' = %s
+                        LIMIT 1
+                    """, (email, email))
+                    
                     existing_user = cur.fetchone()
                     if existing_user:
-                        print(f"[DEBUG] User with email/username {email} already exists")
-                        error = 'This email is already registered'
-                    else:
-                        print("[DEBUG] Email is available for registration")
-                except Exception as e:
-                    print(f"[ERROR] Error checking email existence: {e}")
-                    print(traceback.format_exc())
-                    error = 'Error checking user existence'
-                else:
+                        print(f"[DEBUG] User with email/username {email} already exists (ID: {existing_user[0]})")
+                        error = 'This email is already registered. Please use a different email or try logging in.'
+                        return render_template('register.html', error=error)
+                    
+                    print("[DEBUG] Email/username is available for registration")
+                    
+                    # If we get here, email/username is available - proceed with registration
                     # Hash the password before storing
                     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
                     
-                    # Update user_data with hashed password
+                    # Update user_data with hashed password and email verification status
                     user_data['account']['password'] = hashed_password
                     
-                    try:
-                        print("\n=== Attempting to create user ===")
-                        print(f"Email: {email}")
-                        print(f"Username (same as email): {email}")
-                        
-                        # Ensure all required fields are in user_data
-                        user_data = {
-                            'account': {
-                                'username': email,
+                    print("\n=== Attempting to create user ===")
+                    print(f"Email: {email}")
+                    print(f"Username (same as email): {email}")
+                    
+                    # Ensure all required fields are in user_data
+                    user_data = {
+                        'account': {
+                            'username': email,
+                            'email': email,
+                            'password': hashed_password,
+                            'email_verified': False,  # Add email verification status
+                            'profile': {
+                                'name': name or email.split('@')[0],
                                 'email': email,
-                                'password': hashed_password,
-                                'profile': {
-                                    'name': name or email.split('@')[0],
-                                    'email': email,
-                                    'phone': phone or '',
-                                    'address': address or '',
-                                    'premium': 'no',
-                                    'photo_url': url_for('static', filename='user_photos/default_free.png', _external=True),
-                                    'bio': '',
-                                    'dob': '',
-                                    'gender': 'Prefer not to say',
-                                    'theme': 'light'
-                                },
-                                'conditions': []
-                            }
+                                'phone': phone or '',
+                                'address': address or '',
+                                'premium': 'no',
+                                'photo_url': url_for('static', filename='user_photos/default_free.png', _external=True),
+                                'bio': '',
+                                'dob': '',
+                                'gender': 'Prefer not to say',
+                                'theme': 'light'
+                            },
+                            'conditions': []
                         }
-                        
-                        user_data_json = json.dumps(user_data)
-                        print(f"User data to be inserted: {user_data_json[:200]}...")  # Print first 200 chars
-                        
-                        # Insert new user into PostgreSQL
-                        insert_query = """
-                            INSERT INTO users (username, user_data)
-                            VALUES (%s, %s)
-                            RETURNING id
-                        """
-                        print(f"Executing query: {insert_query}")
-                        print(f"With params: ({email}, [user_data])")
-                        
-                        cur.execute(insert_query, (email, user_data_json))
-                        print("Query executed successfully")
-                        
-                        result = cur.fetchone()
-                        if result:
-                            user_id = result[0]
-                            print(f"User created successfully with ID: {user_id}")
-                            conn.commit()
-                            
-                            # Log the user in with the hashed password
-                            user = User(id=str(user_id), username=email, password=hashed_password, email=email)
-                            login_user(user)
-                            print("User logged in successfully")
-                            return redirect(url_for('index'))
-                        else:
-                            print("❌ Failed to get user ID after insert")
-                            error = 'Error creating user. Please try again.'
+                    }
+                    
+                    user_data_json = json.dumps(user_data)
+                    print(f"User data to be inserted: {user_data_json[:200]}...")  # Print first 200 chars
+                    
+                    # Insert new user into PostgreSQL
+                    insert_query = """
+                        INSERT INTO users (username, password_hash, user_data)
+                        VALUES (%s, %s, %s)
+                        RETURNING id
+                    """
+                    print(f"\n[DEBUG] Executing query: {insert_query}")
+                    print(f"[DEBUG] With params: ({email}, [hashed_password], [user_data])")
+                    
+                    # Ensure password is in both password_hash and user_data
+                    user_data['account']['password'] = hashed_password
+                    user_data_json = json.dumps(user_data)
+                    
+                    # Debug: Print the exact query that will be executed
+                    debug_query = cur.mogrify(insert_query, (email, hashed_password, user_data_json)).decode('utf-8')
+                    print(f"[DEBUG] Full query: {debug_query[:500]}...")
+                    
+                    # Execute with error handling
+                    try:
+                        cur.execute(insert_query, (email, hashed_password, user_data_json))
+                        print("[DEBUG] Query executed successfully")
                     except Exception as e:
+                        print(f"[ERROR] Error executing query: {e}")
+                        print(f"[ERROR] Query was: {debug_query[:500]}...")
+                        print("\n[DEBUG] Database connection info:")
+                        print(f"Autocommit: {conn.autocommit}")
+                        print(f"Isolation level: {conn.isolation_level}")
+                        print(f"Encoding: {conn.encoding}")
+                        raise  # Re-raise the exception after logging
+                    
+                    result = cur.fetchone()
+                    if result:
+                        user_id = result[0]
+                        print(f"User created successfully with ID: {user_id}")
+                        conn.commit()
+                        
+                        try:
+                            # Send verification email
+                            send_verification_email(email, name or email.split('@')[0])
+                            print(f"Verification email sent to {email}")
+                            
+                            # Show verification pending page instead of logging in
+                            return redirect(url_for('verification_pending', email=email))
+                            
+                        except Exception as e:
+                            print(f"Error sending verification email: {e}")
+                            # If email sending fails, still show pending page but log the error
+                            return redirect(url_for('verification_pending', email=email, error='email_failed'))
+                    else:
+                        print("❌ Failed to get user ID after insert")
+                        error = 'Error creating user. Please try again.'
+                except Exception as e:
                         error_msg = f"Error during user creation: {str(e)}"
                         print("\n" + "="*50)
                         print("ERROR DETAILS:")

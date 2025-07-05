@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Access Forbidden - 403{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">Access Forbidden (403)</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">You don't have permission to access this page.</p>
+                    <p>If you believe this is an error, please contact support or <a href="{{ url_for('main.index') }}">return to the homepage</a>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

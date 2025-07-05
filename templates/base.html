@@ -132,7 +132,7 @@
     {% if request.endpoint not in ['login', 'register', 'forgot_password_page'] %}
     <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
-            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('main.index') }}">
                 <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
                 <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
             </a>
@@ -157,7 +157,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     {% if current_user.is_authenticated and request.endpoint != 'index' %}
-    <a href="{{ url_for('index') }}" class="floating-btn" title="Go to Dashboard">
+    <a href="{{ url_for('main.index') }}" class="floating-btn" title="Go to Dashboard">
         <i class="fas fa-home"></i>
     </a>
     {% endif %}

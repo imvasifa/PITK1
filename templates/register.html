@@ -59,7 +59,8 @@
                     {% if error %}
                         <div class="alert alert-danger">{{ error }}</div>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('register') }}" id="registerForm">
+                    <form method="POST" action="{{ url_for('auth.register') }}" id="registerForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
                             <div class="input-group">
@@ -99,7 +100,7 @@
                     </form>
                     <div class="text-center mt-4">
                         <p class="mb-0">Already have an account? 
-                            <a href="{{ url_for('login') }}" class="fw-bold">Login here</a>
+                            <a href="{{ url_for('auth.login') }}" class="fw-bold">Login here</a>
                         </p>
                     </div>
                 </div>

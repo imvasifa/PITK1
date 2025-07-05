@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Your Email - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Verify Your Email Address</h4>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-envelope fa-4x text-primary mb-3"></i>
+                        <h3>Check Your Email</h3>
+                    </div>
+                    
+                    {% if error == 'email_failed' %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            We encountered an issue sending your verification email. Please try logging in again or contact support.
+                        </div>
+                    {% endif %}
+                    
+                    <p class="lead">We've sent a verification link to <strong>{{ email }}</strong>.</p>
+                    <p>Please check your email and click on the verification link to activate your account.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Didn't receive the email?</strong> Check your spam folder or 
+                        <a href="{{ url_for('resend_verification', email=email) }}" class="alert-link">click here to resend</a>.
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <a href="{{ url_for('login') }}" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>Return to Login
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted text-center">
+                    <small>
+                        Having trouble? <a href="{{ url_for('contact') }}">Contact support</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
