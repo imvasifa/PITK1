@@ -289,7 +289,7 @@ def get_user_data(user_id):
             # Execute query to get user data
             cur.execute("""
                 SELECT user_data 
-                FROM users 
+                FROM PITK3 
                 WHERE id = %s
             """, (user_id_int,))
             
@@ -394,7 +394,7 @@ def get_user(user_id):
                    user_data->'account'->>'password' as password,
                    COALESCE(user_data->'account'->'profile'->>'email', 
                            user_data->'account'->>'email', '') as email
-            FROM users 
+            FROM PITK3 
             WHERE id = %s
         """, (user_id,))
         user_data = cur.fetchone()
@@ -473,14 +473,14 @@ def authenticate_user(username, password):
             SELECT 
                 id, 
                 user_data->'account'->>'username' as username,
-                user_data->'account'->>'password' as password_hash,
+                user_data->'account'->>'password' as password,
                 COALESCE(
                     user_data->'account'->'profile'->>'email', 
                     user_data->'account'->>'email', 
                     ''
                 ) as email,
                 user_data->'account' as account_data
-            FROM users 
+            FROM PITK3 
             WHERE user_data->'account'->>'username' = %s
         """, (username,))
         
@@ -500,8 +500,8 @@ def authenticate_user(username, password):
         print(f"✅ Found user: {user_data.get('username')} (ID: {user_data.get('id')})")
         
         # Get password hash
-        password_hash = user_data.get('password_hash')
-        if not password_hash:
+        password = user_data.get('password')
+        if not password:
             print("❌ No password found for user")
             return None
             
@@ -509,7 +509,7 @@ def authenticate_user(username, password):
         print(f"🔑 User ID: {user_data.get('id')}, Username: {user_data.get('username')}")
         try:
             # Verify the password using the existing bcrypt instance
-            password_matches = bcrypt.check_password_hash(password_hash, password)
+            password_matches = bcrypt.check_password_hash(password, password)
             print(f"🔑 Password check result: {password_matches}")
             
             if not password_matches:
@@ -529,7 +529,7 @@ def authenticate_user(username, password):
             return User(
                 id=user_data.get('id'),
                 username=user_data.get('username'),
-                password=password_hash,
+                password=password,
                 email=user_data.get('email', '')
             )
         else:
@@ -550,7 +550,7 @@ def save_user(username, password, email=''):
         # Check if username already exists
         cur = db.get_cursor()
         cur.execute("""
-            SELECT id FROM users 
+            SELECT id FROM PITK3 
             WHERE user_data->'account'->>'username' = %s
         """, (username,))
         if cur.fetchone():
@@ -577,12 +577,12 @@ def save_user(username, password, email=''):
             }
         }
         
-        # Insert new user with password_hash
+        # Insert new user with password
         cur.execute("""
-            INSERT INTO users (username, password_hash, user_data)
-            VALUES (%s, %s, %s)
+            INSERT INTO PITK3 (username, password, email, user_data)
+            VALUES (%s, %s, %s, %s)
             RETURNING id
-        """, (username, hashed_password, json.dumps(user_data)))
+        """, (username, hashed_password, email, json.dumps(user_data)))
         
         result = cur.fetchone()
         if result:
@@ -1212,7 +1212,7 @@ def load_user_conditions(user_id=None):
                 
             cur.execute("""
                 SELECT id, user_data->'account'->'conditions' as conditions 
-                FROM users 
+                FROM PITK3 
                 WHERE user_data->'account'->'conditions' IS NOT NULL
                   AND jsonb_array_length(user_data->'account'->'conditions') > 0
             """)
@@ -1261,7 +1261,7 @@ def load_user_conditions(user_id=None):
             
         cur.execute("""
             SELECT user_data->'account'->'conditions' as conditions 
-            FROM users 
+            FROM PITK3 
             WHERE id = %s
               AND user_data->'account'->'conditions' IS NOT NULL
               AND jsonb_array_length(user_data->'account'->'conditions') > 0
@@ -1341,7 +1341,7 @@ def save_user_conditions(user_id, conditions_list):
             
         # Update user's conditions in the database
         query = """
-            UPDATE users 
+            UPDATE PITK3 
             SET user_data = jsonb_set(
                 COALESCE(user_data, '{}'::jsonb),
                 '{account,conditions}'::text[],
@@ -1992,7 +1992,7 @@ def update_theme():
         if not cur:
             return jsonify({'success': False, 'message': 'Database error'}), 500
         cur.execute(
-            "UPDATE users SET user_data = %s WHERE id = %s RETURNING id",
+            "UPDATE PITK3 SET user_data = %s WHERE id = %s RETURNING id",
             (json.dumps(user_data), current_user.id)
         )
         db.conn.commit()
@@ -2035,7 +2035,7 @@ def update_refresh_interval():
             return jsonify({'success': False, 'message': 'Database error'}), 500
             
         cur.execute(
-            "UPDATE users SET user_data = %s WHERE id = %s RETURNING id",
+            "UPDATE PITK3 SET user_data = %s WHERE id = %s RETURNING id",
             (json.dumps(user_data), current_user.id)
         )
         db.conn.commit()
@@ -2462,7 +2462,7 @@ def register():
                 
                 # Check if username already exists
                 cur.execute("""
-                    SELECT id FROM users 
+                    SELECT id FROM PITK3 
                     WHERE user_data->'account'->>'username' = %s
                 """, (username,))
                 
@@ -2477,10 +2477,10 @@ def register():
                     
                     # Insert new user into PostgreSQL with hashed password
                     cur.execute("""
-                        INSERT INTO users (username, password_hash, user_data)
-                        VALUES (%s, %s, %s)
+                        INSERT INTO PITK3 (username, password, email, user_data)
+                        VALUES (%s, %s, %s, %s)
                         RETURNING id
-                    """, (username, hashed_password, json.dumps(user_data)))
+                    """, (username, hashed_password, email, json.dumps(user_data)))
                     
                     result = cur.fetchone()
                     if result:
@@ -2544,7 +2544,7 @@ def upload_photo():
             # Update the user's photo_path and photo_url in the database (JSONB)
             # First, set photo_path, then set photo_url (atomic update)
             query_path = """
-                UPDATE users 
+                UPDATE PITK3 
                 SET user_data = jsonb_set(
                     COALESCE(user_data, '{}'::jsonb),
                     '{account,profile,photo_path}',
@@ -2561,7 +2561,7 @@ def upload_photo():
             else:
                 # Now update photo_url in the returned JSONB
                 query_url = """
-                    UPDATE users
+                    UPDATE PITK3
                     SET user_data = jsonb_set(
                         user_data,
                         '{account,profile,photo_url}',
@@ -2607,7 +2607,7 @@ def remove_photo():
         # First, get the current photo path to delete the file
         get_photo_query = """
             SELECT user_data->'account'->'profile'->>'photo_path' as photo_path
-            FROM users 
+            FROM PITK3 
             WHERE id = %s
         """
         
@@ -2641,10 +2641,10 @@ def remove_photo():
                 SELECT id, 
                        user_data #- '{account,profile,photo_path}'::text[] 
                                #- '{account,profile,photo_url}'::text[] as new_data
-                FROM users
+                FROM PITK3
                 WHERE id = %s
             )
-            UPDATE users u
+            UPDATE PITK3 u
             SET user_data = updated.new_data,
                 updated_at = NOW()
             FROM updated
@@ -2705,7 +2705,7 @@ def dash():
                 
                 # Get current user data
                 cur.execute("""
-                    SELECT user_data FROM users WHERE id = %s
+                    SELECT user_data FROM PITK3 WHERE id = %s
                 """, (user_id,))
                 
                 result = cur.fetchone()
@@ -2740,7 +2740,7 @@ def dash():
                 
                 # Save the updated data back to PostgreSQL
                 cur.execute("""
-                    UPDATE users 
+                    UPDATE PITK3 
                     SET user_data = %s
                     WHERE id = %s
                     RETURNING id
@@ -2779,8 +2779,8 @@ def dash():
                     
                     # Update the user's password in the database
                     query = """
-                        UPDATE users 
-                        SET password_hash = %s
+                        UPDATE PITK3 
+                        SET password = %s
                         WHERE id = %s
                         RETURNING id
                     """
@@ -2814,7 +2814,7 @@ def dash():
             # Get the user's data from the database
             query = """
                 SELECT user_data 
-                FROM users 
+                FROM PITK3 
                 WHERE id = %s
             """
             
@@ -3973,7 +3973,7 @@ def reset_profile():
         
         # Get current user data
         cur.execute("""
-            SELECT user_data FROM users WHERE id = %s
+            SELECT user_data FROM PITK3 WHERE id = %s
         """, (user_id,))
         
         result = cur.fetchone()
@@ -4028,7 +4028,7 @@ def reset_profile():
         
         # Save the updated data back to PostgreSQL
         cur.execute("""
-            UPDATE users 
+            UPDATE PITK3 
             SET user_data = %s
             WHERE id = %s
             RETURNING id
@@ -4171,7 +4171,7 @@ def _set_premium_expiry(user_id: int, seconds: int = 600):
         # First, get current user data to check if we need to update photo_url
         cur.execute(
             """
-            SELECT user_data FROM users WHERE id = %s
+            SELECT user_data FROM PITK3 WHERE id = %s
             """,
             (user_id,)
         )
@@ -4185,7 +4185,7 @@ def _set_premium_expiry(user_id: int, seconds: int = 600):
         
         # Update user data with premium status and expiry
         update_query = """
-            UPDATE users
+            UPDATE PITK3
             SET user_data = jsonb_set(
                 jsonb_set(
                     COALESCE(user_data, '{}'::jsonb),
@@ -4254,7 +4254,7 @@ def update_user_premium_status(user_id: int, is_premium: bool):
         # First, get current user data to check if we need to update photo_url
         cur.execute(
             """
-            SELECT user_data FROM users WHERE id = %s
+            SELECT user_data FROM PITK3 WHERE id = %s
             """,
             (user_id,)
         )
@@ -4268,7 +4268,7 @@ def update_user_premium_status(user_id: int, is_premium: bool):
         
         # Prepare the base update query
         update_query = """
-            UPDATE users
+            UPDATE PITK3
             SET user_data = jsonb_set(
                 COALESCE(user_data, '{}'::jsonb),
                 '{account,profile,premium}', %s::jsonb, true
@@ -4575,7 +4575,7 @@ def check_premium():
                 (user_data->'account'->'profile'->>'premium') AS premium,
                 (user_data->'account'->'profile'->>'premium_expires_at')::bigint AS expires,
                 (user_data->'account'->'profile'->>'expiry_warn_count')::int AS warn
-            FROM users WHERE id = %s
+            FROM PITK3 WHERE id = %s
             """,
             (user_id,),
         )
@@ -4604,7 +4604,7 @@ def check_premium():
             show_msg = True
         # Persist new warn_count
         cur.execute(
-            """UPDATE users
+            """UPDATE PITK3
                 SET user_data = jsonb_set(
                     COALESCE(user_data, '{}'::jsonb),
                     '{account,profile,expiry_warn_count}', to_jsonb(%s::int), true)
@@ -4688,7 +4688,7 @@ def check_license_statuses():
                                         continue
                                         
                                     cur.execute("""
-                                        SELECT id FROM users 
+                                        SELECT id FROM PITK3 
                                         WHERE user_data->'account'->>'username' = %s
                                     """, (username,))
                                     user_data = cur.fetchone()
