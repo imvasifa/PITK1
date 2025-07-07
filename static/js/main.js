@@ -74,9 +74,8 @@ if (conditionsModal) {
 const updateSettingsForm = document.getElementById('update-settings-form');
 if (updateSettingsForm) {
     updateSettingsForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
+        e.preventDefault(); // Prevent default form submission
         const selected = Array.from(document.querySelectorAll('#admin-conditions-list input:checked')).map(el => el.value);
-        
         try {
             const response = await fetch('/update-settings', {
                 method: 'POST',
@@ -85,7 +84,8 @@ if (updateSettingsForm) {
             });
             const data = await response.json();
             if (data.success) {
-                const modalInstance = bootstrap.Modal.getInstance(conditionsModal);
+                const conditionsModal = document.getElementById('conditionsModal');
+                const modalInstance = conditionsModal ? bootstrap.Modal.getInstance(conditionsModal) : null;
                 if (modalInstance) {
                     modalInstance.hide();
                 }

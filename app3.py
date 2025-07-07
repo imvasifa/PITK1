@@ -3049,55 +3049,68 @@ def index():
 
 @app.route('/get-settings')
 def get_settings():
-    """Get current application settings"""
+    """Get current user-specific settings, including admin condition selections from misc10"""
     try:
-        settings = load_settings()
-        return jsonify(settings)
+        if current_user.is_authenticated:
+            user_data = get_user_data(current_user.id)
+            misc10 = user_data.get('account', {}).get('misc10', [])
+            # Return misc10 as the selected admin conditions
+            settings = load_settings()
+            settings['conditions'] = misc10
+            settings['selected_conditions'] = misc10
+            return jsonify(settings)
+        else:
+            # Fallback to global settings if not logged in
+            settings = load_settings()
+            return jsonify(settings)
     except Exception as e:
         logger.error(f"Error in get_settings: {str(e)}")
         return jsonify(get_default_settings())
 
 @app.route('/update-settings', methods=['POST'])
 def update_settings():
-    """Update application settings"""
+    """Update user-specific admin condition selections in misc10"""
     try:
+        if not current_user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Not authenticated'}), 401
         data = request.get_json()
         logger.info(f"Received update settings request: {data}")
-        
-        # Load current settings
-        current_settings = load_settings()
-        
-        # Update only allowed fields
+        # Only update misc10 for admin conditions
         if 'conditions' in data:
-            logger.info(f"Updating conditions: {data['conditions']}")
-            current_settings['conditions'] = data['conditions']
-            current_settings['selected_conditions'] = data['conditions']  # Keep both for backward compatibility
-        
-        if 'selected_option' in data:
-            logger.info(f"Updating selected option: {data['selected_option']}")
-            current_settings['app_selected'] = data['selected_option']
-            current_settings['browser'] = '1' if data['selected_option'] == 'browser' else '0'
-            current_settings['app'] = '1' if data['selected_option'] == 'app' else '0'
-        
-        # Save settings to database
-        logger.info("Saving settings to database...")
-        if not save_settings(current_settings):
-            logger.error("Failed to save settings to database")
-            return jsonify({'success': False, 'error': 'Failed to save settings to database'}), 500
-        
-        logger.info("Settings saved successfully")
-        return jsonify({
-            'success': True, 
-            'message': 'Settings updated successfully',
-            'settings': current_settings
-        }), 200
-        
+            selected_conditions = data['conditions']
+            # Update misc10 in user_data for the current user
+            cur = db.get_cursor()
+            if not cur:
+                logger.error("Failed to get database cursor")
+                return jsonify({'success': False, 'error': 'Database error'}), 500
+            cur.execute("""
+                UPDATE PITK3
+                SET user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,misc10}',
+                    %s::jsonb,
+                    true
+                ),
+                updated_at = NOW()
+                WHERE id = %s
+                RETURNING id;
+            """, (json.dumps(selected_conditions), current_user.id))
+            if cur.rowcount == 0:
+                logger.error(f"No user found with ID: {current_user.id}")
+                if db.conn is not None:
+                    db.conn.rollback()
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+            if db.conn is not None:
+                db.conn.commit()
+            logger.info(f"Successfully updated misc10 for user {current_user.id}")
+            return jsonify({'success': True, 'message': 'Settings updated successfully'}), 200
+        else:
+            return jsonify({'success': False, 'error': 'No conditions provided'}), 400
     except Exception as e:
         logger.error(f"Error updating settings: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False, 
-            'error': f'Failed to update settings: {str(e)}'
-        }), 500
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({'success': False, 'error': f'Failed to update settings: {str(e)}'}), 500
 
 @app.route('/conditions')
 def get_conditions():
