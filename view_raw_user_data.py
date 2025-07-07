@@ -9,7 +9,7 @@ def view_raw_user_data(username=None):
         cur = db.get_cursor()
         cur.execute("""
             SELECT id, user_data 
-            FROM users 
+            FROM pitk3 
             WHERE user_data->'account'->>'username' = %s
         """, (username,))
         
@@ -19,7 +19,7 @@ def view_raw_user_data(username=None):
             print(f"No user found with username: {username}")
             return
             
-        print(f"\n=== RAW USER DATA FOR: {username} ===\n")
+        print(f"\n=== RAW PITK3 DATA FOR: {username} ===\n")
         print(f"User ID: {user['id']}")
         print("\nComplete user_data JSON:")
         print(json.dumps(user['user_data'], indent=2, default=str))

@@ -2,6 +2,7 @@ import atexit
 from datetime import datetime, date, timezone, timedelta
 import json
 import base64
+import uuid
 from postgres_db import db
 import logging
 import math
@@ -458,7 +459,7 @@ def load_user(user_id):
         return None
         return None
 
-def authenticate_user(username, password):
+def authenticate_user(username, provided_password):
     try:
         print(f"🔍 Attempting to authenticate user: {username}")
         
@@ -473,7 +474,8 @@ def authenticate_user(username, password):
             SELECT 
                 id, 
                 user_data->'account'->>'username' as username,
-                user_data->'account'->>'password' as password,
+                user_data->'account'->>'password' as password_json,
+                password as password_column,  -- Get password from the password column
                 COALESCE(
                     user_data->'account'->'profile'->>'email', 
                     user_data->'account'->>'email', 
@@ -499,51 +501,63 @@ def authenticate_user(username, password):
         # Debug print user data (without password hash for security)
         print(f"✅ Found user: {user_data.get('username')} (ID: {user_data.get('id')})")
         
-        # Get password hash
-        password = user_data.get('password')
-        if not password:
-            print("❌ No password found for user")
-            return None
-            
-        # For all users, check bcrypt hash
-        print(f"🔑 User ID: {user_data.get('id')}, Username: {user_data.get('username')}")
+        # Get stored password hashes from both locations
+        stored_password_hash = user_data.get('password_json')
+        stored_password_col = user_data.get('password_column')
+        
+        # Debug: Print the first few chars of the stored hashes for verification
+        print(f"🔑 Stored hash (user_data): {stored_password_hash[:10]}..." if stored_password_hash else "🔑 No password in user_data")
+        print(f"🔑 Stored hash (password column): {stored_password_col[:10]}..." if stored_password_col else "🔑 No password in password column")
+        
         try:
-            # Verify the password using the existing bcrypt instance
-            password_matches = bcrypt.check_password_hash(password, password)
-            print(f"🔑 Password check result: {password_matches}")
+            # Check password against both possible locations
+            password_matches = False
+            
+            if stored_password_hash and bcrypt.check_password_hash(stored_password_hash, provided_password):
+                password_matches = True
+                print("✅ Password verified from user_data")
+                stored_password = stored_password_hash
+            elif stored_password_col and bcrypt.check_password_hash(stored_password_col, provided_password):
+                password_matches = True
+                print("✅ Password verified from password column")
+                stored_password = stored_password_col
             
             if not password_matches:
                 print("❌ Incorrect password")
                 return None
                 
             # If we get here, password is correct
-            print(f"✅ Password verified for user: {username}")
+            print(f"✅ Login successful for user: {username}")
+            
+            # Update the user_data with the password hash if it was in the password column
+            if stored_password_col and stored_password_col != stored_password_hash:
+                print("🔑 Updating user_data with password from password column")
+                
+                # Update the user_data in the database
+                cur = db.get_cursor()
+                cur.execute("""
+                    UPDATE PITK3 
+                    SET user_data = jsonb_set(user_data, '{account,password}', %s::jsonb)
+                    WHERE id = %s
+                """, (json.dumps(stored_password_col), user_data.get('id')))
+                db.conn.commit()
+            
+            return User(
+                id=user_data.get('id'),
+                username=user_data.get('username'),
+                password=stored_password,  # Store the hashed password
+                email=user_data.get('email', '')
+            )
                 
         except Exception as e:
             print(f"❌ Error verifying password: {str(e)}")
             traceback.print_exc()
-            return None
-                
-        if password_matches:
-            print(f"✅ Authentication successful for user: {username}")
-            return User(
-                id=user_data.get('id'),
-                username=user_data.get('username'),
-                password=password,
-                email=user_data.get('email', '')
-            )
-        else:
-            print("❌ Password does not match")
             return None
             
     except Exception as e:
         print(f"❌ Error authenticating user: {e}")
         traceback.print_exc()
         return None
-        print(f"❌ Error authenticating user: {str(e)}")
-        print("Stack trace:")
-        traceback.print_exc()
-    return None
 
 def save_user(username, password, email=''):
     try:
@@ -561,23 +575,24 @@ def save_user(username, password, email=''):
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         print(f"🔑 Generated password hash for new user: {hashed_password[:20]}...")
         
-        # Create new user data structure
+        # Create new user data structure with hashed password in both places
         user_data = {
             'account': {
                 'username': username,
-                'password': hashed_password,
+                'password': hashed_password,  # Store hashed password in user_data
                 'email': email,
                 'profile': {
                     'name': username,
                     'email': email,
                     'premium': 'no',
-                    'gender': 'Prefer not to say'
+                    'gender': 'Prefer not to say',
+                    'photo_url': url_for('static', filename='user_photos/default_free.png', _external=True)
                 },
                 'conditions': []
             }
         }
         
-        # Insert new user with password
+        # Insert new user with password in both columns
         cur.execute("""
             INSERT INTO PITK3 (username, password, email, user_data)
             VALUES (%s, %s, %s, %s)
@@ -1181,13 +1196,16 @@ def load_user_conditions(user_id=None):
     
     logger.info(f"[DEBUG] load_user_conditions called with user_id: {user_id}")
     
-    # Skip loading during app initialization (before first request)
-    if 'app' not in globals() or not current_app or not current_user:
-        logger.info("[DEBUG] App not initialized, returning empty list")
+    # If no user_id provided and we're not in a request context, return empty list
+    if user_id is None and not current_app:
+        logger.info("[DEBUG] No user_id provided and no app context, returning empty list")
         return []
     
-    # If no user_id provided, return admin conditions
-    if user_id is None:
+    # If no user_id provided but we have a current user, use their ID
+    if user_id is None and current_user and hasattr(current_user, 'id') and current_user.id:
+        user_id = current_user.id
+        logger.info(f"[DEBUG] Using current user ID: {user_id}")
+    elif user_id is None:
         logger.info("[DEBUG] No user_id provided, loading all conditions")
         
         # Use thread-safe cache access
@@ -1238,6 +1256,10 @@ def load_user_conditions(user_id=None):
     
     # For specific user
     try:
+        if user_id is None:
+            logger.error("[DEBUG] No user_id provided for loading conditions")
+            return []
+            
         user_id_int = int(user_id)  # Ensure user_id is an integer for the cache key
         
         # Try to get from cache first if it hasn't expired
@@ -1338,7 +1360,39 @@ def save_user_conditions(user_id, conditions_list):
             return False
             
         logger.info("[DEBUG] Successfully got database cursor")
+        
+        # First, ensure the conditions list is properly formatted
+        if not isinstance(conditions_list, list):
+            logger.error("[DEBUG] conditions_list is not a list")
+            return False
             
+        # Prepare the conditions data with required fields
+        processed_conditions = []
+        for condition in conditions_list:
+            if not isinstance(condition, dict):
+                continue
+                
+            # Ensure required fields exist
+            if 'name' not in condition or 'scan_clause' not in condition:
+                logger.warning(f"[DEBUG] Skipping invalid condition: {condition}")
+                continue
+                
+            # Set default values for optional fields
+            processed_condition = {
+                'id': condition.get('id') or f"user_condition_{uuid.uuid4().hex[:8]}",
+                'name': str(condition['name']).strip(),
+                'scan_clause': str(condition['scan_clause']).strip(),
+                'link': str(condition.get('link', '#')).strip(),
+                'chart_link': str(condition.get('chart_link', '')).strip(),
+                'type': str(condition.get('type', 'user')).strip()
+            }
+            
+            # If chart_link is empty, use link as fallback
+            if not processed_condition['chart_link'] and processed_condition['link'] != '#':
+                processed_condition['chart_link'] = processed_condition['link']
+                
+            processed_conditions.append(processed_condition)
+        
         # Update user's conditions in the database
         query = """
             UPDATE PITK3 
@@ -1347,7 +1401,8 @@ def save_user_conditions(user_id, conditions_list):
                 '{account,conditions}'::text[],
                 %s::jsonb,
                 true
-            )
+            ),
+            updated_at = NOW()
             WHERE id = %s
             RETURNING id;
         """
