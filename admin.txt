@@ -1,0 +1,451 @@
+[
+
+    {
+    "name": "DeepSeek",
+    "type": "admin",
+    "link": "https://chartink.com/screener/deepseek",
+    "scan_clause": """( {57960} ( 
+        latest close > latest ema( latest close , 9 ) and 
+        latest close > latest ema( latest close , 21 ) and 
+        latest ema( latest close , 9 ) > latest ema( latest close , 21 ) and 
+        latest close > greatest( 1 day ago high, 5 ) and 
+        latest volume >= ( latest sma( latest volume , 20 ) * 1.5 ) and 
+        latest rsi( 14 ) < 70 and
+        latest close >= 10 and 
+        latest close <= 2250  
+    ) )"""
+    },
+    {
+    "name": "Gap Up 17% Below 2250",
+    "type": "admin",
+    "link": "",
+    "chart_link": "",
+    "scan_clause": """( {cash} ( 
+        latest close > 1 day ago close * 1.17 and 
+        latest close <= 2250 
+    ) )"""
+    },
+    {
+    "name": "AN Kumar NIFTY500 ✅",
+    "type": "admin",
+    "link": "https://chartink.com/screener/ank-1073",
+    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
+    "scan_clause": """( {57960} ( 
+        ( ( latest close - 1 day ago close ) / ( greatest( 2, latest high ) - least( 2, latest low ) ) ) * 
+        ( latest volume + 1 day ago volume ) / 2 > 0.5 and 
+        latest close > 25 and 
+        latest close < 2250 
+    ) )"""
+    },
+    {
+    "name": "Chanu 5-200 CASH ✅",
+    "type": "admin",
+    "link": "",
+    "chart_link": "",
+    "scan_clause": "( {cash} ( \
+        latest ema( latest close , 5 ) > latest ema( latest close , 200 ) and \
+        1 day ago ema( latest close , 5 ) <= 1 day ago ema( latest close , 200 ) and \
+        latest close > latest max( 20 , latest vwap ) and \
+        latest volume > 1 day ago volume * 1 and \
+        latest volume > latest sma( latest volume , 5 ) * 0.75 and \
+        latest close < 2250 and \
+        latest volume > latest sma( latest volume , 20 ) * 2 and \
+        latest close > latest open and \
+        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and \
+        latest close > latest ema( latest close , 20 ) and \
+        latest max( 10 , latest high ) > latest min( 10 , latest low ) * 1.05 and \
+        latest volume > latest sma( latest volume , 20 ) and \
+        latest max( 50 , latest high ) / latest min( 50 , latest low ) >= 1.35 \
+    ) )"
+    },
+    {
+    "name": "AN Kumar Cash",
+    "type": "admin",
+    "link": "https://chartink.com/screener/ank-1073",
+    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
+    "scan_clause": """( {cash} ( 
+        ( ( latest close - 1 day ago close ) / ( greatest( 2, latest high ) - least( 2, latest low ) ) ) * 
+        ( latest volume + 1 day ago volume ) / 2 > 0.5 and 
+        latest close > 25 and 
+        latest close < 2250 
+    ) )"""
+    },
+    {
+        "name": "KHAIZER",
+        "type": "admin",
+        "link": "https://chartink.com/screener/copy-khizir",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:78d1fc5151e3a3d90e6ae7786f63cca8&timeframe=daily&symbol=", 
+        "scan_clause": """( {57960} ( 
+            latest close > latest ema( latest close , 200 ) and 
+            latest close > latest ema( latest close , 44 ) and 
+            latest close >= latest ema( latest close , 20 ) and 
+            latest close >= latest tma( latest close , 20 ) and 
+            latest close >= latest wma( latest close , 20 ) and 
+            latest close >= latest vwap and 
+            latest close > latest open * 1.03 and 
+            latest close > latest supertrend( 10 , 1.5 ) and 
+            latest volume > 1 day ago volume * 1.5 and 
+            latest macd line( 26 , 12 , 9 ) > latest macd signal( 26 , 12 , 9 ) and 
+            latest close > 1 day ago high and 
+            latest close > latest sma( latest close , 20 ) and 
+            latest close > latest sma( latest close , 50 ) and 
+            latest close > latest sma( latest close , 200 ) and 
+            latest close >= 10 and 
+            latest close <= 2250 
+        ) )"""
+    },
+    {
+        "name": "CROSSED",
+        "type": "admin",
+        "link": "https://chartink.com/screener/crossed-92141",
+        "scan_clause": """( {57960} ( 
+            latest open > latest ema( latest close , 21 ) and 
+            1 day ago open <= 1 day ago ema( latest close , 21 ) and 
+            latest close > latest open * 1.025 and 
+            latest close >= 10 and 
+            latest close <= 2250 and 
+            latest close >= 1 day ago high 
+        ) )"""
+    },
+    {
+        "name": "15 MIN Breakout",
+        "type": "admin",
+        "link": "https://chartink.com/screener/copy-15-minute-stock-breakouts-34515559",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:d54b5e1d428ff9fd372e94622da24fa7&timeframe=15_minute&symbol=", 
+        "scan_clause": """( {57960} ( 
+            [0] 15 minute close > [-1] 15 minute max( 20 , [0] 15 minute close ) and 
+            [0] 15 minute volume > [0] 15 minute sma( volume , 20 ) and 
+            latest close > 1 day ago high and 
+            latest close > latest ema( latest close , 21 ) and 
+            latest close > latest open * 1.025 and 
+            latest close > latest supertrend( 10 , 1.5 ) and 
+            latest close <= 2250 
+        ) )"""
+    },
+    {
+        "name": "STRONG STOCKS POSITIVE",
+        "type": "admin",
+        "link": "https://chartink.com/screener/copy-strong-stocks-22395",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7302638654ee1d6e47747b50291acf65&timeframe=daily&symbol=", 
+        "scan_clause": """( {57960} ( 
+            latest close > 20 and 
+            latest close <= 2250 
+        ) )""",
+    },
+    {
+        "name": "ATR STOCKS",
+        "type": "admin",    
+        "link": "https://chartink.com/screener/atr-stocks",
+        "scan_clause": """( {57960} ( \
+            latest close > ( latest close - ( 3 * latest avg true range( 5 ) ) ) and \
+            latest close > 20 and \
+            latest close <= 2500 and \
+            latest sma( latest close , 50 ) > latest sma( latest close , 200 ) and \
+            latest volume > latest sma( latest volume , 20 ) and \
+            latest close > latest supertrend( 10 , 1.5 ) \
+        ) )"""
+    },
+    {
+        "name": "Deep Seek Volume & Range Break ✅",
+        "type": "admin",   
+        "link": "https://chartink.com/screener/ds-2206",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:9eadb2a72344cf751b91a835fc23e4a0&timeframe=daily&symbol=",
+        "scan_clause": """( {cash} ( 
+        latest close > 50 and 
+        latest close < 2250 and 
+        latest volume > latest sma( latest volume , 5 ) * 2.5 and 
+        latest volume > 1 day ago volume * 1.8 and 
+        latest volume > latest sma( latest volume , 20 ) * 2 and 
+        latest close > latest open and 
+        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
+        latest close > latest ema( latest close , 20 ) and 
+        latest close > latest max( 20 , latest vwap ) and 
+        [=1] 5 minute close < [=1] 5 minute open * 1.03 
+    ) )"""
+    },
+    {
+        "name": "MULTI TIMEFRAME SCAN",
+        "type": "admin",
+        "link": "https://chartink.com/screener/aaaaa-111468",
+        "scan_clause": """( {57960} ( 
+            [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 21 ) and
+            [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 50 ) and
+            [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 200 ) and
+
+            ( {57960} (
+                [0] 15 minute close > [0] 15 minute sma( [0] 15 minute close , 21 ) and
+                [0] 15 minute close > [0] 15 minute sma( [0] 15 minute close , 50 ) and
+                [0] 15 minute close > [0] 15 minute sma( [0] 15 minute close , 200 )
+            ) ) and
+
+            ( {57960} (
+                [0] 10 minute close > [0] 10 minute sma( [0] 10 minute close , 21 ) and
+                [0] 10 minute close > [0] 10 minute sma( [0] 10 minute close , 50 ) and
+                [0] 10 minute close > [0] 10 minute sma( [0] 10 minute close , 200 )
+            ) ) and
+
+            ( {57960} (
+                [0] 5 minute close > [0] 5 minute sma( [0] 5 minute close , 21 ) and
+                [0] 5 minute close > [0] 5 minute sma( [0] 5 minute close , 50 ) and
+                [0] 5 minute close > [0] 5 minute sma( [0] 5 minute close , 200 )
+            ) ) and
+
+            latest close >= 20 and latest close <= 2250
+        ) )"""
+    },
+    {
+        "name": "HARSH SELL STOCKS",
+        "type": "admin",
+        "link": "https://chartink.com/screener/harsh-sell-8",
+        "scan_clause": """( {57960} ( [=1] 10 minute open > [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < -2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
+    },
+    {
+    "name": "VOLUME SHOCKER ",
+    "type": "admin",
+    "link": "https://chartink.com/screener/p45789",
+    "chart_link": "https://chartink.com/stocks-new?symbol=",
+    "scan_clause": """( {57960} ( 
+        latest volume > 1 day ago volume and 
+        1 day ago volume > 2 days ago volume and 
+        latest close > 1 day ago close and 
+        1 day ago close > 2 days ago close and 
+        latest volume > 1000000 and 
+        1 day ago volume > 500000 and 
+        latest close > latest open * 1.03 and 
+        latest open > 1 day ago close 
+    ) )"""
+    },
+    {
+    "name": "High Volume Spike",
+    "type": "admin",
+    "link": "https://chartink.com/screener/shock-19",
+    "chart_link": "https://chartink.com/stocks-new?symbol=",    
+    "scan_clause": """( {57960} ( 
+        latest volume > latest sma( latest volume , 5 ) * 2 and 
+        latest close > 1 day ago close and 
+        latest volume > 500000 
+    ) )"""
+    },
+    {
+        "name": "85 VOLUME SHOCK ",
+        "type": "admin",
+        "link": "https://chartink.com/screener/copy-volume-rahim",
+        "chart_link": "https://chartink.com/stocks-new?symbol=",
+        "scan_clause": """( {cash} ( 
+            latest volume > 1 day ago volume * 0.85 and 
+            1 day ago volume > 2 days ago volume and 
+            latest close > 1 day ago close and 
+            1 day ago close > 2 days ago close and 
+            latest volume > 1000000 and 
+            1 day ago volume > 500000 and 
+            latest close > latest open * 1.025 and 
+            [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
+            latest open > 1 day ago close and 
+            latest volume > latest sma( latest volume , 5 ) * 2 
+        ) )"""
+    },
+    {
+        "name": "HARSH BUY STOCKS",
+        "type": "admin",
+        "link": "https://chartink.com/screener/harsh-645",
+        "scan_clause": """( {57960} ( [=1] 10 minute open < [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < 2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
+    },
+    {
+        "name": "EMA 11 CHANU",
+        "type": "admin",
+        "link": "https://chartink.com/screener/ema-22-271",
+        "scan_clause": """( {57960} ( [0] 15 minute ema ( [0] 15 minute close , 11 ) > [0] 15 minute ema ( [0] 15 minute close , 22 ) and [ -1 ] 15 minute ema ( [0] 15 minute close , 11 )<= [ -1 ] 15 minute ema ( [0] 15 minute close , 22 ) and latest adx ( 14 ) >= 20 ) ) """
+    },
+    {
+        "name": "Smart Cash Flow - Chanu",
+        "type": "admin",
+        "link": "https://chartink.com/screener/copy-85-volume-shameem",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:e93d77e49e9b94220daecb5bae1e6ff8&timeframe=daily&symbol=",
+        "scan_clause": """( {cash} ( 
+            latest volume > 1 day ago volume * 0.85 and 
+            latest close > 1 day ago close and 
+            latest volume > 1000000 and 
+            1 day ago volume > 500000 and 
+            [=1] 5 minute close < [=1] 5 minute open * 1.03 
+        ) )"""
+    },
+    {
+        "name": "30min Volume Spike",
+        "type": "admin",
+        "link": "https://chartink.com/screener/30min-volume-spike",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:99b7045b2e7fc79cc51b0d0ae46e7fac&timeframe=30_minute&symbol=",
+        "scan_clause": """( {cash} ( 
+            [=0] 30 minute volume > [0] 30 minute sma( [0] 30 minute volume , 30 ) * 3 
+        ) )"""
+    },
+    {
+    "name": "Rahim Volume Surge ",
+    "type": "admin",
+    "link": "https://chartink.com/screener/rahim-ds-80",
+    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:279b7c20292d4250387c8dbfa32ac199&timeframe=5_minute&symbol=",
+    "scan_clause": """( {cash} ( 
+        latest volume > latest sma( latest volume , 5 ) * 1.5 and 
+        latest close >= 50 and 
+        latest close < 2250 and 
+        latest volume > 1 day ago volume * 1 and 
+        latest volume > latest sma( latest volume , 20 ) * 2 and 
+        latest close > latest open and 
+        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
+        latest close > latest ema( latest close , 20 ) and 
+        latest close > latest max( 20 , latest vwap ) and 
+        [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
+        latest volume > latest sma( latest volume , 20 ) and 
+        latest max( 10 , latest high ) > latest min( 10 , latest low ) * 1.05 and 
+        latest max( 50 , latest high ) / latest min( 50 , latest low ) >= 1.35 and 
+        ( 
+            ( [0] 15 minute close - [-1] 15 minute close ) / 
+            ( greatest( 2, [0] 15 minute high ) - least( 2, [0] 15 minute low ) ) * 
+            ( [0] 15 minute volume + [-1] 15 minute volume ) / 2 
+        ) > 0.5 
+    ) )"""
+    },
+    {
+        "name": "CHANU VOLATILITY SPIKE ",
+        "type": "admin",
+        "link": "https://chartink.com/screener/copy-volume-shockers-stocks-with-rising-volumes-1111145289",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c7fa7b37712fa79e1b96d4155e7d64d5&timeframe=daily&symbol=",
+        "scan_clause": """( {57960} ( 
+            latest volume > latest sma( volume , 10 ) * 2 and 
+            ( {cash} ( 
+                latest close > 1 day ago close * 1.05 or 
+                latest close < 1 day ago close * 0.95 
+            ) ) 
+        ) )"""
+    },
+    {
+        "name": "Vijay Thakkar",
+        "type": "admin",
+        "link": "https://chartink.com/screener/vijay-thakkar-27107",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
+        "scan_clause": """( {57960} ( 
+            latest volume > latest sma( latest volume , 20 ) * 3 and 
+            latest close > 100 and 
+            ( ( latest close - 1 candle ago close ) / 1 candle ago close ) * 100 >= 3 and 
+            latest sma( latest volume , 20 ) >= 25000 and 
+            latest volume > 100000 
+        ) )"""
+    },
+    {
+        "name": "Only Cash ",
+    "type": "admin",
+        "link": "https://chartink.com/screener/vijay-thakkar-27107",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
+        "scan_clause": """( {cash} ( 
+        ( {57960} not ( 
+            latest close > 0 
+        ) ) and 
+        ( {cash} ( 
+            latest close > 25 and 
+            latest close < 2250 and 
+            latest volume > latest sma( latest volume , 5 ) * 2.5 and 
+            latest volume > 1 day ago volume * 1.8 and 
+            latest volume > latest sma( latest volume , 20 ) * 2 and 
+            latest close > latest open and 
+            latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
+            latest close > latest ema( latest close , 20 ) and 
+            latest close > latest max( 20 , latest vwap ) and 
+            [=1] 5 minute close < [=1] 5 minute open * 1.03 
+        ) ) 
+    ) )"""
+    },
+    {
+    "name": "MAGIC FILTER RAHIM",
+    "type": "admin",
+    "link": "https://chartink.com/screener/che-68",
+    "scan_clause": """({57960}([0] 5 minute close > [0] 5 minute vwap and [0] 5 minute close > [-1] 5 minute vwap and [0] 5 minute close > [-2] 5 minute vwap and [0] 5 minute close > [0] 5 minute supertrend(10,1) and [0] 5 minute close > [-1] 5 minute supertrend(10,1) and [0] 5 minute close > [-2] 5 minute supertrend(10,1) and [0] 5 minute ema([0] 5 minute close,9) > [0] 5 minute supertrend(10,1) and [0] 5 minute close > 20 and [0] 5 minute close <= 2250 and latest close > latest open * 1.02))"""
+    },
+    {
+        "name": "STRONG STOCKS NEGATIVE",
+        "type": "admin",
+        "link": "https://chartink.com/screener/strong-stocks",
+        "scan_clause": """( {57960} ( 
+            latest close > 20 and 
+            latest close <= 2250 and
+            latest close < latest open and
+            (latest open - latest close) / latest open * 100 > 1
+        ) )""",
+    },
+    {
+        "name": "RA Inventor BUY",
+        "type": "admin",
+        "link": "https://chartink.com/screener/ra-score",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:24679f454fd1690bb64e19ac0d079642&timeframe=30_minute&symbol=", 
+        "scan_clause": """( {57960} ( \
+        [0]30 minute close * ([0]30 minute close - [-1] 30 minute close) / [-1] 30 minute close * 100 > 1500 and \
+        latest close > 20 and \
+        latest close <= 2250 \
+    ) )"""
+    },
+    {
+        "name": "RA Inventor SELL",
+        "type": "admin",
+        "link": "https://chartink.com/screener/ra-score-sell",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7a1d3e7c5afc5c6b1b8c4e0d6e4d1b2e&timeframe=30_minute&symbol=",
+        "scan_clause": """( {57960} ( \
+        [0]30 minute close * ([0]30 minute close - [-1] 30 minute close) / [-1] 30 minute close * 100 < -1500 and \
+        latest close > 20 and \
+        latest close <= 2250 \
+    ) )"""
+    },
+    {
+        "name": "RA Inventor 20 Candles BUY",
+        "type": "admin",
+        "link": "https://chartink.com/screener/ra-score",
+        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c78aa5a902629463cf1605aef72c8c1c&timeframe=30_minute&symbol=",
+        "scan_clause": """( {57960} ( \
+        [0]5 minute close * ([0]5 minute close - [-1] 5 minute close) / [-1] 5 minute close * 100 > 1500 and \
+        latest close > 20 and \
+        latest close <= 2250 and \
+        ( latest Close - latest Open ) > ( latest Sum ( latest Close - latest Open , 16 ) / 16 ) * 2 
+        ) )"""
+    },
+    {
+        "name": "DST BUY",  
+        "type": "admin",
+        "link": "https://chartink.com/screener/stst-81",  
+        "chart_link": "https://chartink.com/stocks-new?scan_link=scanlink:5a82d36a216278deb065b37eebc871a0&timeframe=5_minute&symbol=",
+        "scan_clause": """(
+        [0]5 minute supertrend(10,1) > [0]5 minute supertrend(10,3) and
+        [0]5 minute close > [0]5 minute supertrend(10,1) and
+        [0]5 minute close > [0]5 minute supertrend(10,3) and
+        latest close > 20 and \
+        latest close <= 2250 and \
+        [0]5 minute wma([0]5 minute close, 21) > [0]5 minute sma([0]5 minute close, 21)
+    )"""
+    },
+    {
+    "name": "DST SELL",  
+    "type": "admin",
+    "link": "https://chartink.com/screener/dst-sell-4",  
+    "scan_clause": """(
+        [0]5 minute supertrend(10,1) < [0]5 minute supertrend(10,3) and
+        [0]5 minute close < [0]5 minute supertrend(10,1) and
+        latest close > 20 and \
+        latest close <= 2250 and \
+        [0]5 minute close < [0]5 minute supertrend(10,3) and
+        [0]5 minute wma([0]5 minute close, 21) < [0]5 minute sma([0]5 minute close, 21)
+    )"""
+    },
+    {
+        "name": "DEEP High Momentum ✅",
+        "type": "admin",
+        "link": "https://chartink.com/screener/cash-price-volume-surge",
+        "chart_link": "https://chartink.com/stocks-new?symbol=",
+        "scan_clause": """( {cash} ( 
+        latest volume > latest sma( latest volume , 20 ) * 1.5 and 
+        latest close > latest vwap and 
+        latest close > latest open and 
+        latest close >= latest high * 0.98 and 
+        latest close > latest ema( latest close , 20 ) and 
+        latest close > 50 and 
+        latest volume > 100000 and 
+        [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
+        [=1] 5 minute close > [=1] 5 minute open * 0.97 
+    ) )"""
+    },
+]

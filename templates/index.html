@@ -2,6 +2,9 @@
 
 {% block title %}Stock Scanner{% endblock %}
 
+<!-- Admin Condition Cards will render here -->
+<div id="dashboard-cards" class="row"></div>
+
 {% block extra_css %}
     <style>
         /* Responsive spacing below navbar for index only */
@@ -1729,6 +1732,9 @@ if (niftyModal) {
             <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
                 <i class="fas fa-rotate-right"></i>
             </button>
+            <!-- Admin Condition Cards Section -->
+            <div id="dashboard-cards" class="row mt-4"></div>
+            <!-- End Admin Condition Cards Section -->
             <!-- Admin Conditions Button with Enhanced Style -->
             <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
                 background: linear-gradient(135deg, #7b1fa2, #9c27b0);
@@ -1913,16 +1919,15 @@ if (niftyModal) {
                                 {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
                                 {% if not is_default %}
                                     <!-- Custom user photo -->
-                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';">
+                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';" />
                                 {% else %}
                                     <!-- Default photo based on premium status -->
                                     {% set is_premium = user_data.account.profile.premium == 'yes' %}
                                     {% set default_img = 'default_premium.png' if is_premium else 'default_free.png' %}
                                     <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
-                                         alt="{{ 'Premium' if is_premium else 'Free' }} User" 
-                                         class="user-avatar-img"
-                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';"
-                                    >
+     alt="{{ 'Premium' if is_premium else 'Free' }} User" 
+     class="user-avatar-img"
+     onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';" />
                                 {% endif %}
                             {% else %}
                                 <!-- Fallback to default free image if no photo_url is set -->
@@ -2058,6 +2063,11 @@ if (niftyModal) {
         
         <!-- Further reduced vertical spacing below navbar for a more compact layout -->
         <div style="height: 8px;"></div>
+        
+        <!-- Dashboard Cards Container -->
+        <div class="row mb-4" id="dashboard-cards">
+            <!-- Admin condition cards will be rendered here -->
+        </div>
         
         <div class="row" id="scanResults">
             {% if conditions is defined and conditions %}
@@ -3419,6 +3429,81 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+</script>
+<script>
+// Render selected admin condition cards using /api/user/conditions (misc10[]) and /admin-conditions
+// Only show cards for the user's selected admin conditions, with full info
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // 1. Get selected admin condition names from DB
+        const selectedResp = await fetch('/api/user/conditions');
+        const selectedData = await selectedResp.json();
+        const selectedNames = selectedData.success && Array.isArray(selectedData.selected_conditions)
+            ? selectedData.selected_conditions
+            : [];
+
+        // 2. Get full admin condition objects from backend
+        const adminResp = await fetch('/admin-conditions');
+        const adminData = await adminResp.json();
+        const allAdminConds = Array.isArray(adminData.admin_conditions) ? adminData.admin_conditions : [];
+
+        // 3. Filter admin conditions to only those selected by the user
+        const selectedCards = allAdminConds.filter(cond => selectedNames.includes(cond.name));
+
+        // 4. Render cards with full info
+        renderAdminConditionCards(selectedCards);
+    } catch (err) {
+        console.error('Failed to load admin conditions for dashboard:', err);
+    }
+});
+
+// Updated: Accepts full admin condition objects, not just names
+function renderAdminConditionCards(selectedConditions) {
+    const dashboard = document.getElementById('dashboard-cards');
+    if (!dashboard) return;
+    dashboard.innerHTML = '';
+    if (!selectedConditions.length) {
+        dashboard.innerHTML = '';
+        return;
+    }
+    selectedConditions.forEach(cond => {
+        const card = document.createElement('div');
+        card.className = 'col-12 col-md-6 col-lg-4 scan-card';
+        card.innerHTML = `
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <h5 class="card-title mb-2">${cond.name}</h5>
+                    ${cond.link ? `<a href="${cond.link}" target="_blank" class="btn btn-sm btn-primary">Open</a>` : ''}
+                    ${cond.scan_clause ? `<pre class="small">${cond.scan_clause}</pre>` : ''}
+                </div>
+            </div>
+        `;
+        dashboard.appendChild(card);
+    });
+}
+
+function renderAdminConditionCards(selectedConditions) {
+    const dashboard = document.getElementById('dashboard-cards');
+    if (!dashboard) return;
+    dashboard.innerHTML = '';
+    if (!selectedConditions.length) {
+        dashboard.innerHTML = '';
+        return;
+    }
+    selectedConditions.forEach(conditionName => {
+        const card = document.createElement('div');
+        card.className = 'col-12 col-md-6 col-lg-4 scan-card';
+        card.innerHTML = `
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <h5 class="card-title mb-2">${conditionName}</h5>
+                </div>
+            </div>
+        `;
+        dashboard.appendChild(card);
+    });
+}
 </script>
 <script src="{{ url_for('static', filename='js/nifty_modal.js') }}"></script>
 {% endblock %}

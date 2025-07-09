@@ -4,6 +4,8 @@ import json
 import base64
 import uuid
 from postgres_db import db
+from flask import Flask, request, jsonify
+from flask_login import login_required, current_user
 import logging
 import math
 import os
@@ -26,6 +28,9 @@ except ImportError:
     print("⚠️ winsound module not available (expected on non-Windows systems)")
 import redis
 from werkzeug.exceptions import HTTPException
+from flask import Flask, request, jsonify
+
+# [REMOVED DUPLICATE] Do NOT instantiate Flask app here. Only instantiate after all config is set below.
 
 def env_bool(key, default=False):
     """Helper function to parse boolean environment variables"""
@@ -152,6 +157,127 @@ except Exception as e:
     logger.error("Please check your Redis configuration and ensure the Redis server is running")
     redis_client = None
 
+# User Conditions Management
+
+def reset_db_connection():
+    """Reset the database connection to clear any failed transactions"""
+    try:
+        if db.conn:
+            db.conn.rollback()
+            # Reconnect to ensure a fresh connection
+            db.conn.close()
+            db.conn = None
+            # Reinitialize the connection (assuming db has a method to do this)
+            if hasattr(db, 'connect'):
+                db.connect()
+            return True
+    except Exception as e:
+        logger.error(f"Error resetting database connection: {e}")
+    return False
+
+def get_db_cursor():
+    """Get a database cursor with transaction handling"""
+    try:
+        cur = db.get_cursor()
+        # Ensure we're not in a failed transaction
+        try:
+            cur.execute("SELECT 1")
+        except Exception:
+            if db.conn:
+                db.conn.rollback()
+        return cur
+    except Exception as e:
+        logger.error(f"Error getting database cursor: {e}")
+        if db.conn:
+            try:
+                db.conn.rollback()
+            except:
+                pass
+        raise
+
+def get_user_selected_conditions(user_id):
+    """Get user's selected admin conditions from account['misc10'] array"""
+    try:
+        logger.info(f"[get_user_selected_conditions] Called with user_id={user_id} (type: {type(user_id)})")
+        cur = get_db_cursor()
+        try:
+            cur.execute("""
+                SELECT user_data->'account'->'misc10' as misc10
+                FROM pitk3
+                WHERE id = %s
+            """, (user_id,))
+            result = cur.fetchone()
+            logger.info(f"[get_user_selected_conditions] SQL result for user_id={user_id}: {result}")
+            if result and result[0]:
+                import json
+                misc10 = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+                logger.info(f"[get_user_selected_conditions] Parsed misc10: {misc10}")
+                return set(misc10)
+            logger.info(f"[get_user_selected_conditions] No misc10 found for user_id={user_id}")
+            return set()
+        except Exception as e:
+            logger.error(f"Error in get_user_selected_conditions query: {e}")
+            if db.conn:
+                db.conn.rollback()
+            return set()
+    except Exception as e:
+        logger.error(f"Error getting user selected conditions: {e}")
+        return set()
+
+def save_user_selected_conditions(user_id, conditions):
+    """Save user's selected admin conditions to account['misc10'] array"""
+    import traceback
+    import json
+    try:
+        logger.info(f"[save_user_selected_conditions] user_id={user_id}, conditions={conditions}")
+        if not isinstance(conditions, list):
+            logger.error("Provided conditions is not a list!")
+            return False
+
+        # Get a fresh cursor with transaction handling
+        cur = get_db_cursor()
+        
+        try:
+            # Convert Python list to JSON string
+            conditions_json = json.dumps(conditions)
+            
+            # Update the user_data JSONB column
+            cur.execute("""
+                UPDATE pitk3
+                SET user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,misc10}',
+                    %s::jsonb
+                )
+                WHERE id = %s
+                RETURNING id
+            """, (conditions_json, user_id))
+            
+            result = cur.fetchone()
+            if result:
+                db.conn.commit()
+                logger.info("Successfully saved admin conditions")
+                return True
+            else:
+                logger.error("No rows updated - user may not exist")
+                db.conn.rollback()
+                return False
+                
+        except Exception as e:
+            logger.error(f"Database error in save_user_selected_conditions: {e}")
+            traceback.print_exc()
+            if db.conn:
+                db.conn.rollback()
+            return False
+            
+    except Exception as e:
+        logger.error(f"Unexpected error in save_user_selected_conditions: {e}")
+        traceback.print_exc()
+        if db.conn:
+            db.conn.rollback()
+        return False
+
+
 # License settings
 def parse_duration(duration_str, default):
     try:
@@ -183,7 +309,7 @@ import psycopg2.extras as pg_extras
 import secrets
 import string
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app
+from flask import Flask, render_template, jsonify, make_response, send_from_directory, request, flash, abort, redirect, url_for, session, current_app, Response, send_file
 from flask_wtf import FlaskForm
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -205,7 +331,66 @@ countdown_timer = 0  # Initialize countdown timer (0 means no cooldown)
 beep_interval = 30  # Beep every 30 seconds
 beep_running = True  # Control the beep thread
 
+# Only instantiate the Flask app ONCE
 app = Flask(__name__, static_url_path='/static', static_folder='static')
+
+# --- Register /api/user/conditions routes and error handler below the app instance ---
+@app.route('/api/user/conditions', methods=['GET'])
+def get_user_selected_conditions_api():
+    """Get user's selected conditions (always returns JSON, even if not authenticated)"""
+    try:
+        logger.info(f"[get_user_selected_conditions_api] current_user.id={getattr(current_user, 'id', None)} (type: {type(getattr(current_user, 'id', None))}), is_authenticated={getattr(current_user, 'is_authenticated', None)}")
+        if not current_user or not hasattr(current_user, 'id') or not current_user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Unauthorized', 'selected_conditions': []}), 401
+        selected_conditions = get_user_selected_conditions(current_user.id)
+        logger.info(f"[get_user_selected_conditions_api] selected_conditions={selected_conditions}")
+        return jsonify({
+            'success': True,
+            'selected_conditions': list(selected_conditions)
+        })
+    except Exception as e:
+        logger.error(f"Error in get_user_selected_conditions_api: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'selected_conditions': []
+        }), 500
+
+@app.errorhandler(401)
+def unauthorized_error(e):
+    return jsonify({'success': False, 'error': 'Unauthorized', 'selected_conditions': []}), 401
+
+@app.route('/api/user/conditions', methods=['POST'])
+@login_required
+def save_user_conditions():
+    """Save user's selected conditions"""
+    try:
+        data = request.get_json()
+        selected_conditions = data.get('selected_conditions', [])
+        
+        if not isinstance(selected_conditions, list):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid data format'
+            }), 400
+            
+        if save_user_selected_conditions(current_user.id, selected_conditions):
+            return jsonify({
+                'success': True,
+                'message': 'Conditions saved successfully'
+            })
+            
+        return jsonify({
+            'success': False,
+            'error': 'Failed to save conditions'
+        }), 500
+        
+    except Exception as e:
+        logger.error(f"Error in save_user_conditions: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to save conditions'
+        }), 500
 
 # Generate a secure secret key if not exists, or use environment variable
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
@@ -682,448 +867,6 @@ class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
-
-# Define the scan conditions
-admin_conditions = [
-    {
-    "name": "DeepSeek",
-    "type": "admin",
-    "link": "https://chartink.com/screener/deepseek",
-    "scan_clause": """( {57960} ( 
-        latest close > latest ema( latest close , 9 ) and 
-        latest close > latest ema( latest close , 21 ) and 
-        latest ema( latest close , 9 ) > latest ema( latest close , 21 ) and 
-        latest close > greatest( 1 day ago high, 5 ) and 
-        latest volume >= ( latest sma( latest volume , 20 ) * 1.5 ) and 
-        latest rsi( 14 ) < 70 and
-        latest close >= 10 and 
-        latest close <= 2250  
-    ) )"""
-    },
-    {
-    "name": "AN Kumar NIFTY500 ✅",
-    "type": "admin",
-    "link": "https://chartink.com/screener/ank-1073",
-    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
-    "scan_clause": """( {57960} ( 
-        ( ( latest close - 1 day ago close ) / ( greatest( 2, latest high ) - least( 2, latest low ) ) ) * 
-        ( latest volume + 1 day ago volume ) / 2 > 0.5 and 
-        latest close > 25 and 
-        latest close < 2250 
-    ) )"""
-    },
-    {
-    "name": "Chanu 5-200 CASH ✅",
-    "type": "admin",
-    "link": "",
-    "chart_link": "",
-    "scan_clause": "( {cash} ( \
-        latest ema( latest close , 5 ) > latest ema( latest close , 200 ) and \
-        1 day ago ema( latest close , 5 ) <= 1 day ago ema( latest close , 200 ) and \
-        latest close > latest max( 20 , latest vwap ) and \
-        latest volume > 1 day ago volume * 1 and \
-        latest volume > latest sma( latest volume , 5 ) * 0.75 and \
-        latest close < 2250 and \
-        latest volume > latest sma( latest volume , 20 ) * 2 and \
-        latest close > latest open and \
-        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and \
-        latest close > latest ema( latest close , 20 ) and \
-        latest max( 10 , latest high ) > latest min( 10 , latest low ) * 1.05 and \
-        latest volume > latest sma( latest volume , 20 ) and \
-        latest max( 50 , latest high ) / latest min( 50 , latest low ) >= 1.35 \
-    ) )"
-    },
-    {
-    "name": "AN Kumar Cash",
-    "type": "admin",
-    "link": "https://chartink.com/screener/ank-1073",
-    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:729e8670d63135d95c4d928c801e6a3e&timeframe=15_minute&symbol=",
-    "scan_clause": """( {cash} ( 
-        ( ( latest close - 1 day ago close ) / ( greatest( 2, latest high ) - least( 2, latest low ) ) ) * 
-        ( latest volume + 1 day ago volume ) / 2 > 0.5 and 
-        latest close > 25 and 
-        latest close < 2250 
-    ) )"""
-    },
-    {
-        "name": "KHAIZER",
-        "type": "admin",
-        "link": "https://chartink.com/screener/copy-khizir",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:78d1fc5151e3a3d90e6ae7786f63cca8&timeframe=daily&symbol=", 
-        "scan_clause": """( {57960} ( 
-            latest close > latest ema( latest close , 200 ) and 
-            latest close > latest ema( latest close , 44 ) and 
-            latest close >= latest ema( latest close , 20 ) and 
-            latest close >= latest tma( latest close , 20 ) and 
-            latest close >= latest wma( latest close , 20 ) and 
-            latest close >= latest vwap and 
-            latest close > latest open * 1.03 and 
-            latest close > latest supertrend( 10 , 1.5 ) and 
-            latest volume > 1 day ago volume * 1.5 and 
-            latest macd line( 26 , 12 , 9 ) > latest macd signal( 26 , 12 , 9 ) and 
-            latest close > 1 day ago high and 
-            latest close > latest sma( latest close , 20 ) and 
-            latest close > latest sma( latest close , 50 ) and 
-            latest close > latest sma( latest close , 200 ) and 
-            latest close >= 10 and 
-            latest close <= 2250 
-        ) )"""
-    },
-    {
-        "name": "CROSSED",
-        "type": "admin",
-        "link": "https://chartink.com/screener/crossed-92141",
-        "scan_clause": """( {57960} ( 
-            latest open > latest ema( latest close , 21 ) and 
-            1 day ago open <= 1 day ago ema( latest close , 21 ) and 
-            latest close > latest open * 1.025 and 
-            latest close >= 10 and 
-            latest close <= 2250 and 
-            latest close >= 1 day ago high 
-        ) )"""
-    },
-    {
-        "name": "15 MIN Breakout",
-        "type": "admin",
-        "link": "https://chartink.com/screener/copy-15-minute-stock-breakouts-34515559",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:d54b5e1d428ff9fd372e94622da24fa7&timeframe=15_minute&symbol=", 
-        "scan_clause": """( {57960} ( 
-            [0] 15 minute close > [-1] 15 minute max( 20 , [0] 15 minute close ) and 
-            [0] 15 minute volume > [0] 15 minute sma( volume , 20 ) and 
-            latest close > 1 day ago high and 
-            latest close > latest ema( latest close , 21 ) and 
-            latest close > latest open * 1.025 and 
-            latest close > latest supertrend( 10 , 1.5 ) and 
-            latest close <= 2250 
-        ) )"""
-    },
-    {
-        "name": "STRONG STOCKS POSITIVE",
-        "type": "admin",
-        "link": "https://chartink.com/screener/copy-strong-stocks-22395",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7302638654ee1d6e47747b50291acf65&timeframe=daily&symbol=", 
-        "scan_clause": """( {57960} ( 
-            latest close > 20 and 
-            latest close <= 2250 
-        ) )""",
-    },
-    {
-        "name": "ATR STOCKS",
-        "type": "admin",    
-        "link": "https://chartink.com/screener/atr-stocks",
-        "scan_clause": """( {57960} ( \
-            latest close > ( latest close - ( 3 * latest avg true range( 5 ) ) ) and \
-            latest close > 20 and \
-            latest close <= 2500 and \
-            latest sma( latest close , 50 ) > latest sma( latest close , 200 ) and \
-            latest volume > latest sma( latest volume , 20 ) and \
-            latest close > latest supertrend( 10 , 1.5 ) \
-        ) )"""
-    },
-    {
-        "name": "Deep Seek Volume & Range Break ✅",
-        "type": "admin",   
-        "link": "https://chartink.com/screener/ds-2206",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:9eadb2a72344cf751b91a835fc23e4a0&timeframe=daily&symbol=",
-        "scan_clause": """( {cash} ( 
-        latest close > 50 and 
-        latest close < 2250 and 
-        latest volume > latest sma( latest volume , 5 ) * 2.5 and 
-        latest volume > 1 day ago volume * 1.8 and 
-        latest volume > latest sma( latest volume , 20 ) * 2 and 
-        latest close > latest open and 
-        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
-        latest close > latest ema( latest close , 20 ) and 
-        latest close > latest max( 20 , latest vwap ) and 
-        [=1] 5 minute close < [=1] 5 minute open * 1.03 
-    ) )"""
-    },
-    {
-        "name": "MULTI TIMEFRAME SCAN",
-        "type": "admin",
-        "link": "https://chartink.com/screener/aaaaa-111468",
-        "scan_clause": """( {57960} ( 
-            [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 21 ) and
-            [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 50 ) and
-            [0] 30 minute close > [0] 30 minute sma( [0] 30 minute close , 200 ) and
-
-            ( {57960} (
-                [0] 15 minute close > [0] 15 minute sma( [0] 15 minute close , 21 ) and
-                [0] 15 minute close > [0] 15 minute sma( [0] 15 minute close , 50 ) and
-                [0] 15 minute close > [0] 15 minute sma( [0] 15 minute close , 200 )
-            ) ) and
-
-            ( {57960} (
-                [0] 10 minute close > [0] 10 minute sma( [0] 10 minute close , 21 ) and
-                [0] 10 minute close > [0] 10 minute sma( [0] 10 minute close , 50 ) and
-                [0] 10 minute close > [0] 10 minute sma( [0] 10 minute close , 200 )
-            ) ) and
-
-            ( {57960} (
-                [0] 5 minute close > [0] 5 minute sma( [0] 5 minute close , 21 ) and
-                [0] 5 minute close > [0] 5 minute sma( [0] 5 minute close , 50 ) and
-                [0] 5 minute close > [0] 5 minute sma( [0] 5 minute close , 200 )
-            ) ) and
-
-            latest close >= 20 and latest close <= 2250
-        ) )"""
-    },
-    {
-        "name": "HARSH SELL STOCKS",
-        "type": "admin",
-        "link": "https://chartink.com/screener/harsh-sell-8",
-        "scan_clause": """( {57960} ( [=1] 10 minute open > [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < -2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
-    },
-    {
-    "name": "VOLUME SHOCKER ",
-    "type": "admin",
-    "link": "https://chartink.com/screener/p45789",
-    "chart_link": "https://chartink.com/stocks-new?symbol=",
-    "scan_clause": """( {57960} ( 
-        latest volume > 1 day ago volume and 
-        1 day ago volume > 2 days ago volume and 
-        latest close > 1 day ago close and 
-        1 day ago close > 2 days ago close and 
-        latest volume > 1000000 and 
-        1 day ago volume > 500000 and 
-        latest close > latest open * 1.03 and 
-        latest open > 1 day ago close 
-    ) )"""
-    },
-    {
-    "name": "High Volume Spike",
-    "type": "admin",
-    "link": "https://chartink.com/screener/shock-19",
-    "chart_link": "https://chartink.com/stocks-new?symbol=",    
-    "scan_clause": """( {57960} ( 
-        latest volume > latest sma( latest volume , 5 ) * 2 and 
-        latest close > 1 day ago close and 
-        latest volume > 500000 
-    ) )"""
-    },
-    {
-        "name": "85 VOLUME SHOCK ",
-        "type": "admin",
-        "link": "https://chartink.com/screener/copy-volume-rahim",
-        "chart_link": "https://chartink.com/stocks-new?symbol=",
-        "scan_clause": """( {cash} ( 
-            latest volume > 1 day ago volume * 0.85 and 
-            1 day ago volume > 2 days ago volume and 
-            latest close > 1 day ago close and 
-            1 day ago close > 2 days ago close and 
-            latest volume > 1000000 and 
-            1 day ago volume > 500000 and 
-            latest close > latest open * 1.025 and 
-            [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
-            latest open > 1 day ago close and 
-            latest volume > latest sma( latest volume , 5 ) * 2 
-        ) )"""
-    },
-    {
-        "name": "HARSH BUY STOCKS",
-        "type": "admin",
-        "link": "https://chartink.com/screener/harsh-645",
-        "scan_clause": """( {57960} ( [=1] 10 minute open < [=1] 10 minute close and ( {57960} ( [=1] 10 minute "close - 1 candle ago close / 1 candle ago close * 100" < 2 ) ) and ( {166311} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {136699} not ( latest close > 0 ) ) and ( {167068} not ( latest close > 0 ) ) and latest close > 20 and latest close <= 2250 ) )"""
-    },
-    {
-        "name": "EMA 11 CHANU",
-        "type": "admin",
-        "link": "https://chartink.com/screener/ema-22-271",
-        "scan_clause": """( {57960} ( [0] 15 minute ema ( [0] 15 minute close , 11 ) > [0] 15 minute ema ( [0] 15 minute close , 22 ) and [ -1 ] 15 minute ema ( [0] 15 minute close , 11 )<= [ -1 ] 15 minute ema ( [0] 15 minute close , 22 ) and latest adx ( 14 ) >= 20 ) ) """
-    },
-    {
-        "name": "Smart Cash Flow - Chanu",
-        "type": "admin",
-        "link": "https://chartink.com/screener/copy-85-volume-shameem",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:e93d77e49e9b94220daecb5bae1e6ff8&timeframe=daily&symbol=",
-        "scan_clause": """( {cash} ( 
-            latest volume > 1 day ago volume * 0.85 and 
-            latest close > 1 day ago close and 
-            latest volume > 1000000 and 
-            1 day ago volume > 500000 and 
-            [=1] 5 minute close < [=1] 5 minute open * 1.03 
-        ) )"""
-    },
-    {
-        "name": "30min Volume Spike",
-        "type": "admin",
-        "link": "https://chartink.com/screener/30min-volume-spike",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:99b7045b2e7fc79cc51b0d0ae46e7fac&timeframe=30_minute&symbol=",
-        "scan_clause": """( {cash} ( 
-            [=0] 30 minute volume > [0] 30 minute sma( [0] 30 minute volume , 30 ) * 3 
-        ) )"""
-    },
-    {
-    "name": "Rahim Volume Surge ",
-    "type": "admin",
-    "link": "https://chartink.com/screener/rahim-ds-80",
-    "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:279b7c20292d4250387c8dbfa32ac199&timeframe=5_minute&symbol=",
-    "scan_clause": """( {cash} ( 
-        latest volume > latest sma( latest volume , 5 ) * 1.5 and 
-        latest close >= 50 and 
-        latest close < 2250 and 
-        latest volume > 1 day ago volume * 1 and 
-        latest volume > latest sma( latest volume , 20 ) * 2 and 
-        latest close > latest open and 
-        latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
-        latest close > latest ema( latest close , 20 ) and 
-        latest close > latest max( 20 , latest vwap ) and 
-        [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
-        latest volume > latest sma( latest volume , 20 ) and 
-        latest max( 10 , latest high ) > latest min( 10 , latest low ) * 1.05 and 
-        latest max( 50 , latest high ) / latest min( 50 , latest low ) >= 1.35 and 
-        ( 
-            ( [0] 15 minute close - [-1] 15 minute close ) / 
-            ( greatest( 2, [0] 15 minute high ) - least( 2, [0] 15 minute low ) ) * 
-            ( [0] 15 minute volume + [-1] 15 minute volume ) / 2 
-        ) > 0.5 
-    ) )"""
-    },
-    {
-        "name": "CHANU VOLATILITY SPIKE ",
-        "type": "admin",
-        "link": "https://chartink.com/screener/copy-volume-shockers-stocks-with-rising-volumes-1111145289",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c7fa7b37712fa79e1b96d4155e7d64d5&timeframe=daily&symbol=",
-        "scan_clause": """( {57960} ( 
-            latest volume > latest sma( volume , 10 ) * 2 and 
-            ( {cash} ( 
-                latest close > 1 day ago close * 1.05 or 
-                latest close < 1 day ago close * 0.95 
-            ) ) 
-        ) )"""
-    },
-    {
-        "name": "Vijay Thakkar",
-        "type": "admin",
-        "link": "https://chartink.com/screener/vijay-thakkar-27107",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
-        "scan_clause": """( {57960} ( 
-            latest volume > latest sma( latest volume , 20 ) * 3 and 
-            latest close > 100 and 
-            ( ( latest close - 1 candle ago close ) / 1 candle ago close ) * 100 >= 3 and 
-            latest sma( latest volume , 20 ) >= 25000 and 
-            latest volume > 100000 
-        ) )"""
-    },
-    {
-        "name": "Only Cash ",
-    "type": "admin",
-        "link": "https://chartink.com/screener/vijay-thakkar-27107",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:db8c18083f5668803c52fcae01bc1b8d&timeframe=daily&symbol=",
-        "scan_clause": """( {cash} ( 
-        ( {57960} not ( 
-            latest close > 0 
-        ) ) and 
-        ( {cash} ( 
-            latest close > 25 and 
-            latest close < 2250 and 
-            latest volume > latest sma( latest volume , 5 ) * 2.5 and 
-            latest volume > 1 day ago volume * 1.8 and 
-            latest volume > latest sma( latest volume , 20 ) * 2 and 
-            latest close > latest open and 
-            latest high - latest low > latest sma( latest high - latest low , 5 ) * 1.5 and 
-            latest close > latest ema( latest close , 20 ) and 
-            latest close > latest max( 20 , latest vwap ) and 
-            [=1] 5 minute close < [=1] 5 minute open * 1.03 
-        ) ) 
-    ) )"""
-    },
-    {
-    "name": "MAGIC FILTER RAHIM",
-    "type": "admin",
-    "link": "https://chartink.com/screener/che-68",
-    "scan_clause": """({57960}([0] 5 minute close > [0] 5 minute vwap and [0] 5 minute close > [-1] 5 minute vwap and [0] 5 minute close > [-2] 5 minute vwap and [0] 5 minute close > [0] 5 minute supertrend(10,1) and [0] 5 minute close > [-1] 5 minute supertrend(10,1) and [0] 5 minute close > [-2] 5 minute supertrend(10,1) and [0] 5 minute ema([0] 5 minute close,9) > [0] 5 minute supertrend(10,1) and [0] 5 minute close > 20 and [0] 5 minute close <= 2250 and latest close > latest open * 1.02))"""
-    },
-    {
-        "name": "STRONG STOCKS NEGATIVE",
-        "type": "admin",
-        "link": "https://chartink.com/screener/strong-stocks",
-        "scan_clause": """( {57960} ( 
-            latest close > 20 and 
-            latest close <= 2250 and
-            latest close < latest open and
-            (latest open - latest close) / latest open * 100 > 1
-        ) )""",
-    },
-    {
-        "name": "RA Inventor BUY",
-        "type": "admin",
-        "link": "https://chartink.com/screener/ra-score",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:24679f454fd1690bb64e19ac0d079642&timeframe=30_minute&symbol=", 
-        "scan_clause": """( {57960} ( \
-        [0]30 minute close * ([0]30 minute close - [-1] 30 minute close) / [-1] 30 minute close * 100 > 1500 and \
-        latest close > 20 and \
-        latest close <= 2250 \
-    ) )"""
-    },
-    {
-        "name": "RA Inventor SELL",
-        "type": "admin",
-        "link": "https://chartink.com/screener/ra-score-sell",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:7a1d3e7c5afc5c6b1b8c4e0d6e4d1b2e&timeframe=30_minute&symbol=",
-        "scan_clause": """( {57960} ( \
-        [0]30 minute close * ([0]30 minute close - [-1] 30 minute close) / [-1] 30 minute close * 100 < -1500 and \
-        latest close > 20 and \
-        latest close <= 2250 \
-    ) )"""
-    },
-    {
-        "name": "RA Inventor 20 Candles BUY",
-        "type": "admin",
-        "link": "https://chartink.com/screener/ra-score",
-        "chart_link": "https://chartink.com/stocks-new?from_scan=1&scan_link=scanlink:c78aa5a902629463cf1605aef72c8c1c&timeframe=30_minute&symbol=",
-        "scan_clause": """( {57960} ( \
-        [0]5 minute close * ([0]5 minute close - [-1] 5 minute close) / [-1] 5 minute close * 100 > 1500 and \
-        latest close > 20 and \
-        latest close <= 2250 and \
-        ( latest Close - latest Open ) > ( latest Sum ( latest Close - latest Open , 16 ) / 16 ) * 2 
-        ) )"""
-    },
-    {
-        "name": "DST BUY",  
-        "type": "admin",
-        "link": "https://chartink.com/screener/stst-81",  
-        "chart_link": "https://chartink.com/stocks-new?scan_link=scanlink:5a82d36a216278deb065b37eebc871a0&timeframe=5_minute&symbol=",
-        "scan_clause": """(
-        [0]5 minute supertrend(10,1) > [0]5 minute supertrend(10,3) and
-        [0]5 minute close > [0]5 minute supertrend(10,1) and
-        [0]5 minute close > [0]5 minute supertrend(10,3) and
-        latest close > 20 and \
-        latest close <= 2250 and \
-        [0]5 minute wma([0]5 minute close, 21) > [0]5 minute sma([0]5 minute close, 21)
-    )"""
-    },
-    {
-    "name": "DST SELL",  
-    "type": "admin",
-    "link": "https://chartink.com/screener/dst-sell-4",  
-    "scan_clause": """(
-        [0]5 minute supertrend(10,1) < [0]5 minute supertrend(10,3) and
-        [0]5 minute close < [0]5 minute supertrend(10,1) and
-        latest close > 20 and \
-        latest close <= 2250 and \
-        [0]5 minute close < [0]5 minute supertrend(10,3) and
-        [0]5 minute wma([0]5 minute close, 21) < [0]5 minute sma([0]5 minute close, 21)
-    )"""
-    },
-    {
-        "name": "DEEP High Momentum ✅",
-        "type": "admin",
-        "link": "https://chartink.com/screener/cash-price-volume-surge",
-        "chart_link": "https://chartink.com/stocks-new?symbol=",
-        "scan_clause": """( {cash} ( 
-        latest volume > latest sma( latest volume , 20 ) * 1.5 and 
-        latest close > latest vwap and 
-        latest close > latest open and 
-        latest close >= latest high * 0.98 and 
-        latest close > latest ema( latest close , 20 ) and 
-        latest close > 50 and 
-        latest volume > 100000 and 
-        [=1] 5 minute close < [=1] 5 minute open * 1.03 and 
-        [=1] 5 minute close > [=1] 5 minute open * 0.97 
-    ) )"""
-    },
-]
 
 # Global variables
 data_queue = queue.Queue()
@@ -1920,49 +1663,39 @@ def fetch_data():
             # Create a new dictionary to store results
             new_scan_results = {}
             with requests.Session() as session:
-                # Fetch data for built-in conditions
+                # Fetch admin conditions dynamically for the current user
+                admin_conditions = []
+                try:
+                    cur = db.get_cursor()
+                    cur.execute("""
+                        SELECT user_data->'account'->'misc10' FROM PITK3 WHERE id = %s
+                    """, (current_user.id,))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        misc10 = row[0]
+                        if isinstance(misc10, str):
+                            import json
+                            misc10 = json.loads(misc10)
+                        admin_conditions = misc10 if isinstance(misc10, list) else []
+                except Exception as e:
+                    logger.error(f"Error fetching admin_conditions from misc10 in fetch_data: {e}")
+                    admin_conditions = []
+                # Fetch data for admin conditions
                 for condition in admin_conditions:
                     stocks = fetch_and_process_data(session, condition)
                     if stocks:
                         new_scan_results[condition['name']] = stocks
-                
                 # Fetch data for user conditions
-                user_conditions = load_user_conditions()
+                user_conditions = load_user_conditions(current_user.id) if hasattr(current_user, 'id') else []
                 for condition in user_conditions:
-                    # Make sure the scan_clause is properly formatted for the API
-                    if 'scan_clause' in condition and condition['scan_clause']:
-                        # Format the scan clause properly for the API
-                        if not condition['scan_clause'].strip().startswith('('):
-                            # Wrap the scan clause in the required format if not already wrapped
-                            formatted_scan_clause = f"( {{57960}} ( {condition['scan_clause']} ) )"
-                            # logger.info(f"Formatted scan clause for {condition['name']}: {formatted_scan_clause}")
-                    
-                    # Debug log before fetching
-                    # logger.info(f"Fetching data for user condition: {condition['name']}")
-                    # logger.info(f"Scan clause: {condition.get('scan_clause', 'No scan clause')}")
-                    
                     stocks = fetch_and_process_data(session, condition)
-                    
-                    # Debug log after fetching
                     if stocks:
-                        if isinstance(stocks, list):
-                            # logger.info(f"Found {len(stocks)} stocks for user condition: {condition['name']}")
-                            new_scan_results[condition['name']] = stocks
-                        else:
-                            logger.error(f"Invalid stocks data for {condition['name']}: {stocks}")
+                        new_scan_results[condition['name']] = stocks
                     else:
-                        # logger.info(f"No stocks found for user condition: {condition['name']}")
-                        # Initialize with empty list to ensure the condition appears in results
                         new_scan_results[condition['name']] = []
-
-            # Update the global variables
             scan_results = new_scan_results
-            
-            # Load mute status from db.json
             settings = load_settings()
             is_muted = settings.get("mute_status", False)
-
-                       
         except Exception as e:
             logger.error(f"Error in _fetch_data_impl: {e}", exc_info=True)
             return None
@@ -2225,9 +1958,24 @@ def get_scan_results():
         # Load user conditions
         user_conditions = load_user_conditions()
         
-        # Combine built-in and user conditions
-        all_scan_conditions = admin_conditions.copy()
-        all_scan_conditions.extend(user_conditions)
+        # Fetch admin conditions dynamically for the current user
+        admin_conditions = []
+        try:
+            cur = db.get_cursor()
+            cur.execute("""
+                SELECT user_data->'account'->'misc10' FROM PITK3 WHERE id = %s
+            """, (current_user.id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                misc10 = row[0]
+                if isinstance(misc10, str):
+                    import json
+                    misc10 = json.loads(misc10)
+                admin_conditions = misc10 if isinstance(misc10, list) else []
+        except Exception as e:
+            logger.error(f"Error fetching admin_conditions from misc10 in get_scan_results: {e}")
+            admin_conditions = []
+        all_scan_conditions = admin_conditions + user_conditions
         
         # logger.info(f"Selected conditions: {selected_conditions}")
         # logger.info(f"User conditions: {[c['name'] for c in user_conditions]}")
@@ -2331,6 +2079,24 @@ DB_FILE = 'db.json'
 
 def get_default_settings():
     """Get default settings structure"""
+    # Dynamically fetch admin conditions for default settings
+    admin_conditions = []
+    try:
+        if current_user.is_authenticated:
+            cur = db.get_cursor()
+            cur.execute("""
+                SELECT user_data->'account'->'misc10' FROM PITK3 WHERE id = %s
+            """, (current_user.id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                misc10 = row[0]
+                if isinstance(misc10, str):
+                    import json
+                    misc10 = json.loads(misc10)
+                admin_conditions = misc10 if isinstance(misc10, list) else []
+    except Exception as e:
+        logger.error(f"Error fetching admin_conditions from misc10 in get_default_settings: {e}")
+        admin_conditions = []
     return {
         "mute_status": False,
         'app_selected': 'app',
@@ -2395,12 +2161,40 @@ def login():
                     # Configure session
                     session.permanent = True  # type: ignore
                     app.permanent_session_lifetime = timedelta(minutes=7)
-                    
+
                     logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
-                    
+
+                    # Fetch admin conditions and save to misc10
+                    import requests
+                    admin_url = 'https://www.indianplans.in/admin_con.txt'
+                    try:
+                        resp = requests.get(admin_url, timeout=10)
+                        resp.raise_for_status()
+                        admin_conditions = resp.json()
+                        # Update misc10 in user_data for this user
+                        cur = db.get_cursor()
+                        if cur:
+                            update_query = """
+                                UPDATE PITK3
+                                SET user_data = jsonb_set(
+                                    COALESCE(user_data, '{}'::jsonb),
+                                    '{account,misc10}',
+                                    %s::jsonb,
+                                    true
+                                )
+                                WHERE id = %s
+                            """
+                            cur.execute(update_query, (json.dumps(admin_conditions), user.id))
+                            if db.conn is not None:
+                                db.conn.commit()
+                            logger.info(f"Admin conditions updated in misc10 for user {user.id}")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch or update admin conditions for user {user.id}: {e}")
+                    # Continue with login flow regardless of fetch outcome
+
                     # Create response
                     response = make_response(redirect(request.args.get('next') or url_for('index')))
-                    
+
                     # Set remember me cookie if requested
                     if remember:
                         token = user.get_auth_token()
@@ -2413,7 +2207,7 @@ def login():
                             secure=app.config['SESSION_COOKIE_SECURE']
                         )
                         logger.debug(f"Set remember_token cookie for user {user.id}")
-                    
+
                     return response
                 else:
                     error = 'Login failed. Please try again.'
@@ -2982,52 +2776,53 @@ def index():
     else:
         flash_message = None
     
-    # Load user conditions and combine with built-in conditions
+    # Load user conditions (custom) for this user
     user_conditions = load_user_conditions(current_user.id) if current_user.is_authenticated else []
-    all_conditions = admin_conditions.copy()
-    all_conditions.extend(user_conditions)
-    
+
+    # Fetch admin conditions (dynamic, per user) from misc10
+    admin_conditions = []
+    try:
+        cur = db.get_cursor()
+        cur.execute("""
+            SELECT user_data->'account'->'misc10' FROM PITK3 WHERE id = %s
+        """, (current_user.id,))
+        row = cur.fetchone()
+        if row and row[0]:
+            misc10 = row[0]
+            if isinstance(misc10, str):
+                import json
+                misc10 = json.loads(misc10)
+            admin_conditions = misc10 if isinstance(misc10, list) else []
+    except Exception as e:
+        logger.error(f"Error fetching admin_conditions from misc10: {e}")
+        admin_conditions = []
+
+    # Combine all conditions for lookup (admin + user)
+    all_conditions = admin_conditions + user_conditions
+
     # Categorize stocks into Buy/Sell
     buy_suggestions, sell_suggestions = categorize_stocks()
 
-    # Debug log for scan results
-    # logger.info(f"Scan results keys: {list(scan_results.keys() if scan_results else [])}")
-    
-    # Prepare conditions with their stocks
+    # Prepare conditions with their stocks for dashboard rendering
     conditions_with_stocks = []
-    
-    # First, add all user conditions regardless of selection status
-    # This ensures they're always visible in the UI
+
+    # Add user conditions (always visible)
     for condition in user_conditions:
-        # Get stocks for this condition, default to empty list
         stocks = scan_results.get(condition["name"], [])
-        if condition["name"] in selected_conditions:
-            # logger.info(f"Adding user condition {condition['name']} with {len(stocks)} stocks")
-            pass
-        # Add condition with its stocks to the list
         conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": True})
-    
-    # Then add selected built-in conditions
+
+    # Add selected admin conditions
     for condition in admin_conditions:
-        # Check if this condition is selected
         if condition["name"] in selected_conditions:
-            # Get stocks for this condition, default to empty list
             stocks = scan_results.get(condition["name"], [])
-            # logger.info(f"Adding built-in condition {condition['name']} with {len(stocks)} stocks")
-            # Add condition with its stocks to the list
             conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": False})
-    
-    # Debug log for conditions being displayed
-    # logger.info(f"Conditions being displayed: {[c['name'] for c in conditions_with_stocks]}")
-    
-    # Make sure all selected conditions are included, even if they don't have stocks
+
+    # Ensure all selected conditions are included, even if they have no stocks yet
     selected_condition_names = [c['name'] for c in conditions_with_stocks]
     for condition_name in selected_conditions:
         if condition_name not in selected_condition_names and condition_name != 'on':
-            # Find the condition in all_conditions
             for condition in all_conditions:
                 if condition['name'] == condition_name:
-                    # logger.info(f"Adding missing condition: {condition_name}")
                     conditions_with_stocks.append({**condition, "stocks": []})
                     break
 
@@ -3084,7 +2879,7 @@ def update_settings():
                 logger.error("Failed to get database cursor")
                 return jsonify({'success': False, 'error': 'Database error'}), 500
             cur.execute("""
-                UPDATE PITK3
+                UPDATE pitk3
                 SET user_data = jsonb_set(
                     COALESCE(user_data, '{}'::jsonb),
                     '{account,misc10}',
@@ -3114,41 +2909,60 @@ def update_settings():
 
 @app.route('/conditions')
 def get_conditions():
+    """
+    Return all admin (from misc10) and user-defined conditions for the current user, marking which admin conditions are selected.
+    """
     try:
-        # Get admin conditions and ensure type is set to 'admin'
+        if not current_user.is_authenticated:
+            return jsonify([])
+
+        # Fetch admin conditions from misc10
+        cur = db.get_cursor()
+        cur.execute("""
+            SELECT user_data->'account'->'misc10', user_data->'account'->'conditions'
+            FROM PITK3 WHERE id = %s
+        """, (current_user.id,))
+        row = cur.fetchone()
+        admin_conditions = []
+        selected_admin_names = set()
+        if row:
+            misc10 = row[0]
+            selected = row[1]
+            if misc10:
+                if isinstance(misc10, str):
+                    import json
+                    misc10 = json.loads(misc10)
+                admin_conditions = misc10 if isinstance(misc10, list) else []
+            if selected:
+                if isinstance(selected, str):
+                    import json
+                    selected = json.loads(selected)
+                # selected is a list of dicts with 'name' keys
+                selected_admin_names = set([c['name'] for c in selected if isinstance(c, dict) and 'name' in c])
+
+        # Prepare admin conditions with type and selection info
         admin_conditions_with_type = []
-        for idx, condition in enumerate(admin_conditions, 1):
+        for condition in admin_conditions:
             if not isinstance(condition, dict):
-                print(f"Warning: Admin condition at index {idx-1} is not a dictionary: {condition}")
                 continue
-                
-            # Create a deep copy to avoid modifying the original
-            condition_copy = dict(condition)
-            
-            # Ensure name exists and is a string
-            if 'name' not in condition_copy or not isinstance(condition_copy['name'], str):
-                print(f"Warning: Admin condition at index {idx-1} is missing or has invalid name: {condition}")
-                continue
-                
-            # Force type to be 'admin' for all admin conditions
-            condition_copy['type'] = 'admin'
-            admin_conditions_with_type.append(condition_copy)
-            
-        # Get user conditions
-        user_conditions = load_user_conditions()
-        
-        # Debug: Log counts
-        print(f"Admin conditions: {len(admin_conditions_with_type)}")
-        print(f"User conditions: {len(user_conditions)}")
-        
-        # Combine both lists
+            c = dict(condition)
+            c['type'] = 'admin'
+            c['selected'] = c.get('name') in selected_admin_names
+            admin_conditions_with_type.append(c)
+
+        # Fetch user-defined conditions (custom, not admin)
+        user_conditions = load_user_conditions(current_user.id) if hasattr(current_user, 'id') else []
+        for c in user_conditions:
+            if isinstance(c, dict):
+                c['type'] = 'user'
+                c['selected'] = True  # user-defined are always selected for the user
+
         all_conditions = admin_conditions_with_type + user_conditions
         return jsonify(all_conditions)
     except Exception as e:
-        print(f"Error in get_conditions: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"[get_conditions] Error: {str(e)}", exc_info=True)
         return jsonify([])
+
 
 @app.route('/api/validate-licence', methods=['POST'])
 @login_required
@@ -4462,12 +4276,13 @@ def ensure_licenses_table():
                         BEGIN
                             IF NOT EXISTS (
                                 SELECT 1 FROM pg_constraint 
-                                WHERE conname = 'fk_licenses_user'
+                              FROM PITK3 WHERE user_data->'account'->>'username' = 'fk_licenses_user'
                             ) THEN
                                 ALTER TABLE public.licenses
                                 ADD CONSTRAINT fk_licenses_user
                                 FOREIGN KEY (used_by) 
-                                REFERENCES public.users(id)
+                                REFERENCES public.PITK3(id)
+{{ ... }}
                                 ON DELETE SET NULL;
                             END IF;
                         END
@@ -4805,6 +4620,9 @@ def cleanup():
     pygame.quit()
 
 # Main execution
+# Print all registered routes for verification
+print("\nRegistered Routes:\n", app.url_map)
+
 if __name__ == '__main__':
     # Ensure database tables exist
     if not ensure_app_settings_table():

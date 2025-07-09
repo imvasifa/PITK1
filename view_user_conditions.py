@@ -15,7 +15,7 @@ def view_user_conditions(user_id=1):
         # Get user data with conditions
         cur.execute("""
             SELECT user_data->'conditions' as conditions
-            FROM users 
+            FROM pitk3 
             WHERE id = %s
         """, (user_id,))
         
