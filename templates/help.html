@@ -2,7 +2,76 @@
 
 {% block title %}Help - PRICE IS THE KING{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Add scroll margin to all section targets to account for fixed navbar */
+    [id] {
+        scroll-margin-top: 80px; /* Adjust this value based on your navbar height */
+    }
+    
+    /* Add padding to sections to prevent content from being hidden under navbar */
+    .mb-5 {
+        padding-top: 20px;
+    }
+    
+    /* Card styling */
+    .card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-header {
+        font-weight: 600;
+    }
+    
+    .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+        color: #0d6efd;
+    }
+    
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: #dee2e6;
+    }
+    
+    .badge {
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
+<!-- Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
+    <div class="container d-flex justify-content-between align-items-center">
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+            <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+            <span class="d-none d-sm-inline">PRICE IS THE KING</span>
+        </a>
+        
+        <div class="d-flex align-items-center">
+            <!-- Home Button -->
+            <a href="{{ url_for('index') }}" class="btn btn-primary me-2 d-flex align-items-center" title="Home">
+                <i class="fas fa-home me-1"></i>
+                <span class="d-none d-md-inline">Home</span>
+            </a>
+            
+            <!-- Logout Button -->
+            <a href="{{ url_for('logout') }}" class="btn btn-danger d-flex align-items-center" title="Logout">
+                <i class="fas fa-sign-out-alt me-1"></i>
+                <span class="d-none d-md-inline">Logout</span>
+            </a>
+        </div>
+    </div>
+</nav>
+
+<!-- Add padding to account for fixed navbar -->
+<div style="height: 70px;"></div>
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
@@ -37,10 +106,7 @@
                                     <h5 class="card-title"><i class="fas fa-cog me-2 text-primary"></i>Features</h5>
                                     <div class="list-group list-group-flush">
                                         <a href="#real-time-updates" class="list-group-item list-group-item-action">
-                                            <i class="fas fa-sync-alt me-2"></i>Real-time Updates
-                                        </a>
-                                        <a href="#nifty-indices" class="list-group-item list-group-item-action">
-                                            <i class="fas fa-chart-line me-2"></i>Nifty Indices
+                                            <i class="fas fa-sync-alt me-2"></i>Auto Refresh Feature
                                         </a>
                                         <a href="#themes" class="list-group-item list-group-item-action">
                                             <i class="fas fa-moon me-2"></i>Light/Dark Theme
@@ -55,9 +121,6 @@
                                 <div class="card-body">
                                     <h5 class="card-title"><i class="fas fa-info-circle me-2 text-primary"></i>Information</h5>
                                     <div class="list-group list-group-flush">
-                                        <a href="#troubleshooting" class="list-group-item list-group-item-action">
-                                            <i class="fas fa-tools me-2"></i>Troubleshooting
-                                        </a>
                                         <a href="#faq" class="list-group-item list-group-item-action">
                                             <i class="fas fa-question me-2"></i>FAQ
                                         </a>
@@ -68,6 +131,11 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div id="about" class="mb-5">
+                        <h4 class="border-bottom pb-2 mb-3">About This App</h4>
+                        <p>This application works on top of Chartink's scanning platform. It allows you to monitor and manage your Chartink scans collectively. To use this app, you'll need to first create your scan conditions on Chartink.com and then add them here using the scan URL or scan clause.</p>
                     </div>
 
                     <div id="add-condition" class="mb-5">
@@ -87,7 +155,7 @@
                         <ul>
                             <li><strong>Edit:</strong> Click the <i class="fas fa-edit text-primary"></i> icon to modify a condition</li>
                             <li><strong>Delete:</strong> Click the <i class="fas fa-trash-alt text-danger"></i> icon to remove a condition</li>
-                            <li><strong>Refresh:</strong> Click the refresh button available in the Navigation bat at the top to manually update all conditions</li>
+                            <li><strong>Refresh:</strong> Click the refresh button in the navigation bar to manually update all conditions</li>
                         </ul>
                     </div>
 
@@ -104,33 +172,18 @@
 
                     <div id="real-time-updates" class="mb-5">
                         <h4 class="border-bottom pb-2 mb-3">Auto Refresh Feature</h4>
-                        <p>The dashboard automatically refreshes every 2 minutes to show the latest data. You can also manually refresh at any time by clicking the refresh button in the navigation bar. Inside the dashboard option you can select the time interval.</p>
+                        <p>The dashboard automatically refreshes to show the latest data. You can also manually refresh at any time by clicking the refresh button in the navigation bar. Inside the dashboard option you can select the time interval.</p>
                     </div>
 
-                    <div id="nifty-indices" class="mb-5">
-                        <h4 class="border-bottom pb-2 mb-3">Nifty Indices Information</h4>
-                        <div class="alert alert-info">
-                            <h5><i class="fas fa-info-circle me-2"></i>Real-time Data from NSE India</h5>
-                            <p class="mb-0">
-                                Our Nifty Indices data is fetched in real-time directly from the National Stock Exchange (NSE) of India. 
-                                The percentage changes shown are calculated from the <strong>Day's Open</strong> price, not the previous day's close.
-                                This gives you a more accurate view of the current day's market movement.
-                            </p>
-                        </div>
-                        <p>Key points about Nifty Indices data:</p>
-                        <ul>
-                            <li>Data is updated every 30 seconds during market hours</li>
-                            <li>All values are in real-time with minimal delay</li>
-                            <li>Percentage change is calculated from the day's opening price</li>
-                            <li>Data is sourced directly from NSE India's official feed</li>
-                        </ul>
+                    <div id="themes" class="mb-5">
+                        <h4 class="border-bottom pb-2 mb-3">Light/Dark Theme</h4>
+                        <p>You can switch between light and dark themes using the theme toggle button in the navigation bar. Your preference will be saved for future visits.</p>
                     </div>
 
                     <div id="disclaimer" class="alert alert-warning">
                         <h5><i class="fas fa-exclamation-triangle me-2"></i>Important Disclaimer</h5>
                         <p class="mb-0">
-                            We are not providing Buy and Sell Suggestions. We are not registered with SEBI or any financial institutions.
-                            This App is not meant for advisory/recommendation purposes. Risk disclosures on derivatives - 9 out of 10 individual traders in the equity Futures and Options Segment incurred net losses. On average, loss makers registered net trading losses close to 750,000. Over and above the net trading losses incurred, loss makers expended an additional 28% of net trading losses as transaction costs. Those making net trading profits, incurred between 15% to 50% of such profits as transaction costs.
+                            We are not providing Buy and Sell Suggestions. We are not registered with SEBI or any financial institutions. This App is not meant for advisory/recommendation purposes. Risk disclosures on derivatives - 9 out of 10 individual traders in the equity Futures and Options Segment incurred net losses. On average, loss makers registered net trading losses close to 750,000. Over and above the net trading losses incurred, loss makers expended an additional 28% of net trading losses as transaction costs. Those making net trading profits, incurred between 15% to 50% of such profits as transaction costs.
                             <br><br>
                             The information provided should not be construed as investment advice. Always conduct your own research and consult with a qualified financial advisor before making any investment decisions.
                         </p>
@@ -171,7 +224,7 @@
                                 </h2>
                                 <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                     <div class="accordion-body">
-                                        Scan results are automatically updated every 5 minutes. You can also manually refresh the results by clicking the refresh button.
+                                        The dashboard automatically refreshes to show the latest data. You can also manually refresh at any time.
                                     </div>
                                 </div>
                             </div>
@@ -189,7 +242,6 @@
                                             <li>Market is closed</li>
                                             <li>Your scan conditions are too strict</li>
                                             <li>No stocks match your criteria</li>
-                                            <li>Connection issue with data source</li>
                                         </ul>
                                         Try adjusting your scan parameters or check back during market hours.
                                     </div>
@@ -204,7 +256,7 @@
                                 </h2>
                                 <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                     <div class="accordion-body">
-                                        All your conditions are automatically saved in your account. You can access them from any device by logging in with your credentials.
+                                        Your scans are automatically saved when you add them. You can access them anytime by logging in to your account.
                                     </div>
                                 </div>
                             </div>
@@ -217,7 +269,7 @@
                                 </h2>
                                 <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                     <div class="accordion-body">
-                                        Our platform is fully responsive and works on all mobile devices through your web browser. No app installation is required.
+                                        Currently, we only have a web application that works on both desktop and mobile browsers. You can add it to your home screen for quick access.
                                     </div>
                                 </div>
                             </div>
@@ -227,26 +279,26 @@
                     <!-- Contact Support Section -->
                     <div id="contact" class="mb-5">
                         <h4 class="border-bottom pb-2 mb-3">Contact Support</h4>
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="row align-items-center">
-                                    <div class="col-12">
-                                        <h5 class="card-title">ICON Corporation</h5>
-                                        <p class="card-text mb-1">
-                                            <i class="fas fa-map-marker-alt me-2 text-muted"></i>
-                                            Shop No 8, Upstairs, 23-1-546,<br>
-                                            Ravi Chettu Centre, Fathekhan Pet Main Rd,<br>
-                                            Nellore, Andhra Pradesh 524003<br>
-                                            INDIA
-                                        </p>
-                                        <p class="card-text mb-1">
-                                            <i class="fas fa-envelope me-2 text-muted"></i>
-                                            <a href="mailto:imjjrobo@gmail.com" class="text-decoration-none">imjjrobo@gmail.com</a>
-                                        </p>
-                                        <p class="card-text">
-                                            <i class="fas fa-phone-alt me-2 text-muted"></i>
-                                            <a href="tel:+916305683377" class="text-decoration-none">+91 6305683377</a>
-                                        </p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-map-marker-alt me-2 text-primary"></i> ICON Corporation</h5>
+                                        <p class="mb-1">Shop No 8, Upstairs, 23-1-546,</p>
+                                        <p class="mb-1">Ravi Chettu Centre, Fathekhan Pet Main Rd,</p>
+                                        <p class="mb-1">Nellore, Andhra Pradesh 524003</p>
+                                        <p class="mb-1">INDIA</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-3 mt-md-0">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-envelope me-2 text-primary"></i> Email</h5>
+                                        <p class="mb-3">imjjrobo@gmail.com</p>
+                                        
+                                        <h5><i class="fas fa-phone me-2 text-primary"></i> Phone</h5>
+                                        <p class="mb-0">+91 6305683377</p>
                                     </div>
                                 </div>
                             </div>
@@ -258,31 +310,5 @@
     </div>
 </div>
 
-<style>
-    .card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        border: 1px solid rgba(0,0,0,.125);
-    }
-    .card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    .list-group-item {
-        border-left: none;
-        border-right: none;
-    }
-    .list-group-item:first-child {
-        border-top: none;
-    }
-    .list-group-item:last-child {
-        border-bottom: none;
-    }
-    .list-group-item i {
-        width: 20px;
-        text-align: center;
-    }
-    h4 {
-        color: var(--primary-color);
-    }
-</style>
+
 {% endblock %}

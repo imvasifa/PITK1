@@ -1317,37 +1317,38 @@ if (niftyModal) {
 
 
     <!-- Navbar -->
-    <nav class="navbar">
-        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-            <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
-            <span>PRICE IS THE KING</span>
-        </a>
-
-        <span id="next-refresh" style="font-size: 0.9em; font-weight: 500;">
-            <i class="fas fa-clock" style="font-size: 0.9em; margin-left: 35px;"></i>
-            <span style="margin-left: 5px;">Next refresh in</span>
-            <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
-        </span>
-        <div class="navbar-buttons">
-
-            <!-- Dark Mode Toggle with Sun/Moon Icons -->
-            <div class="d-inline-block align-middle ms-3" id="themeToggleContainer">
-                <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
-    <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
-</button>
-            </div>
-            <!-- Mute/Unmute Button with Theme Style -->
-            <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle sound">
-                <i id="muteIcon" class="fas fa-volume-up"></i>
-            </button>
+    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
+        <div class="container d-flex justify-content-between align-items-center">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+                <span class="d-none d-sm-inline">PRICE IS THE KING</span>
+            </a>
             
-            <!-- Refresh Button with Theme Style -->
-            <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
-                <i class="fas fa-rotate-right"></i>
-            </button>
-            <!-- User Conditions Button with Enhanced Style -->
-            <!-- User Conditions Button with Enhanced Style -->
-            <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
+            <div class="d-flex align-items-center">
+                <span id="next-refresh" class="me-3" style="font-size: 0.9em; font-weight: 500;">
+                    <i class="fas fa-clock" style="font-size: 0.9em;"></i>
+                    <span style="margin-left: 5px;">Next refresh in</span>
+                    <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
+                </span>
+                <!-- Dark Mode Toggle with Sun/Moon Icons -->
+                <div class="d-inline-block align-middle" id="themeToggleContainer">
+                    <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
+                        <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                    </button>
+                </div>
+                
+                <!-- Mute/Unmute Button with Theme Style -->
+                <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle sound">
+                    <i id="muteIcon" class="fas fa-volume-up"></i>
+                </button>
+                
+                <!-- Refresh Button with Theme Style -->
+                <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
+                    <i class="fas fa-rotate-right"></i>
+                </button>
+
+                <!-- User Conditions Button with Enhanced Style -->
+                <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn btn-primary navbar-round-btn ms-2" style="
                 background: linear-gradient(135deg, #7b1fa2, #9c27b0);
                 border: none;
                 border-radius: 50%;
@@ -2608,8 +2609,8 @@ if (niftyModal) {
 <div class="modal fade" id="conditionsModal" tabindex="-1" aria-labelledby="conditionsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="conditionsModalLabel">Manage Conditions</h5>
+            <div class="modal-header" style="color: #000000 !important;">
+                <h5 class="modal-title" id="conditionsModalLabel" style="color: #000000 !important;">Manage Conditions</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -2752,6 +2753,45 @@ if (niftyModal) {
 
 <!-- Nifty Indices Modal -->
 <style>
+    /* Ensure ALL text in conditions modal is black */
+    #conditionsModal {
+        color: #000 !important;
+    }
+    
+    /* Force modal header and description text to be black */
+    #conditionsModal .modal-header,
+    #conditionsModal .modal-header *,
+    #conditionsModal .modal-body,
+    #conditionsModal .modal-body h6 {
+        color: #000 !important;
+    }
+    
+    /* Force ALL text in conditions modal to be black */
+    #conditionsModal,
+    #conditionsModal *:not(.btn):not(.btn *):not(i) {
+        color: #000 !important;
+    }
+    #conditionsModal *,
+    #conditionsModal .modal-content *,
+    #conditionsModal .modal-body *,
+    #conditionsModal .modal-title,
+    #conditionsModal .form-label,
+    #conditionsModal .form-control,
+    #conditionsModal .list-group-item,
+    #conditionsModal h5,
+    #conditionsModal h6,
+    #conditionsModal p,
+    #conditionsModal label,
+    #conditionsModal .nav-link,
+    #conditionsModal .modal-header * {
+        color: inherit !important;
+    }
+    /* Keep buttons text white for contrast */
+    #conditionsModal .btn,
+    #conditionsModal .btn * {
+        color: #fff !important;
+    }
+    
     #niftyModal .modal-dialog {
         min-height: 80vh;
         max-height: 90vh;

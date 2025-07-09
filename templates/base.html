@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     <title>KING</title>
+    <style>
+        /* Force black text in conditions modal */
+        #conditionsModal {
+            --bs-modal-color: #000000 !important;
+            color: #000000 !important;
+        }
+        #conditionsModal *:not(.btn, .btn *, i) {
+            color: inherit !important;
+        }
+    </style>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='pitk-logo.svg') }}">
     <link rel="shortcut icon" type="image/svg+xml" href="{{ url_for('static', filename='pitk-logo.svg') }}">
     <style>
