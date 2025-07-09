@@ -190,8 +190,67 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
+import psycopg2
+import psycopg2.extras
 from wtforms import StringField, PasswordField, SubmitField, validators
 from wtforms.validators import DataRequired, Email, EqualTo
+
+# Initialize Flask app
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to False for development
+app.config['REMEMBER_COOKIE_SECURE'] = False  # Set to False for development
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Session expires after 30 minutes
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+# Create upload folder if it doesn't exist
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Initialize extensions
+bcrypt = Bcrypt(app)
+
+# Configure login manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'info'
+login_manager.session_protection = 'strong'  # Basic session protection
+
+# Ensure the login manager is properly initialized
+login_manager._login_disabled = False
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        # Convert user_id to integer if it's a string
+        user_id = int(user_id)
+        # Get user from database
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute('SELECT * FROM users WHERE id = %s', (user_id,))
+        user_data = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if user_data:
+            user = User(
+                id=user_data['id'],
+                username=user_data['username'],
+                password=user_data['password'],
+                email=user_data.get('email', '')
+            )
+            return user
+    except (ValueError, psycopg2.Error) as e:
+        app.logger.error(f"Error loading user {user_id}: {str(e)}")
+    return None
+
+# Set maximum content length for file uploads (16MB)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # Set logging level to INFO to reduce verbosity
 logging.basicConfig(level=logging.INFO)
@@ -1479,18 +1538,12 @@ def fetch_data():
             # Create a new dictionary to store results
             new_scan_results = {}
             with requests.Session() as session:
-                # Fetch data for built-in conditions
-                for condition in admin_conditions:
-                    stocks = fetch_and_process_data(session, condition)
-                    if stocks:
-                        new_scan_results[condition['name']] = stocks
-                
                 # Fetch data for user conditions
                 user_conditions = load_user_conditions()
                 for condition in user_conditions:
                     # Make sure the scan_clause is properly formatted for the API
                     if 'scan_clause' in condition and condition['scan_clause']:
-                        # Format the scan clause properly for the API
+                        # Wrap the scan clause in the required format if not already wrapped
                         if not condition['scan_clause'].strip().startswith('('):
                             # Wrap the scan clause in the required format if not already wrapped
                             formatted_scan_clause = f"( {{57960}} ( {condition['scan_clause']} ) )"
@@ -1952,13 +2005,20 @@ def login():
                 
                 if login_success:
                     # Configure session
-                    session.permanent = True  # type: ignore
-                    app.permanent_session_lifetime = timedelta(minutes=7)
+                    session.permanent = True
+                    app.permanent_session_lifetime = timedelta(minutes=30)
+                    
+                    # Update session with user info
+                    session['user_id'] = user.id
+                    session['_fresh'] = True
                     
                     logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
                     
+                    # Get next URL or default to index
+                    next_url = request.args.get('next') or url_for('index')
+                    
                     # Create response
-                    response = make_response(redirect(request.args.get('next') or url_for('index')))
+                    response = make_response(redirect(next_url))
                     
                     # Set remember me cookie if requested
                     if remember:
@@ -1966,13 +2026,15 @@ def login():
                         response.set_cookie(
                             'remember_token',
                             value=token,
-                            max_age=420,  # 7 minutes
+                            max_age=1800,  # 30 minutes
                             httponly=True,
                             samesite='Lax',
                             secure=app.config['SESSION_COOKIE_SECURE']
                         )
                         logger.debug(f"Set remember_token cookie for user {user.id}")
                     
+                    # Ensure session is saved
+                    session.modified = True
                     return response
                 else:
                     error = 'Login failed. Please try again.'
@@ -1984,6 +2046,9 @@ def login():
         except Exception as e:
             error = 'An error occurred during login. Please try again.'
             logger.error(f"Error during login for user {username}: {str(e)}", exc_info=True)
+    
+    # For GET requests or failed logins, show the login form
+    return render_template('login.html', error=error)
     
     return render_template('login.html', error=error)
 
@@ -2506,6 +2571,19 @@ def handle_app_unavailable(error):
 
 # Main Application Routes
 
+@app.route('/help')
+@login_required
+def help_page():
+    try:
+        # Ensure user_data is properly initialized
+        user_data = getattr(current_user, 'user_data', {})
+        theme = getattr(current_user, 'theme', 'light')
+        return render_template('help.html', user_data=user_data, theme=theme)
+    except Exception as e:
+        app.logger.error(f"Error in help page: {str(e)}")
+        app.logger.exception(e)  # Log the full exception
+        return "An error occurred while loading the help page.", 500
+
 @app.route('/')
 @login_required
 def index():
@@ -2541,52 +2619,31 @@ def index():
     else:
         flash_message = None
     
-    # Load user conditions and combine with built-in conditions
+    # Load user conditions
     user_conditions = load_user_conditions(current_user.id) if current_user.is_authenticated else []
-    all_conditions = admin_conditions.copy()
-    all_conditions.extend(user_conditions)
     
     # Categorize stocks into Buy/Sell
     buy_suggestions, sell_suggestions = categorize_stocks()
 
-    # Debug log for scan results
-    # logger.info(f"Scan results keys: {list(scan_results.keys() if scan_results else [])}")
-    
     # Prepare conditions with their stocks
     conditions_with_stocks = []
     
-    # First, add all user conditions regardless of selection status
-    # This ensures they're always visible in the UI
+    # Add all user conditions
     for condition in user_conditions:
         # Get stocks for this condition, default to empty list
         stocks = scan_results.get(condition["name"], [])
         if condition["name"] in selected_conditions:
-            # logger.info(f"Adding user condition {condition['name']} with {len(stocks)} stocks")
             pass
         # Add condition with its stocks to the list
         conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": True})
-    
-    # Then add selected built-in conditions
-    for condition in admin_conditions:
-        # Check if this condition is selected
-        if condition["name"] in selected_conditions:
-            # Get stocks for this condition, default to empty list
-            stocks = scan_results.get(condition["name"], [])
-            # logger.info(f"Adding built-in condition {condition['name']} with {len(stocks)} stocks")
-            # Add condition with its stocks to the list
-            conditions_with_stocks.append({**condition, "stocks": stocks, "is_custom": False})
-    
-    # Debug log for conditions being displayed
-    # logger.info(f"Conditions being displayed: {[c['name'] for c in conditions_with_stocks]}")
     
     # Make sure all selected conditions are included, even if they don't have stocks
     selected_condition_names = [c['name'] for c in conditions_with_stocks]
     for condition_name in selected_conditions:
         if condition_name not in selected_condition_names and condition_name != 'on':
-            # Find the condition in all_conditions
-            for condition in all_conditions:
+            # Find the condition in user_conditions
+            for condition in user_conditions:
                 if condition['name'] == condition_name:
-                    # logger.info(f"Adding missing condition: {condition_name}")
                     conditions_with_stocks.append({**condition, "stocks": []})
                     break
 
