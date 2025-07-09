@@ -1729,8 +1729,8 @@ if (niftyModal) {
             <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
                 <i class="fas fa-rotate-right"></i>
             </button>
-            <!-- Admin Conditions Button with Enhanced Style -->
-            <button id="adminConditionsButton" title="Admin Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
+            <!-- User Conditions Button with Enhanced Style -->
+            <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
                 background: linear-gradient(135deg, #7b1fa2, #9c27b0);
                 border: none;
                 border-radius: 50%;
@@ -1744,7 +1744,7 @@ if (niftyModal) {
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
                 transition: all 0.3s ease;
             ">
-                <i class="fas fa-list-ul" title="Conditions"></i>
+                <i class="fas fa-list-ul" title="User Conditions"></i>
             </button>
 
 
@@ -2069,9 +2069,14 @@ if (niftyModal) {
                                 <h3>Welcome to PRICE IS THE KING Stock Scanner!</h3>
                                 <p class="lead mb-4">Get started by adding your first Chartink screener to see stocks collectively.</p>
                             </div>
-                            <a href="https://chartink.com/" target="_blank" class="btn btn-primary btn-lg">
-                                <i class="fas fa-external-link-alt me-2"></i>Open Chartink
-                            </a>
+                            <div class="d-flex flex-wrap justify-content-center gap-3 mb-3">
+                                <a href="https://chartink.com/" target="_blank" class="btn btn-primary btn-lg flex-grow-1 flex-sm-grow-0 text-nowrap">
+                                    <i class="fas fa-external-link-alt me-2"></i>Open Chartink
+                                </a>
+                                <a href="https://www.youtube.com/embed/5E9X4VZ1KfY" target="_blank" class="btn btn-danger btn-lg flex-grow-1 flex-sm-grow-0 text-nowrap">
+                                    <i class="fab fa-youtube me-2"></i>Watch Tutorial
+                                </a>
+                            </div>
                             <div class="mt-4 p-3 bg-warning bg-opacity-10 border border-warning rounded text-start">
                                 <p class="mb-0 fw-medium text-warning">
                                     <i class="fas fa-exclamation-triangle me-2"></i>Disclaimer: We are not providing Buy and Sell Suggestions. We are not registered with SEBI or any financial institutions.
@@ -2152,6 +2157,12 @@ if (niftyModal) {
     <!-- Screener link (scan definition) -->
     {% if condition.link %}
     <a href="{{ condition.link }}" target="_blank" class="text-success me-2" title="Open Screener">
+        <i class="fas fa-chart-line"></i>
+    </a>
+    <a href="https://www.youtube.com/embed/5E9X4VZ1KfY" target="_blank" class="text-danger" title="Watch Tutorial">
+        <i class="fab fa-youtube"></i>
+    </a>
+    {% else %}
     <span class="text-secondary" title="Chart link not available">
         <i class="fas fa-chart-line"></i>
     </span>
