@@ -221,8 +221,8 @@ login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
 login_manager.session_protection = 'strong'  # Basic session protection
 
-# Ensure the login manager is properly initialized
-login_manager._login_disabled = False
+# Set login disabled status through app config instead of directly on login_manager
+app.config['LOGIN_DISABLED'] = False
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -1838,6 +1838,7 @@ def get_scan_results():
         user_conditions = load_user_conditions()
         
         # Combine built-in and user conditions
+        admin_conditions = []  # Initialize empty admin conditions
         all_scan_conditions = admin_conditions.copy()
         all_scan_conditions.extend(user_conditions)
         
@@ -3158,134 +3159,7 @@ def check_licence():
             'is_premium': is_premium
         }), 500
 
-@app.route('/nifty-data')
-def fetch_nifty_data():
-    """
-    Fetch Nifty indices data from NSE's official API
-    
-    Returns:
-    JSON response of Nifty indices with their current values, changes, and percentage changes
-    """
-    try:
-        nifty_data = get_nifty_data()
-        return jsonify(nifty_data)
-    except Exception as e:
-        logger.error(f"Error in nifty-data route: {str(e)}")
-        return jsonify({}), 500
-
-def get_nifty_data():
-    """
-    Fetch Nifty indices data from NSE's official API
-    
-    Returns:
-    dict: A dictionary of Nifty indices with their current values, changes, and percentage changes
-    """
-    url = "https://www.nseindia.com/api/allIndices"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Accept": "application/json",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.nseindia.com/"
-    }
-    
-    # Specific indices in the EXACT order you specified
-    tracked_indices = [
-        'NIFTY 50', 
-        'NIFTY 100', 
-        'NIFTY 200', 
-        'NIFTY 500', 
-        'NIFTY ALPHA 50',
-        'NIFTY BANK', 
-        'NIFTY ENERGY', 
-        'NIFTY FMCG', 
-        'NIFTY HIGH BETA 50', 
-        'NIFTY HOUSING', 
-        'NIFTY METAL', 
-        'NIFTY PRIVATE BANK', 
-        'NIFTY PSE', 
-        'NIFTY PSU BANK', 
-        'NIFTY REALTY', 
-        'NIFTY OIL & GAS',
-        'NIFTY PHARMA'
-    ]
-    
-    nifty_data = {}
-    
-    try:
-        # Create a session to handle cookies and maintain connection
-        session = requests.Session()
-        
-        # First, establish a session by visiting the main NSE website
-        # logger.debug("Establishing session with NSE website")
-        pre_response = session.get("https://www.nseindia.com", headers=headers)
-        # logger.debug(f"Pre-session response status: {pre_response.status_code}")
-        
-        # Fetch indices data
-        # logger.debug(f"Fetching data from URL: {url}")
-        response = session.get(url, headers=headers)
-        
-        # Log full response details for debugging
-        # logger.debug(f"Response status code: {response.status_code}")
-        
-        # Check if request was successful
-        if response.status_code == 200:
-            try:
-                data = response.json()
-            except ValueError as json_error:
-                logger.error(f"JSON parsing error: {json_error}")
-                logger.error(f"Response content: {response.text}")
-                return {}
-            
-            # Create a mapping of uppercase index names to their original data
-            index_map = {
-                index_data.get('index', '').upper(): index_data 
-                for index_data in data.get('data', [])
-            }
-            
-            # Extract values for specified indices in the specified order
-            for nse_index in tracked_indices:
-                try:
-                    # Get the index data from the map
-                    index_data = index_map.get(nse_index)
-                    if not index_data:
-                        continue
-                    
-                    # Prepend 'Nifty' to the display name
-                    display_name = f"Nifty {index_data['index'].replace('NIFTY ', '')}"
-                    
-                    # Calculate change as Last Price - Open Price
-                    last_price = float(index_data.get('last', 0))
-                    open_price = float(index_data.get('open', 0))
-                    change = last_price - open_price
-                    
-                    # Calculate percentage change
-                    pct_change = (change / open_price * 100) if open_price != 0 else 0
-                    
-                    nifty_data[display_name] = {
-                        "change": f"{change:+.2f}",
-                        "last": f"{last_price:,.2f}",
-                        "open": f"{open_price:,.2f}",
-                        "pChange": f"{pct_change:+.2f}"
-                    }
-                except Exception as parse_error:
-                    logger.error(f"Error parsing index data for {nse_index}: {parse_error}")
-            
-            # logger.info(f"Fetched Nifty data: {nifty_data}")
-            return nifty_data
-        
-        else:
-            logger.error(f"Failed to fetch indices. Status code: {response.status_code}")
-            logger.error(f"Response content: {response.text}")
-            return {}
-    
-    except requests.exceptions.RequestException as req_error:
-        logger.error(f"Network error fetching NSE indices: {req_error}")
-        return {}
-    except Exception as e:
-        logger.error(f"Unexpected error fetching NSE indices: {str(e)}")
-        return {}
-
-@app.route('/get_nifty_data')
+@app.route('/get-nifty-data')
 def fetch_get_nifty_data():
     """
     Route to fetch Nifty data

@@ -87,15 +87,15 @@
                         <ul>
                             <li><strong>Edit:</strong> Click the <i class="fas fa-edit text-primary"></i> icon to modify a condition</li>
                             <li><strong>Delete:</strong> Click the <i class="fas fa-trash-alt text-danger"></i> icon to remove a condition</li>
-                            <li><strong>Refresh:</strong> Click the refresh button to manually update all conditions</li>
+                            <li><strong>Refresh:</strong> Click the refresh button available in the Navigation bat at the top to manually update all conditions</li>
                         </ul>
                     </div>
 
                     <div id="using-chartink" class="mb-5">
                         <h4 class="border-bottom pb-2 mb-3">Using Chartink Screens</h4>
-                        <p>To use Chartink screens with this tool:</p>
+                        <p>To use CHARTINK screens with this tool:</p>
                         <ol>
-                            <li>Go to <a href="https://chartink.com/" target="_blank">Chartink.com</a> and log in</li>
+                            <li>Go to <a href="https://chartink.com/" target="_blank">chartink.com</a> and log in</li>
                             <li>Create or open a scanner with your desired conditions</li>
                             <li>Click on "Copy Link" or copy the URL from your browser</li>
                             <li>Paste this URL when adding a new condition</li>
@@ -103,8 +103,27 @@
                     </div>
 
                     <div id="real-time-updates" class="mb-5">
-                        <h4 class="border-bottom pb-2 mb-3">Real-time Updates</h4>
-                        <p>The dashboard automatically refreshes every 2 minutes to show the latest data. You can also manually refresh at any time by clicking the refresh button in the navigation bar.</p>
+                        <h4 class="border-bottom pb-2 mb-3">Auto Refresh Feature</h4>
+                        <p>The dashboard automatically refreshes every 2 minutes to show the latest data. You can also manually refresh at any time by clicking the refresh button in the navigation bar. Inside the dashboard option you can select the time interval.</p>
+                    </div>
+
+                    <div id="nifty-indices" class="mb-5">
+                        <h4 class="border-bottom pb-2 mb-3">Nifty Indices Information</h4>
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-info-circle me-2"></i>Real-time Data from NSE India</h5>
+                            <p class="mb-0">
+                                Our Nifty Indices data is fetched in real-time directly from the National Stock Exchange (NSE) of India. 
+                                The percentage changes shown are calculated from the <strong>Day's Open</strong> price, not the previous day's close.
+                                This gives you a more accurate view of the current day's market movement.
+                            </p>
+                        </div>
+                        <p>Key points about Nifty Indices data:</p>
+                        <ul>
+                            <li>Data is updated every 30 seconds during market hours</li>
+                            <li>All values are in real-time with minimal delay</li>
+                            <li>Percentage change is calculated from the day's opening price</li>
+                            <li>Data is sourced directly from NSE India's official feed</li>
+                        </ul>
                     </div>
 
                     <div id="disclaimer" class="alert alert-warning">
@@ -121,9 +140,117 @@
                     <div class="mb-5">
                         <h4 class="border-bottom pb-2 mb-3">Video Tutorial</h4>
                         <div class="ratio ratio-16x9">
-                            <iframe src="https://www.youtube.com/embed/5E9X4VZ1KfY" title="Tutorial Video" allowfullscreen></iframe>
+                            <iframe src="https://www.youtube.com/embed/IzWhUy5B3jc" title="Tutorial Video" allowfullscreen></iframe>
                         </div>
                         <p class="mt-2 text-muted">Watch this video for a quick guide on how to use our platform.</p>
+                    </div>
+
+                    <!-- FAQ Section -->
+                    <div id="faq" class="mb-5">
+                        <h4 class="border-bottom pb-2 mb-3">Frequently Asked Questions</h4>
+                        
+                        <div class="accordion" id="faqAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                        How do I add a new condition?
+                                    </button>
+                                </h2>
+                                <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        Click the <strong>Add Condition</strong> button, enter a name, paste your Chartink scan URL or enter the scan clause, and click Save.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                        How often are the scan results updated?
+                                    </button>
+                                </h2>
+                                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        Scan results are automatically updated every 5 minutes. You can also manually refresh the results by clicking the refresh button.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                        Why am I not seeing any results?
+                                    </button>
+                                </h2>
+                                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        This could be due to:
+                                        <ul>
+                                            <li>Market is closed</li>
+                                            <li>Your scan conditions are too strict</li>
+                                            <li>No stocks match your criteria</li>
+                                            <li>Connection issue with data source</li>
+                                        </ul>
+                                        Try adjusting your scan parameters or check back during market hours.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                        How do I save my favorite scans?
+                                    </button>
+                                </h2>
+                                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        All your conditions are automatically saved in your account. You can access them from any device by logging in with your credentials.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                                        Is there a mobile app available?
+                                    </button>
+                                </h2>
+                                <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        Our platform is fully responsive and works on all mobile devices through your web browser. No app installation is required.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Support Section -->
+                    <div id="contact" class="mb-5">
+                        <h4 class="border-bottom pb-2 mb-3">Contact Support</h4>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-12">
+                                        <h5 class="card-title">ICON Corporation</h5>
+                                        <p class="card-text mb-1">
+                                            <i class="fas fa-map-marker-alt me-2 text-muted"></i>
+                                            Shop No 8, Upstairs, 23-1-546,<br>
+                                            Ravi Chettu Centre, Fathekhan Pet Main Rd,<br>
+                                            Nellore, Andhra Pradesh 524003<br>
+                                            INDIA
+                                        </p>
+                                        <p class="card-text mb-1">
+                                            <i class="fas fa-envelope me-2 text-muted"></i>
+                                            <a href="mailto:imjjrobo@gmail.com" class="text-decoration-none">imjjrobo@gmail.com</a>
+                                        </p>
+                                        <p class="card-text">
+                                            <i class="fas fa-phone-alt me-2 text-muted"></i>
+                                            <a href="tel:+916305683377" class="text-decoration-none">+91 6305683377</a>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

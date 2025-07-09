@@ -1071,365 +1071,6 @@
             float: right;
             margin-right: 15px;
         }
-        
-        #lastUpdateTime {
-            color: #fff;
-        }
-
-        .nifty-btn {
-    background: linear-gradient(45deg, #9c27b0, #e91e63);
-    color: var(--text-light);
-    border: none;
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    cursor: pointer;
-    font-weight: 500;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    font-size: 1.3rem;
-}
-
-        .nifty-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            filter: brightness(1.1);
-        }
-
-        .nifty-btn i {
-            margin-right: 8px;
-            font-size: 1.1em;
-        }
-
-        #niftyModal .table {
-            margin-bottom: 0;
-        }
-        #niftyModal .table th {
-            background-color: var(--primary-dark);
-            color: var(--text-light);
-            border-color: var(--border-dark);
-        }
-        #niftyModal .table td {
-            border-color: var(--border-dark);
-        }
-
-        .modal-header-actions {
-            display: flex;
-            align-items: center;
-        }
-
-        #niftyReloadBtn {
-            transition: transform 0.3s ease;
-        }
-
-        #niftyReloadBtn:hover {
-            transform: rotate(180deg);
-        }
-
-        #niftyLastUpdatedTime {
-            font-size: 0.7rem;
-            opacity: 0.7;
-        }
-        
-        /* Last Update Styles */
-        .last-update {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-            color: var(--text-dark);
-            font-size: 0.9rem;
-            opacity: 0.7;
-        }
-
-        .last-update .far.fa-clock {
-            margin-right: 0.5rem;
-            color: var(--accent-color);
-        }
-
-        .dark-theme .last-update {
-            color: var(--text-light);
-            opacity: 0.8;
-        }
-
-        .dark-theme .last-update .far.fa-clock {
-            color: var(--accent-color);
-        }
-
-        /* Dark theme styles */
-        body.dark-theme {
-            background-color: #121212 !important;
-            color: #e0e0e0 !important;
-        }
-        
-        body.dark-theme .navbar {
-            background-color: #1f1f1f !important;
-            border-bottom: 1px solid #333 !important;
-        }
-        
-        body.dark-theme .card {
-            background-color: #1e1e1e !important;
-            color: #e0e0e0 !important;
-            border: 1px solid #333 !important;
-        }
-        
-        body.dark-theme .table {
-            color: #e0e0e0 !important;
-        }
-        
-        body.dark-theme .modal-content {
-            background-color: #2c2c2c !important;
-            color: #e0e0e0 !important;
-        }
-        
-        body.dark-theme .form-control {
-            background-color: #333 !important;
-            color: #e0e0e0 !important;
-            border-color: #555 !important;
-        }
-        
-        /* Theme toggle button styles */
-        .theme-toggle-btn {
-            background: none;
-            border: none;
-            color: var(--text-color, inherit);
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-        
-        .theme-toggle-btn:hover {
-            color: var(--accent-color, #00bcd4);
-        }
-
-        /* Custom styles for the app */
-        /* Stock symbol styling - enhanced for all browsers */
-        .stock-symbol, td a, table td a, .table td a {
-            color: #00bcd4 !important; /* Bright cyan color for stock symbols */
-            font-weight: 500;
-            text-decoration: none !important;
-        }
-        
-        /* Ensure stock symbols maintain color after clicking - with higher specificity */
-        .stock-symbol:visited, .stock-symbol:active, .stock-symbol:focus, .stock-symbol:hover,
-        td a:visited, td a:active, td a:focus, td a:hover,
-        table td a:visited, table td a:active, table td a:focus, table td a:hover,
-        .table td a:visited, .table td a:active, .table td a:focus, .table td a:hover {
-            color: #00bcd4 !important;
-            text-decoration: none !important;
-            opacity: 1 !important;
-        }
-        
-        /* Fix for Brave browser specific issues with checkboxes */
-        @supports (-webkit-appearance: none) and (not (overflow: -webkit-marquee)) and (not (-ms-ime-align:auto)) {
-            .form-check-input {
-                pointer-events: auto !important;
-                opacity: 1 !important;
-                position: static !important;
-            }
-        }
-
-        /* Dark theme global styles */
-        body.dark-theme {
-            background-color: #121212 !important;
-            color: #e0e0e0 !important;
-        }
-
-        /* Navbar */
-        body.dark-theme .navbar {
-            background-color: #1f1f1f !important;
-            border-bottom: 1px solid #333 !important;
-        }
-
-        body.dark-theme .navbar-brand {
-            color: #e0e0e0 !important;
-        }
-
-        /* Cards */
-        body.dark-theme .card {
-            background-color: #1e1e1e !important;
-            color: #e0e0e0 !important;
-            border: 1px solid #333 !important;
-        }
-
-        body.dark-theme .card-header {
-            background-color: #2a2a2a !important;
-            color: #e0e0e0 !important;
-            border-bottom: 1px solid #444 !important;
-        }
-
-        /* Tables */
-        body.dark-theme .table {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .table-dark {
-            background-color: #1e1e1e !important;
-        }
-
-        body.dark-theme .table thead {
-            background-color: #2a2a2a !important;
-            color: var(--text-light) !important;
-        }
-
-        /* Modals */
-        body.dark-theme .modal-content {
-            background-color: #2c2c2c !important;
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .modal-header {
-            border-bottom: 1px solid #444 !important;
-        }
-
-        body.dark-theme .modal-footer {
-            border-top: 1px solid #444 !important;
-        }
-
-        /* Form controls */
-        body.dark-theme .form-control {
-            background-color: #333 !important;
-            color: #e0e0e0 !important;
-            border-color: #555 !important;
-        }
-
-        body.dark-theme .form-control:focus {
-            background-color: #3a3a3a !important;
-            color: #e0e0e0 !important;
-            border-color: #666 !important;
-            box-shadow: 0 0 0 0.25rem rgba(100, 100, 100, 0.25) !important;
-        }
-
-        /* Buttons */
-        body.dark-theme .btn-primary {
-            background-color: #3f51b5 !important;
-            border-color: #3f51b5 !important;
-        }
-
-        body.dark-theme .btn-secondary {
-            background-color: #555 !important;
-            border-color: #666 !important;
-        }
-
-        /* Alerts */
-        body.dark-theme .alert {
-            background-color: #2a2a2a !important;
-            color: #e0e0e0 !important;
-            border-color: #444 !important;
-        }
-
-        /* Theme toggle button */
-        body.dark-theme .theme-toggle-btn {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .theme-toggle-btn:hover {
-            color: #00bcd4 !important;
-        }
-
-        /* Scrollbar (for webkit browsers) */
-        body.dark-theme::-webkit-scrollbar {
-            width: 12px;
-            background-color: #1e1e1e !important;
-        }
-
-        body.dark-theme::-webkit-scrollbar-thumb {
-            background-color: #555 !important;
-            border-radius: 6px !important;
-        }
-
-        /* Light Theme Table Styles */
-        .table {
-            background-color: #ffffff !important;
-            color: #333 !important;
-        }
-
-        .table thead {
-            background-color: #f8f9fa !important;
-            color: #333 !important;
-        }
-
-        .table tbody tr {
-            background-color: #ffffff !important;
-            color: #333 !important;
-        }
-
-        .table tbody tr:nth-child(even) {
-            background-color: #f2f2f2 !important;
-        }
-
-        .table-hover tbody tr:hover {
-            background-color: rgba(0,0,0,0.075) !important;
-            transition: background-color 0.3s ease;
-        }
-
-        /* Dark Theme Table Styles */
-        .dark-theme .table {
-            background-color: #1e1e1e !important;
-            color: #e0e0e0 !important;
-        }
-
-        .dark-theme .table thead {
-            background-color: #2a2a2a !important;
-            color: var(--text-light) !important;
-        }
-
-        .dark-theme .table tbody tr {
-            color: #e0e0e0 !important;
-            border-color: #333 !important;
-        }
-
-        .dark-theme .table tbody tr:nth-child(even) {
-            background-color: #252525 !important;
-        }
-
-        .dark-theme .table-hover tbody tr:hover {
-            background-color: rgba(255,255,255,0.1) !important;
-            transition: background-color 0.3s ease;
-        }
-
-        /* Ensure table styles work with existing theme */
-        .table {
-            --bs-table-bg: transparent;
-            --bs-table-accent-bg: transparent;
-            --bs-table-striped-bg: rgba(0, 0, 0, 0.05);
-            --bs-table-hover-bg: rgba(0, 0, 0, 0.075);
-        }
-
-        .dark-theme .table {
-            --bs-table-bg: transparent;
-            --bs-table-accent-bg: transparent;
-            --bs-table-striped-bg: rgba(255, 255, 255, 0.1);
-            --bs-table-hover-bg: rgba(255, 255, 255, 0.15);
-        }
-
-        /* Responsive Breakpoints */
-        @media (max-width: 768px) {
-            .container {
-                padding-left: 10px;
-                padding-right: 10px;
-            }
-
-            .scan-card {
-                margin-bottom: 15px;
-            }
-
-            .navbar {
-                padding: 10px 0;
-            }
-
-            .navbar-brand {
-                font-size: 1.2rem;
-            }
-
-            .table-responsive {
-                font-size: 0.9rem;
-            }
-        }
-
         @media (max-width: 576px) {
             .container-fluid {
                 padding-left: 5px;
@@ -1675,31 +1316,6 @@ if (niftyModal) {
 
 
 
-    <!-- Nifty Indices Modal -->
-    <div class="modal fade" id="niftyModal" tabindex="-1" aria-labelledby="niftyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
-            <div class="modal-content bg-dark text-light">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="niftyModalLabel">
-                        <i class="fas fa-chart-line me-2"></i>Nifty Indices
-                    </h5>
-                    <div class="modal-header-actions">
-                        <button id="niftyReloadBtn" class="btn btn-outline-light me-2" title="Reload Data" onclick="showNiftyModal()">
-                            <i class="fas fa-rotate-right"></i>
-                        </button>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                </div>
-                <div class="modal-body" id="niftyModalBody">
-                    <!-- Content will be dynamically loaded here -->
-                </div>
-                <div class="modal-footer">
-                    <small class="text-muted" id="niftyLastUpdatedTime"></small>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Navbar -->
     <nav class="navbar">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
@@ -1730,6 +1346,7 @@ if (niftyModal) {
                 <i class="fas fa-rotate-right"></i>
             </button>
             <!-- User Conditions Button with Enhanced Style -->
+            <!-- User Conditions Button with Enhanced Style -->
             <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn ms-2 navbar-round-btn" style="
                 background: linear-gradient(135deg, #7b1fa2, #9c27b0);
                 border: none;
@@ -1745,25 +1362,6 @@ if (niftyModal) {
                 transition: all 0.3s ease;
             ">
                 <i class="fas fa-list-ul" title="User Conditions"></i>
-            </button>
-
-
-            <!-- Nifty Button with Enhanced Style -->
-            <button class="btn navbar-round-btn ms-2" data-bs-toggle="modal" data-bs-target="#niftyModal" style="
-                background: linear-gradient(135deg, #e65100, #ff6d00);
-                border: none;
-                border-radius: 50%;
-                width: 48px;
-                height: 48px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.3rem;
-                color: white;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                transition: all 0.3s ease;
-            ">
-                <i class="fas fa-chart-bar" title="Nifty Indices"></i>
             </button>
 
             <!-- Help Button with Enhanced Style -->
@@ -1932,7 +1530,7 @@ if (niftyModal) {
                                 {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
                                 {% if not is_default %}
                                     <!-- Custom user photo -->
-                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';">
+                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='/static/user_photos/default_free.png';">
                                 {% else %}
                                     <!-- Default photo based on premium status -->
                                     {% set is_premium = user_data.account.profile.premium == 'yes' %}
@@ -1940,7 +1538,7 @@ if (niftyModal) {
                                     <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
                                          alt="{{ 'Premium' if is_premium else 'Free' }} User" 
                                          class="user-avatar-img"
-                                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='user_photos/default_free.png') }}';"
+                                         onerror="this.onerror=null; this.src='/static/user_photos/default_free.png';"
                                     >
                                 {% endif %}
                             {% else %}
@@ -2067,13 +1665,13 @@ if (niftyModal) {
                             <div class="mb-4">
                                 <i class="fas fa-chart-line fa-4x text-primary mb-3"></i>
                                 <h3>Welcome to PRICE IS THE KING Stock Scanner!</h3>
-                                <p class="lead mb-4">Get started by adding your first Chartink screener to see stocks collectively.</p>
+                                <p class="lead mb-4">Get started by adding your Chartink screeners to see stocks collectively.</p>
                             </div>
                             <div class="d-flex flex-wrap justify-content-center gap-3 mb-3">
                                 <a href="https://chartink.com/" target="_blank" class="btn btn-primary btn-lg flex-grow-1 flex-sm-grow-0 text-nowrap">
                                     <i class="fas fa-external-link-alt me-2"></i>Open Chartink
                                 </a>
-                                <a href="https://www.youtube.com/embed/5E9X4VZ1KfY" target="_blank" class="btn btn-danger btn-lg flex-grow-1 flex-sm-grow-0 text-nowrap">
+                                <a href="https://youtu.be/IzWhUy5B3jc" target="_blank" class="btn btn-danger btn-lg flex-grow-1 flex-sm-grow-0 text-nowrap">
                                     <i class="fab fa-youtube me-2"></i>Watch Tutorial
                                 </a>
                             </div>
@@ -2083,7 +1681,7 @@ if (niftyModal) {
                                     <br><br>
                                     This App is not meant for advisory/recommendation purposes. Risk disclosures on derivatives - 9 out of 10 individual traders in the equity Futures and Options Segment incurred net losses. On average, loss makers registered net trading losses close to 750,000. Over and above the net trading losses incurred, loss makers expended an additional 28% of net trading losses as transaction costs. Those making net trading profits, incurred between 15% to 50% of such profits as transaction costs.
                                     <br><br>
-                                    The information provided should not be construed as investment advice. Always conduct your own research and consult with a qualified financial advisor before making any investment decisions.
+                                    The information provided should not be construed as investment advice. Always conduct your own research before making any investment decisions.
                                 </p>
                             </div>
                         </div>
@@ -2159,7 +1757,7 @@ if (niftyModal) {
     <a href="{{ condition.link }}" target="_blank" class="text-success me-2" title="Open Screener">
         <i class="fas fa-chart-line"></i>
     </a>
-    <a href="https://www.youtube.com/embed/5E9X4VZ1KfY" target="_blank" class="text-danger" title="Watch Tutorial">
+    <a href="https://youtu.be/IzWhUy5B3jc" target="_blank" class="text-danger" title="Watch Tutorial">
         <i class="fab fa-youtube"></i>
     </a>
     {% else %}
@@ -2430,8 +2028,16 @@ if (niftyModal) {
     }
 }
 
-        document.getElementById('conditionsModal').addEventListener('show.bs.modal', function () {
+        // Handle modal show event
+        const conditionsModal = document.getElementById('conditionsModal');
+        
+        conditionsModal.addEventListener('show.bs.modal', function () {
             populateUserConditions();
+        });
+        
+        // Add event listener for when the modal is closed
+        conditionsModal.addEventListener('hidden.bs.modal', function () {
+            window.location.reload();
         });
 
         document.getElementById('update-settings-form').addEventListener('submit', async function(e) {
@@ -2491,7 +2097,6 @@ if (niftyModal) {
         const knownModalIds = [
             'conditionsModal',  // Conditions modal
             'settingsModal',   // Settings modal
-            'niftyModal',      // Nifty modal
             'userConditionModal', // User condition modal if exists
             'adminConditionModal', // Admin condition modal if exists
             'chartModal'       // Any chart modal
@@ -2982,7 +2587,6 @@ if (niftyModal) {
                     <ul>
                         <li>Track multiple stock conditions simultaneously</li>
                         <li>Real-time updates with auto-refresh</li>
-                        <li>View Nifty indices with the <i class="fas fa-chart-bar"></i> button</li>
                         <li>Toggle between light and dark themes</li>
                     </ul>
                 </div>
@@ -3346,5 +2950,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-<script src="{{ url_for('static', filename='js/nifty_modal.js') }}"></script>
+
 {% endblock %}
