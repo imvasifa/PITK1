@@ -278,24 +278,61 @@ export class UserConditions {
     }
 
     async deleteCondition(id) {
-        if (!id || !confirm('Are you sure you want to delete this condition?')) {
+        if (!id) {
+            console.error('No condition ID provided for deletion');
             return;
         }
         
         try {
+            // Show loading state
+            const deleteButtons = document.querySelectorAll(`.delete-condition[data-condition-id="${id}"]`);
+            deleteButtons.forEach(btn => {
+                const originalHTML = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                btn.setAttribute('data-original-html', originalHTML);
+            });
+            
             const response = await fetch(`/api/user-conditions/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                credentials: 'same-origin'
             });
             
             if (!response.ok) {
                 throw new Error('Failed to delete condition');
             }
             
+            // Show success message
+            if (typeof showToast === 'function') {
+                showToast('Condition deleted successfully', 'success');
+            }
+            
+            // Reload conditions to update the UI
             await this.loadConditions();
             
         } catch (error) {
             console.error('Error deleting condition:', error);
-            alert(`Error deleting condition: ${error.message}`);
+            
+            // Restore button states on error
+            const deleteButtons = document.querySelectorAll(`.delete-condition[data-condition-id="${id}"]`);
+            deleteButtons.forEach(btn => {
+                btn.disabled = false;
+                if (btn.hasAttribute('data-original-html')) {
+                    btn.innerHTML = btn.getAttribute('data-original-html');
+                    btn.removeAttribute('data-original-html');
+                }
+            });
+            
+            // Show error message
+            if (typeof showToast === 'function') {
+                showToast(`Error: ${error.message}`, 'error');
+            } else {
+                alert(`Error deleting condition: ${error.message}`);
+            }
         }
     }
 
