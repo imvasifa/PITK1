@@ -138,7 +138,17 @@
                         </div>
                                     <div class="mb-3">
                                         <label for="email" class="form-label">Email</label>
-                                        <input type="email" class="form-control" id="email" name="email" value="{{ profile.email | default('', true) }}">
+                                        <div class="input-group">
+                                            <input type="email" class="form-control" id="email" name="email" value="{{ profile.email | default('', true) }}" {% if profile.email_verified %}readonly{% endif %}>
+                                            {% if profile.email and not profile.email_verified %}
+                                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#verifyEmailModal">
+                                                <i class="fas fa-envelope me-1"></i> Verify
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                        {% if profile.email_verified %}
+                                        <small class="text-success"><i class="fas fa-check-circle"></i> Email verified</small>
+                                        {% endif %}
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -956,6 +966,286 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initial load
         if (refreshBtn) {
             loadLicenses();
+        }
+    });
+    
+    // Email Verification Modal
+    const verifyEmailModal = `
+    <div class="modal fade" id="verifyEmailModal" tabindex="-1" aria-labelledby="verifyEmailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="verifyEmailModalLabel">Verify Your Email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="otpStep1">
+                        <p>We'll send a 6-digit verification code to your email address:</p>
+                        <p class="text-center fw-bold">{{ profile.email }}</p>
+                        <button id="sendOtpBtn" class="btn btn-primary w-100">
+                            <i class="fas fa-paper-plane me-2"></i>Send Verification Code
+                        </button>
+                    </div>
+                    
+                    <div id="otpStep2" style="display: none;">
+                        <p>Enter the 6-digit code sent to your email:</p>
+                        <div class="otp-input-group d-flex justify-content-center gap-2 mb-3">
+                            <input type="text" maxlength="1" class="form-control text-center otp-digit" style="font-size: 1.5rem; height: 50px;" autofocus>
+                            <input type="text" maxlength="1" class="form-control text-center otp-digit" style="font-size: 1.5rem; height: 50px;">
+                            <input type="text" maxlength="1" class="form-control text-center otp-digit" style="font-size: 1.5rem; height: 50px;">
+                            <input type="text" maxlength="1" class="form-control text-center otp-digit" style="font-size: 1.5rem; height: 50px;">
+                            <input type="text" maxlength="1" class="form-control text-center otp-digit" style="font-size: 1.5rem; height: 50px;">
+                            <input type="text" maxlength="1" class="form-control text-center otp-digit" style="font-size: 1.5rem; height: 50px;">
+                        </div>
+                        <div id="otpError" class="text-danger mb-2" style="min-height: 24px;"></div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted" id="otpTimer"></small>
+                            <button id="resendOtpBtn" class="btn btn-link p-0" style="display: none;">
+                                Resend Code
+                            </button>
+                        </div>
+                        <button id="verifyOtpBtn" class="btn btn-primary w-100 mt-3">
+                            <i class="fas fa-check-circle me-2"></i>Verify Email
+                        </button>
+                    </div>
+                    
+                    <div id="otpSuccess" class="text-center" style="display: none;">
+                        <div class="mb-3">
+                            <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                        </div>
+                        <h4 class="text-success mb-3">Email Verified Successfully!</h4>
+                        <p>Your email has been verified. You can now enjoy all the features.</p>
+                        <button class="btn btn-success" data-bs-dismiss="modal">
+                            <i class="fas fa-thumbs-up me-2"></i>Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    
+    // Add modal to the document
+    document.body.insertAdjacentHTML('beforeend', verifyEmailModal);
+    
+    // Email Verification JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        const sendOtpBtn = document.getElementById('sendOtpBtn');
+        const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+        const resendOtpBtn = document.getElementById('resendOtpBtn');
+        const otpInputs = document.querySelectorAll('.otp-digit');
+        const otpError = document.getElementById('otpError');
+        const otpTimer = document.getElementById('otpTimer');
+        const otpStep1 = document.getElementById('otpStep1');
+        const otpStep2 = document.getElementById('otpStep2');
+        const otpSuccess = document.getElementById('otpSuccess');
+        let countdown = 300; // 5 minutes in seconds
+        let countdownInterval;
+
+        // Handle send OTP button click
+        if (sendOtpBtn) {
+            sendOtpBtn.addEventListener('click', sendOtp);
+        }
+
+        // Handle verify OTP button click
+        if (verifyOtpBtn) {
+            verifyOtpBtn.addEventListener('click', verifyOtp);
+        }
+
+        // Handle resend OTP button click
+        if (resendOtpBtn) {
+            resendOtpBtn.addEventListener('click', sendOtp);
+        }
+
+        // Handle OTP input
+        otpInputs.forEach((input, index) => {
+            // Only allow numbers
+            input.addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+                
+                // Move to next input on number input
+                if (this.value.length === 1 && index < otpInputs.length - 1) {
+                    otpInputs[index + 1].focus();
+                }
+            });
+            
+            // Handle backspace
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && this.value === '' && index > 0) {
+                    otpInputs[index - 1].focus();
+                }
+            });
+        });
+
+        // Handle paste event
+        document.addEventListener('paste', function(e) {
+            const pastedData = e.clipboardData.getData('text/plain').trim();
+            if (pastedData.match(/^\d{6}$/)) {
+                otpInputs.forEach((input, i) => {
+                    if (i < pastedData.length) {
+                        input.value = pastedData[i];
+                    }
+                });
+                verifyOtp();
+                e.preventDefault();
+            }
+        });
+
+        function sendOtp() {
+            // Show loading state
+            const originalText = sendOtpBtn.innerHTML;
+            sendOtpBtn.disabled = true;
+            sendOtpBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...';
+            
+            // Call API to send OTP
+            fetch('/send-verification-otp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show OTP input
+                    otpStep1.style.display = 'none';
+                    otpStep2.style.display = 'block';
+                    
+                    // Start countdown timer
+                    startCountdown();
+                    
+                    // Focus first OTP input
+                    otpInputs[0].focus();
+                } else {
+                    showError(data.message || 'Failed to send OTP. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('An error occurred. Please try again.');
+            })
+            .finally(() => {
+                // Reset button state
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.innerHTML = originalText;
+            });
+        }
+
+        function verifyOtp() {
+            // Get OTP from inputs
+            const otp = Array.from(otpInputs).map(input => input.value).join('');
+            
+            if (otp.length !== 6) {
+                showError('Please enter a 6-digit code');
+                return;
+            }
+            
+            // Show loading state
+            const originalText = verifyOtpBtn.innerHTML;
+            verifyOtpBtn.disabled = true;
+            verifyOtpBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Verifying...';
+            
+            // Call API to verify OTP
+            fetch('/verify-email-otp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ otp: otp })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    otpStep2.style.display = 'none';
+                    otpSuccess.style.display = 'block';
+                    
+                    // Update UI to show verified status
+                    const verifyButton = document.querySelector('button[data-bs-target="#verifyEmailModal"]');
+                    if (verifyButton) {
+                        verifyButton.outerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Verified</span>';
+                    }
+                    
+                    // Reload the page after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showError(data.message || 'Invalid verification code. Please try again.');
+                    // Clear OTP inputs on error
+                    otpInputs.forEach(input => input.value = '');
+                    otpInputs[0].focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('An error occurred. Please try again.');
+            })
+            .finally(() => {
+                // Reset button state
+                verifyOtpBtn.disabled = false;
+                verifyOtpBtn.innerHTML = originalText;
+            });
+        }
+
+        function startCountdown() {
+            clearInterval(countdownInterval);
+            countdown = 300; // Reset to 5 minutes
+            updateTimerDisplay();
+            
+            countdownInterval = setInterval(() => {
+                countdown--;
+                updateTimerDisplay();
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    resendOtpBtn.style.display = 'inline';
+                    otpTimer.style.display = 'none';
+                }
+            }, 1000);
+        }
+        
+        function updateTimerDisplay() {
+            const minutes = Math.floor(countdown / 60);
+            const seconds = countdown % 60;
+            otpTimer.textContent = `Code expires in ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
+        
+        function showError(message) {
+            otpError.textContent = message;
+            otpError.style.display = 'block';
+            
+            // Hide error after 5 seconds
+            setTimeout(() => {
+                otpError.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Reset modal when closed
+        const verifyEmailModalElement = document.getElementById('verifyEmailModal');
+        if (verifyEmailModalElement) {
+            verifyEmailModalElement.addEventListener('hidden.bs.modal', function () {
+                // Reset all inputs
+                otpInputs.forEach(input => input.value = '');
+                otpError.style.display = 'none';
+                
+                // Reset steps
+                otpStep1.style.display = 'block';
+                otpStep2.style.display = 'none';
+                otpSuccess.style.display = 'none';
+                
+                // Reset buttons
+                if (sendOtpBtn) sendOtpBtn.disabled = false;
+                if (verifyOtpBtn) verifyOtpBtn.disabled = false;
+                if (resendOtpBtn) resendOtpBtn.style.display = 'none';
+                if (otpTimer) otpTimer.style.display = 'block';
+                
+                // Clear any existing timers
+                clearInterval(countdownInterval);
+            });
         }
     });
 </script>

@@ -187,6 +187,18 @@ from flask import Flask, render_template, jsonify, make_response, send_from_dire
 from flask_wtf import FlaskForm
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
+import os
+import logging
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, current_app
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
+import os
+import logging
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -202,19 +214,26 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to False for development
 app.config['REMEMBER_COOKIE_SECURE'] = False  # Set to False for development
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['REMEMBER_COOKIE_HTTPONLY'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Session expires after 30 minutes
-app.config['SESSION_REFRESH_EACH_REQUEST'] = True
-app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Create upload folder if it doesn't exist
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Email configuration from environment variables
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', '1') == '1'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+app.config['SECURITY_PASSWORD_SALT'] = os.getenv('SECURITY_PASSWORD_SALT', 'dev-salt-for-testing')
 
-# Initialize extensions
+# Initialize Flask extensions
 bcrypt = Bcrypt(app)
+mail = Mail(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+# Initialize token serializer
+token_serializer = URLSafeTimedSerializer(app.secret_key)
 
 # Configure login manager
-login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
@@ -409,7 +428,7 @@ def inject_profile():
 
 # User class with proper type handling
 class User(UserMixin):
-    def __init__(self, id, username, password, email=''):
+    def __init__(self, id, username, password, email='', user_data=None):
         # Store ID as string to avoid conversion issues
         try:
             self.id = int(id) if id is not None and str(id).strip() not in ['', 'id'] else None
@@ -420,10 +439,17 @@ class User(UserMixin):
         self.username = username
         self.password = password
         self.email = email
-        self._user_data = None
+        self._user_data = user_data or {}
         
         # Debug logging
         print(f"🔍 Created User - ID: {self.id} (type: {type(self.id)}), Username: {self.username}")
+    
+    @property
+    def email_verified(self):
+        """Check if the user's email is verified"""
+        if not self._user_data:
+            return False
+        return self._user_data.get('account', {}).get('email_verified', False)
 
     def get_id(self):
         # Return string representation as required by Flask-Login
@@ -2057,6 +2083,38 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
+def send_otp_email(user_email, username, otp):
+    """Send OTP to user's email for verification"""
+    try:
+        msg = Message(
+            'Your Email Verification OTP',
+            recipients=[user_email],
+            html=f'''
+            <h2>Hello {username}!</h2>
+            <p>Your OTP for email verification is:</p>
+            <h1 style="font-size: 36px; letter-spacing: 5px; color: #4CAF50;">{otp}</h1>
+            <p>This OTP is valid for 10 minutes.</p>
+            <p>If you didn't request this, please ignore this email.</p>
+            '''
+        )
+        mail.send(msg)
+        return True
+    except Exception as e:
+        logger.error(f"Error sending OTP email: {e}")
+        return False
+
+def generate_verification_token(email):
+    """Generate a verification token for the given email"""
+    return token_serializer.dumps(email, salt='email-verification-salt')
+
+def verify_token(token, expiration=86400):
+    """Verify the token and return the email if valid"""
+    try:
+        email = token_serializer.loads(
+            token,
+            salt='email-verification-salt',
+            max_age=expiration
+        )
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -2065,7 +2123,7 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        email = request.form.get('email', '')
+        email = request.form.get('email', '').strip()
         name = request.form.get('name', username)
         phone = request.form.get('phone', '')
         address = request.form.get('address', '')
@@ -2164,10 +2222,19 @@ def register():
                         user_id = result[0]
                         conn.commit()
                         
+                        # Generate verification token
+                        verification_token = generate_verification_token(email)
+                        
+                        # Send verification email
+                        if send_verification_email(email, username, verification_token):
+                            flash('Registration successful! Please check your email to verify your account.', 'success')
+                        else:
+                            flash('Registration successful, but we couldn\'t send the verification email. Please contact support.', 'warning')
+                        
                         # Log the user in with the hashed password
                         user = User(id=str(user_id), username=username, password=hashed_password, email=email)
                         login_user(user)
-                        return redirect(url_for('index'))
+                        return redirect(url_for('unverified'))
                     else:
                         print("❌ Failed to get user ID after insert")
                         error = 'Error creating user. Please try again.'
@@ -2185,6 +2252,168 @@ def register():
                     conn.close()
     
     return render_template('register.html', error=error)
+
+@app.route('/verify-email/<token>')
+def generate_otp():
+    """Generate a 6-digit OTP"""
+    return ''.join(random.choices('0123456789', k=6))
+
+# Store OTPs temporarily (in production, use Redis or database)
+otp_storage = {}
+
+@app.route('/send-verification-otp', methods=['POST'])
+@login_required
+def send_verification_otp():
+    try:
+        if current_user.email_verified:
+            return jsonify({'success': False, 'message': 'Email already verified'}), 400
+        
+        # Generate OTP
+        otp = generate_otp()
+        otp_storage[current_user.id] = {
+            'otp': otp,
+            'expiry': datetime.utcnow() + timedelta(minutes=10),
+            'attempts': 0
+        }
+        
+        # Send OTP via email
+        if send_otp_email(current_user.email, current_user.username, otp):
+            return jsonify({
+                'success': True,
+                'message': 'Verification OTP sent to your email',
+                'expires_in': 10  # minutes
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send OTP. Please try again.'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error sending OTP: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred while sending OTP'
+        }), 500
+
+@app.route('/verify-email-otp', methods=['POST'])
+@login_required
+def verify_email_otp():
+    try:
+        if current_user.email_verified:
+            return jsonify({'success': False, 'message': 'Email already verified'}), 400
+        
+        data = request.get_json()
+        otp = data.get('otp')
+        
+        if not otp or not otp.isdigit() or len(otp) != 6:
+            return jsonify({'success': False, 'message': 'Invalid OTP format'}), 400
+        
+        # Get stored OTP
+        stored_otp = otp_storage.get(current_user.id)
+        
+        if not stored_otp:
+            return jsonify({
+                'success': False,
+                'message': 'OTP not found or expired. Please request a new one.'
+            }), 400
+        
+        # Check expiry
+        if datetime.utcnow() > stored_otp['expiry']:
+            del otp_storage[current_user.id]
+            return jsonify({
+                'success': False,
+                'message': 'OTP has expired. Please request a new one.'
+            }), 400
+        
+        # Check attempts
+        if stored_otp['attempts'] >= 3:
+            del otp_storage[current_user.id]
+            return jsonify({
+                'success': False,
+                'message': 'Too many attempts. Please request a new OTP.'
+            }), 400
+        
+        # Verify OTP
+        if stored_otp['otp'] != otp:
+            stored_otp['attempts'] += 1
+            return jsonify({
+                'success': False,
+                'message': 'Invalid OTP',
+                'attempts_remaining': 3 - stored_otp['attempts']
+            }), 400
+        
+        # OTP verified, update user's email verification status
+        conn = db.get_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            UPDATE users 
+            SET user_data = jsonb_set(
+                COALESCE(user_data, '{}'::jsonb),
+                '{account,email_verified}',
+                'true'::jsonb,
+                true
+            )
+            WHERE id = %s
+            RETURNING id
+        """, (current_user.id,))
+        
+        if cur.rowcount == 0:
+            return jsonify({
+                'success': False,
+                'message': 'User not found'
+            }), 404
+        
+        conn.commit()
+        
+        # Clean up
+        if current_user.id in otp_storage:
+            del otp_storage[current_user.id]
+        
+        return jsonify({
+            'success': True,
+            'message': 'Email verified successfully!',
+            'redirect': url_for('dash')
+        })
+        
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        logger.error(f"Error verifying OTP: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred while verifying OTP'
+        }), 500
+    finally:
+        if 'cur' in locals() and cur is not None:
+            cur.close()
+        if 'conn' in locals() and conn is not None:
+            conn.close()
+
+@app.route('/unverified')
+@login_required
+def unverified():
+    if current_user.email_verified:
+        return redirect(url_for('index'))
+    return render_template('unverified.html')
+
+@app.route('/resend-verification', methods=['POST'])
+@login_required
+def resend_verification():
+    if current_user.email_verified:
+        return redirect(url_for('index'))
+    
+    # Generate new verification token
+    verification_token = generate_verification_token(current_user.email)
+    
+    # Send verification email
+    if send_verification_email(current_user.email, current_user.username, verification_token):
+        flash('A new verification email has been sent. Please check your inbox.', 'info')
+    else:
+        flash('Failed to send verification email. Please try again later.', 'danger')
+    
+    return redirect(url_for('unverified'))
 
 @app.route('/upload-photo', methods=['POST'])
 @login_required
