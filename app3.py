@@ -2010,7 +2010,6 @@ def login():
                     app.permanent_session_lifetime = timedelta(minutes=30)
                     
                     # Update session with user info
-                    session['user_id'] = user.id
                     session['_fresh'] = True
                     
                     logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
@@ -2049,8 +2048,6 @@ def login():
             logger.error(f"Error during login for user {username}: {str(e)}", exc_info=True)
     
     # For GET requests or failed logins, show the login form
-    return render_template('login.html', error=error)
-    
     return render_template('login.html', error=error)
 
 @app.route('/logout')

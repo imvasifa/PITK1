@@ -110,13 +110,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginBtn = document.getElementById('loginBtn');
     
     if (loginForm) {
-        loginForm.addEventListener('submit', function() {
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
             // Show loader
             loadingOverlay.style.display = 'flex';
             
             // Disable submit button to prevent double submission
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Signing in...';
+            
+            try {
+                const formData = new FormData(loginForm);
+                const response = await fetch(loginForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+                
+                if (response.redirected) {
+                    // If we get a redirect, follow it
+                    window.location.href = response.url;
+                } else {
+                    // If no redirect, reload to show any error messages
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                window.location.reload();
+            }
         });
     }
 });

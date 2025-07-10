@@ -1889,11 +1889,16 @@ if (niftyModal) {
         }
 
         // Function to populate user conditions in the UI
-        async function populateUserConditions() {
+        async function populateUserConditions(retryCount = 0) {
             console.log('populateUserConditions called');
             const container = document.getElementById('user-conditions-list-container');
             if (!container) {
-                console.error('Could not find user conditions container');
+                if (retryCount < 5) {
+                    // Retry after a short delay if container is not found
+                    setTimeout(() => populateUserConditions(retryCount + 1), 100);
+                } else {
+                    console.error('Could not find user conditions container after retries');
+                }
                 return;
             }
             console.log('Found container:', container);
@@ -2029,39 +2034,104 @@ if (niftyModal) {
     }
 }
 
+        // Function to load admin conditions
+        async function loadAdminConditions() {
+            try {
+                const response = await fetch('/api/conditions');
+                const conditions = await response.json();
+                const container = document.getElementById('admin-conditions-list');
+                
+                if (conditions && conditions.length > 0) {
+                    container.innerHTML = conditions.map(condition => `
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   value="${condition.id}" id="condition-${condition.id}">
+                            <label class="form-check-label" for="condition-${condition.id}">
+                                ${condition.name}
+                            </label>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p>No conditions available</p>';
+                }
+            } catch (error) {
+                console.error('Error loading conditions:', error);
+                document.getElementById('admin-conditions-list').innerHTML = 
+                    '<div class="alert alert-danger">Error loading conditions</div>';
+            }
+        }
+
         // Handle modal show event
         const conditionsModal = document.getElementById('conditionsModal');
         
         conditionsModal.addEventListener('show.bs.modal', function () {
             populateUserConditions();
+            loadAdminConditions();
         });
+        // Ensure checkboxes are populated every time the 'Your Conditions' tab is shown
+        const userConditionsTab = document.getElementById('user-conditions-tab');
+        if (userConditionsTab) {
+            userConditionsTab.addEventListener('shown.bs.tab', function () {
+                populateUserConditions();
+            });
+        }
+        // MutationObserver to ensure checkboxes are populated as soon as container appears
+        const observer = new MutationObserver((mutationsList, observer) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    const container = document.getElementById('user-conditions-list-container');
+                    if (container && container.childElementCount === 0) {
+                        populateUserConditions();
+                    }
+                }
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
         
-        // Add event listener for when the modal is closed
+        // No need to reload the page when modal is closed
+        // This was causing the checkboxes to disappear
         conditionsModal.addEventListener('hidden.bs.modal', function () {
-            window.location.reload();
+            // No action needed on modal close
         });
 
         document.getElementById('update-settings-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const selected = Array.from(document.querySelectorAll('#admin-conditions-list input:checked')).map(el => el.value);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
             
             try {
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+                
                 const response = await fetch('/update-settings', {
-                method: 'POST',
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ conditions: selected })
                 });
+                
                 const data = await response.json();
                 if (data.success) {
+                    showToast('Settings saved successfully', 'success');
+                    // Just close the modal without reloading the page
                     const modal = bootstrap.Modal.getInstance(document.getElementById('conditionsModal'));
                     modal.hide();
-                    window.location.reload(); // Reload to apply changes
-            } else {
-                    alert('Failed to save settings.');
+                    // Update the UI to reflect the changes
+                    await Promise.all([
+                        populateUserConditions(),
+                        loadAdminConditions()
+                    ]);
+                } else {
+                    throw new Error(data.message || 'Failed to save settings');
                 }
             } catch (error) {
                 console.error('Error saving settings:', error);
-                alert('An error occurred while saving settings.');
+                showToast(error.message || 'An error occurred while saving settings', 'error');
+            } finally {
+                // Reset button state
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
             }
         });
     </script>
@@ -2664,59 +2734,7 @@ if (niftyModal) {
     </div>
 </div>
 
-<!-- User Conditions Modal -->
-<div class="modal fade" id="userConditionsModal" tabindex="-1" aria-labelledby="userConditionsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Your Conditions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Form View (initially hidden) -->
-                <div id="user-condition-form-view" style="display: none;">
-                    <form id="user-condition-form" onsubmit="handleUserConditionSubmit(event)">
-                        <input type="hidden" id="edit-condition-id" value="">
-                        <div class="mb-3">
-                            <label for="condition-name" class="form-label">Condition Name</label>
-                            <input type="text" class="form-control" id="condition-name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="condition-link" class="form-label">Link (Optional)</label>
-                            <input type="url" class="form-control" id="condition-link">
-                        </div>
-                        <div class="mb-3">
-                            <label for="chart-link" class="form-label">Chart Link (Optional)</label>
-                            <input type="url" class="form-control" id="chart-link">
-                        </div>
-                        <div class="mb-3">
-                            <label for="scan-clause" class="form-label">Scan Clause</label>
-                            <textarea class="form-control" id="scan-clause" rows="4" required></textarea>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <button type="button" class="btn btn-secondary" onclick="hideConditionForm()">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Save Condition</button>
-                        </div>
-                    </form>
-                </div>
 
-                <!-- List View -->
-                <div id="user-conditions-list-view">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6>Your Custom Conditions</h6>
-                        <button type="button" class="btn btn-sm btn-primary" onclick="showConditionForm()">
-                            <i class="fas fa-plus me-1"></i> Add New Condition
-                        </button>
-                    </div>
-                    <div id="user-conditions-list-container" class="list-group"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Settings Modal -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
@@ -2753,33 +2771,77 @@ if (niftyModal) {
 
 <!-- Nifty Indices Modal -->
 <style>
-    /* Ensure ALL text in conditions modal is black */
-    #conditionsModal {
-        color: #000 !important;
-    }
-    
-    /* Force modal header and description text to be black */
-    #conditionsModal .modal-header,
-    #conditionsModal .modal-header *,
-    #conditionsModal .modal-body,
-    #conditionsModal .modal-body h6 {
-        color: #000 !important;
-    }
-    
-    /* Force ALL text in conditions modal to be black */
+    /* Make all text in the conditions modal black, except for buttons and icons */
     #conditionsModal,
     #conditionsModal *:not(.btn):not(.btn *):not(i) {
         color: #000 !important;
     }
-    #conditionsModal *,
-    #conditionsModal .modal-content *,
-    #conditionsModal .modal-body *,
+    #conditionsModal .modal-header,
     #conditionsModal .modal-title,
+    #conditionsModal .modal-title *,
+    #conditionsModal .modal-header .modal-title,
+    #conditionsModal .modal-header .modal-title *,
+    #conditionsModal .modal-body,
+    #conditionsModal .modal-body h6,
+    #conditionsModal .modal-body .text-muted,
+    #conditionsModal .modal-body .text-secondary,
+    #conditionsModal .modal-body .modal-subtitle,
+    #conditionsModal .modal-header h5,
+    #conditionsModal .modal-header h6,
+    #conditionsModal .modal-header p,
+    #conditionsModal h5,
+    #conditionsModal h6,
+    #conditionsModal p,
+    #conditionsModal .text-muted,
+    #conditionsModal .text-secondary {
+        color: #000 !important;
+    }
+    #conditionsModal .modal-header,
+    #conditionsModal .modal-header *,
+    #conditionsModal .modal-title,
+    #conditionsModal .modal-title *,
+    #conditionsModal .modal-header .modal-title,
+    #conditionsModal .modal-header .modal-title *,
+    #conditionsModal .modal-header h5,
+    #conditionsModal .modal-header h6,
+    #conditionsModal .modal-header p {
+        color: #000 !important;
+    }
     #conditionsModal .form-label,
     #conditionsModal .form-control,
     #conditionsModal .list-group-item,
     #conditionsModal h5,
     #conditionsModal h6,
+    #conditionsModal p,
+    #conditionsModal label,
+    #conditionsModal .nav-link,
+    #conditionsModal .modal-header * {
+        color: #000 !important;
+    }
+    /* Override Bootstrap nav-link active color */
+    #conditionsModal .nav-link.active {
+        color: #000 !important;
+        font-weight: bold;
+    }
+    /* Keep buttons and their icons white for contrast */
+    #conditionsModal .btn,
+    #conditionsModal .btn * {
+        color: #fff !important;
+    }
+    /* Ensure form inputs have black text */
+    #conditionsModal input,
+    #conditionsModal textarea {
+        color: #000 !important;
+    }
+    /* Ensure checkboxes and radio labels are black */
+    #conditionsModal .form-check-label {
+        color: #000 !important;
+    }
+    /* Prevent icon color override */
+    #conditionsModal i {
+        color: inherit !important;
+    }
+
     #conditionsModal p,
     #conditionsModal label,
     #conditionsModal .nav-link,
