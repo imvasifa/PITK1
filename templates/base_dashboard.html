@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard - Stock Scanner{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        /* Custom Navbar Styles */
+        .custom-navbar {
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%) !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            min-height: 80px;
+            height: 80px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+        }
+        
+        .custom-navbar .navbar-brand {
+            padding: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .custom-navbar .logo-container {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .custom-navbar .logo-container img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .custom-navbar .brand-title {
+            color: white;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .custom-navbar .navbar-nav .nav-link {
+            color: white;
+            padding: 0.5rem 1rem;
+            margin: 0 0.2rem;
+            transition: all 0.3s ease;
+            min-width: 80px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-weight: 500;
+            border-radius: 20px;
+        }
+        
+        .custom-navbar .nav-button {
+            min-width: 80px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: white;
+            font-weight: 500;
+            border-radius: 20px;
+            padding: 0 15px;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .custom-navbar .btn-home {
+            background: #007bff;
+            border: none;
+        }
+        
+        .custom-navbar .btn-logout {
+            background: #dc3545;
+            border: none;
+        }
+        
+        .custom-navbar .btn-home:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .custom-navbar .btn-logout:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .custom-navbar .navbar-nav .nav-link:hover,
+        .custom-navbar .navbar-nav .nav-link:focus {
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .custom-navbar .navbar-nav .nav-link.active {
+            color: white;
+            font-weight: 500;
+            position: relative;
+        }
+        
+        .custom-navbar .navbar-nav .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+        }
+        
+        .custom-navbar .navbar-toggler {
+            border: none;
+            padding: 0.5rem;
+        }
+        
+        .custom-navbar .navbar-toggler:focus {
+            box-shadow: none;
+            outline: none;
+        }
+        
+        .custom-navbar .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+        
+        /* Main Content */
+        .dashboard-main {
+            margin-top: 100px;
+            padding-bottom: 2rem;
+        }
+        
+        /* Cropper Modal */
+        #cropper-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.7);
+            align-items: center;
+            justify-content: center;
+            z-index: 3000 !important;
+        }
+        
+        #cropper-modal .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        
+        #cropper-modal.active {
+            display: flex;
+        }
+        
+        /* Profile Picture Upload */
+        .profile-pic-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 1.5rem;
+            border-radius: 50%;
+            overflow: hidden;
+            cursor: pointer;
+            border: 3px solid {% if profile.premium == 'yes' %}#ffd700{% else %}#6c757d{% endif %};
+            transition: all 0.3s ease;
+        }
+        
+        .profile-pic-container:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .profile-pic {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: all 0.3s ease;
+        }
+        
+        .profile-pic-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .profile-pic-container:hover .profile-pic-overlay {
+            opacity: 1;
+        }
+        
+        .profile-pic-upload {
+            display: none;
+        }
+        
+        /* Premium Badge */
+        .premium-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(45deg, #ffd700, #ffa500);
+            color: #000;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Custom Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark custom-navbar">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='images/pitklogo.png') }}" alt="PITK Logo">
+                </div>
+                <h1 class="brand-title">PRICE IS THE KING</h1>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link nav-button btn-home" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-button btn-logout" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-1"></i> Logout
+                        </a>
+                    </li>
+
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container dashboard-main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Cropper Modal -->
+    <div id="cropper-modal">
+        <div class="modal-content">
+            <h5 class="mb-3">Crop your photo</h5>
+            <div>
+                <img id="cropper-image" style="max-width: 100%; max-height: 300px;" />
+            </div>
+            <div class="cropper-preview mt-3 mb-3"></div>
+            <button type="button" class="btn btn-primary" id="crop-confirm">Crop & Upload</button>
+            <button type="button" class="btn btn-secondary" id="crop-cancel">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

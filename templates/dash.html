@@ -1,162 +1,65 @@
-{% extends "base.html" %}
-
-{% block title %}Dashboard - Stock Scanner{% endblock %}
-
-{% block extra_css %}
-<style>
-    /* Show only specific navbar elements on dashboard */
-    .navbar .d-flex.align-items-center > *:not(.navbar-brand):not(.user-menu):not(#themeToggleContainer) {
-        display: none !important;
-    }
-    /* Ensure navbar brand is visible */
-    .navbar .navbar-brand,
-    .navbar .navbar-brand * {
-        display: flex !important;
-        visibility: visible !important;
-    }
-    /* Show user menu (contains logout) */
-    .navbar .user-menu {
-        display: block !important;
-    }
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-        z-index: 9999;
-    }
-    
-    .loading-message {
-        color: white;
-        text-align: center;
-        margin-top: 20px;
-    }
-    
-    .loading-message h3 {
-        margin-bottom: 10px;
-        font-size: 1.5rem;
-    }
-    
-    .loading-message p {
-        font-size: 1rem;
-        opacity: 0.8;
-    }
-    
-    /* Profile photo styles */
-    .profile-photo-container {
-        position: relative;
-        margin: 0 auto;
-        width: 150px;
-    }
-    
-    .user-avatar-wrapper {
-        position: relative;
-        transition: all 0.3s ease;
-        cursor: pointer;
-    }
-    
-    .user-avatar-wrapper:hover .photo-upload-overlay {
-        opacity: 1;
-    }
-    
-    .photo-upload-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        color: white;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        border-radius: 50%;
-    }
-    
-    .photo-upload-overlay i {
-        font-size: 24px;
-        margin-bottom: 5px;
-    }
-    
-    .photo-upload-overlay div {
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    /* Premium badge styles */
-    .user-avatar-premium {
-        box-shadow: 0 0 15px rgba(25, 135, 84, 0.5);
-    }
-    
-    .user-avatar-free {
-        box-shadow: 0 0 15px rgba(108, 117, 125, 0.3);
-    }
-    
-    /* Toast notifications */
-    .toast-container {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1100;
-    }
-    
-    .toast {
-        min-width: 250px;
-    }
-</style>
-{% endblock %}
+{% extends "base_dashboard.html" %}
 
 {% block content %}
-    
-    <!-- Navbar -->
-    <!-- Removed duplicate navbar: now using only the base.html navbar -->
-        <div class="container d-flex justify-content-between align-items-center">
-            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
-                <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
+    <!-- Custom Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark custom-navbar">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo">
+                </div>
+                <span class="brand-title d-none d-sm-inline">PRICE IS THE KING</span>
             </a>
-            <div>
-                <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
-                    <i class="fas fa-home"></i> <span class="d-none d-sm-inline">Home</span>
+            
+            <div class="d-flex align-items-center">
+                <!-- Home Button -->
+                <a href="{{ url_for('index') }}" class="nav-button btn-home">
+                    <i class="fas fa-home"></i> Home
                 </a>
-                <a href="{{ url_for('logout') }}" class="btn btn-danger">
-                    <i class="fas fa-sign-out-alt"></i> <span class="d-none d-sm-inline">Logout</span>
+                
+                <!-- Logout Button -->
+                <a href="{{ url_for('logout') }}" class="nav-button btn-logout ms-2">
+                    <i class="fas fa-sign-out-alt"></i> Logout
                 </a>
             </div>
         </div>
     </nav>
-    
-    <!-- Add padding to account for fixed navbar -->
-    <div style="padding-top: 80px;"></div>
-<div class="container mb-5" style="margin-top:8px !important; padding-top:0 !important;">
-    <div class="row">
-        <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-body text-center">
-                    {% set has_custom_photo = profile.photo_url and 'default' not in profile.photo_url %}
-                    {% set default_photo = url_for('static', filename='images/avatar_premium.png') if profile.premium == 'yes' else url_for('static', filename='images/avatar.png') %}
-                    {% set user_photo = profile.photo_url if has_custom_photo else default_photo %}
-                    
-                    <div class="profile-photo-container mb-3">
-                        <div class="user-avatar-wrapper {% if profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" 
-                             style="width: 150px; height: 150px; margin: 0 auto; position: relative; border-radius: 50%; overflow: hidden; border: 3px solid {% if profile.premium == 'yes' %}#198754{% else %}#6c757d{% endif %};">
-                            <label for="photo_upload" style="cursor: pointer; display: block; width: 100%; height: 100%;">
-                                <img src="{{ user_photo }}" class="profile-pic img-fluid" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile Photo">
-                                <div class="photo-upload-overlay">
-                                    <i class="fas fa-camera"></i>
-                                    <div>Change Photo</div>
-                                </div>
-                            </label>
-                        </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <div class="container mb-5 dashboard-main" style="max-width: 1100px; margin-top: 100px;">
+        <div class="row">
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-body text-center">
+                        {% set has_custom_photo = profile.photo_url and 'default' not in profile.photo_url %}
+                        {% set default_photo = url_for('static', filename='images/avatar_premium.png') if profile.premium == 'yes' else url_for('static', filename='images/avatar.png') %}
+                        {% set user_photo = profile.photo_url if has_custom_photo else default_photo %}
+                        
+                        <div class="profile-photo-container mb-3">
+                            {% set border_color = '#198754' if profile.premium == 'yes' else '#6c757d' %}
+                            <div class="user-avatar-wrapper {% if profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" 
+                                 style="width: 150px; height: 150px; margin: 0 auto; position: relative; border-radius: 50%; overflow: hidden; border: 3px solid {{ border_color }};">
+                                <label for="photo_upload" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+                                    <img src="{{ user_photo }}" class="profile-pic img-fluid" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile Photo">
+                                    <div class="photo-upload-overlay">
+                                        <i class="fas fa-camera"></i>
+                                        <div>Change Photo</div>
+                                    </div>
+                                </label>
+                            </div>
                         <input type="file" name="photo" id="photo_upload" style="display: none;" accept="image/png, image/jpeg, image/gif" onchange="uploadPhoto(event)">
                         
                         {% if has_custom_photo %}
@@ -426,34 +329,24 @@
         </div>
     </div>
 </div>
-        </div>
-    </div>
-</div>
 
 <!-- Cropper Modal -->
-<div id="cropper-modal">
+<div id="cropper-modal" style="display: none;">
   <div class="modal-content">
     <h5 class="mb-3">Crop your photo</h5>
     <div>
       <img id="cropper-image" style="max-width: 100%; max-height: 300px;" />
     </div>
     <div class="cropper-preview mt-3 mb-3"></div>
-    <button class="btn btn-primary" id="crop-confirm">Crop & Upload</button>
-    <button class="btn btn-secondary" id="crop-cancel">Cancel</button>
+    <button type="button" class="btn btn-primary" id="crop-confirm">Crop & Upload</button>
+    <button type="button" class="btn btn-secondary" id="crop-cancel">Cancel</button>
   </div>
-</div>
-
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loadingOverlay">
-    <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;">
-    <div class="loading-message">
-        <h3>PRICE IS THE KING</h3>
-        <p id="loadingMessage">Processing...</p>
-    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet" />
+
+{% block extra_js %}
 <script>
 let cropper;
 let cropperModal = document.getElementById('cropper-modal');
@@ -1364,12 +1257,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Show loading state
+        // Get the upload button
         const photoUpload = document.getElementById('photo_upload');
         const originalButton = photoUpload.previousElementSibling;
-        const originalHTML = originalButton ? originalButton.innerHTML : '';
         if (originalButton) {
-            originalButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
             originalButton.disabled = true;
         }
         
@@ -1437,7 +1328,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset the input and button
             photoUpload.value = '';
             if (originalButton) {
-                originalButton.innerHTML = originalHTML;
                 originalButton.disabled = false;
             }
         }
@@ -1554,4 +1444,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     }
 </script>
+{% endblock %}
 {% endblock %}

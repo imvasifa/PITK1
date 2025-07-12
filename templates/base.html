@@ -169,7 +169,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body{% if theme == 'dark' %} class="dark-theme"{% endif %}>
-    {% if request.endpoint not in ['login', 'register', 'forgot_password_page'] %}
+    {% if request.endpoint == 'index' %}
     <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top" style="min-height: 80px; height: 80px;">
         <div class="container d-flex justify-content-between align-items-center">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}" style="padding: 0; margin: 0;">
@@ -205,35 +205,8 @@
                 <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
                     <i class="fas fa-rotate-right"></i>
                 </button>
-                <!-- Home Button -->
-                <a href="{{ url_for('index') }}" class="btn btn-primary navbar-round-btn ms-2" style="
-                    min-width: 80px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    text-decoration: none;
-                    color: white;
-                    font-weight: 500;
-                    border-radius: 20px;
-                    padding: 0 15px;">
-                    <i class="fas fa-home me-1"></i> Home
-                </a>
-                
-                <!-- Logout Button -->
-                <a href="{{ url_for('logout') }}" class="btn btn-danger navbar-round-btn ms-2" style="
-                    min-width: 80px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    text-decoration: none;
-                    color: white;
-                    font-weight: 500;
-                    border-radius: 20px;
-                    padding: 0 15px;">
-                    <i class="fas fa-sign-out-alt me-1"></i> Logout
-                </a>
+                <!-- Custom navbar content from child templates -->
+                {% block navbar_extra %}{% endblock %}
                 
                 <!-- User Conditions Button with Enhanced Style -->
                 <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn btn-primary navbar-round-btn ms-2" style="
