@@ -13,12 +13,25 @@
 }
 
 /* Navbar: Keep logo, text, and timer in one row */
+.navbar {
+    min-height: 80px;
+    padding: 0.5rem 1rem;
+}
+
 .navbar-brand {
     white-space: nowrap;
     margin: 0;
-    padding: 0.5rem 1rem;
+    padding: 0;
     display: flex;
     align-items: center;
+    height: 80px;
+}
+
+/* Adjust logo size in navbar */
+.navbar-brand img {
+    height: 60px;
+    width: auto;
+    max-height: 100%;
 }
 
 .navbar-brand .refresh-timer {

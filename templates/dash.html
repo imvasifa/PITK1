@@ -4,6 +4,20 @@
 
 {% block extra_css %}
 <style>
+    /* Show only specific navbar elements on dashboard */
+    .navbar .d-flex.align-items-center > *:not(.navbar-brand):not(.user-menu):not(#themeToggleContainer) {
+        display: none !important;
+    }
+    /* Ensure navbar brand is visible */
+    .navbar .navbar-brand,
+    .navbar .navbar-brand * {
+        display: flex !important;
+        visibility: visible !important;
+    }
+    /* Show user menu (contains logout) */
+    .navbar .user-menu {
+        display: block !important;
+    }
     .loading-overlay {
         position: fixed;
         top: 0;

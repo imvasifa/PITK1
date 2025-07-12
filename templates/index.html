@@ -1316,120 +1316,8 @@ if (niftyModal) {
 
 
 
-    <!-- Navbar -->
-    <!-- Removed duplicate navbar: now using only the base.html navbar -->
-        <div class="container d-flex justify-content-between align-items-center">
-            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-                <span class="logo-circle d-inline-block align-text-top me-2"><img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" width="64" height="64"></span>
-                <span class="d-none d-md-inline">PRICE IS THE KING</span>
-            </a>
-            
-            <div class="d-flex align-items-center">
-                <span id="next-refresh" class="me-3" style="font-size: 0.9em; font-weight: 500;">
-                    <i class="fas fa-clock" style="font-size: 0.9em;"></i>
-                    <span style="margin-left: 5px;">Next refresh in</span>
-                    <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
-                </span>
-                <!-- Dark Mode Toggle with Sun/Moon Icons -->
-                <div class="d-inline-block align-middle" id="themeToggleContainer">
-                    <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
-                        <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
-                    </button>
-                </div>
-                
-                <!-- Mute/Unmute Button with Theme Style -->
-                <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle sound">
-                    <i id="muteIcon" class="fas fa-volume-up"></i>
-                </button>
-                
-                <!-- Refresh Button with Theme Style -->
-                <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
-                    <i class="fas fa-rotate-right"></i>
-                </button>
+    <!-- Navbar is now in base.html -->
 
-                <!-- User Conditions Button with Enhanced Style -->
-                <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn btn-primary navbar-round-btn ms-2" style="
-                background: linear-gradient(135deg, #7b1fa2, #9c27b0);
-                border: none;
-                border-radius: 50%;
-                width: 48px;
-                height: 48px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.3rem;
-                color: white;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                transition: all 0.3s ease;
-            ">
-                <i class="fas fa-list-ul" title="User Conditions"></i>
-            </button>
-
-            <!-- Help Button with Enhanced Style -->
-            <a href="{{ url_for('help_page') }}" class="btn navbar-round-btn ms-2" style="
-                background: linear-gradient(135deg, #007bff, #00bcd4);
-                border: none;
-                border-radius: 50%;
-                width: 48px;
-                height: 48px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.3rem;
-                color: white;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                transition: all 0.3s ease;
-                text-decoration: none;
-            ">
-                <i class="fas fa-question" title="Help"></i>
-            </a>
-
-
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    const themeToggleBtn = document.getElementById('themeToggleBtn');
-                    const themeIcon = document.getElementById('themeToggleIcon');
-                    
-                    // Check for saved theme preference or use preferred color scheme
-                    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-                    const currentTheme = localStorage.getItem('theme');
-                    
-                    // Set theme based on saved preference or system preference
-                    if (currentTheme === 'dark' || (!currentTheme && prefersDarkScheme.matches)) {
-                        document.body.classList.add('dark-theme');
-                        themeIcon.classList.remove('fa-moon');
-                        themeIcon.classList.add('fa-sun');
-                    }
-                    
-                    // Toggle theme on button click
-                    themeToggleBtn.addEventListener('click', function() {
-                        document.body.classList.toggle('dark-theme');
-                        
-                        // Toggle icon
-                        themeIcon.classList.toggle('fa-moon');
-                        themeIcon.classList.toggle('fa-sun');
-                        
-                        // Save theme preference
-                        const isDark = document.body.classList.contains('dark-theme');
-                        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-                    });
-                    
-                    // Listen for system theme changes
-                    prefersDarkScheme.addListener((e) => {
-                        if (!localStorage.getItem('theme')) {  // Only auto-update if no manual preference set
-                            if (e.matches) {
-                                document.body.classList.add('dark-theme');
-                                themeIcon.classList.remove('fa-moon');
-                                themeIcon.classList.add('fa-sun');
-                            } else {
-                                document.body.classList.remove('dark-theme');
-                                themeIcon.classList.remove('fa-sun');
-                                themeIcon.classList.add('fa-moon');
-                            }
-                        }
-                    });
-                });
-            </script>
             {% if current_user.is_authenticated %}
             {% set user_data = get_user_data(current_user.id) %}
             <style>
@@ -1519,58 +1407,9 @@ if (niftyModal) {
                     });
                 });
             </script>
-            <div class="user-menu">
-                <div class="user-menu-avatar-container">
-                    <!-- Avatar border indicates status -->
-                    <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
-                        <!-- Status dot above avatar -->
-                        <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
-                        <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
-                            {% if user_data and user_data.account.profile.photo_url %}
-                                {% set photo_url = user_data.account.profile.photo_url %}
-                                {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
-                                {% if not is_default %}
-                                    <!-- Custom user photo -->
-                                    <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='/static/user_photos/default_free.png';">
-                                {% else %}
-                                    <!-- Default photo based on premium status -->
-                                    {% set is_premium = user_data.account.profile.premium == 'yes' %}
-                                    {% set default_img = 'default_premium.png' if is_premium else 'default_free.png' %}
-                                    <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
-                                         alt="{{ 'Premium' if is_premium else 'Free' }} User" 
-                                         class="user-avatar-img"
-                                         onerror="this.onerror=null; this.src='/static/user_photos/default_free.png';"
-                                    >
-                                {% endif %}
-                            {% else %}
-                                <!-- Fallback to default free image if no photo_url is set -->
-                                <img src="{{ url_for('static', filename='user_photos/default_free.png') }}" 
-                                     alt="User" 
-                                     class="user-avatar-img"
-                                >
-                            {% endif %}
-                        </button>
-                    </span>
-                </div>
-                <!-- Dropdown menu -->
-                <div id="userDropdown">
-                    <!-- User info in dropdown (without image) -->
-                    <div style="padding: 12px 16px; border-bottom: 1px solid #e0e0e0;">
-                        <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">{{ current_user.username }}</div>
-                        {% if current_user.email %}
-                        <div style="font-size: 0.85em; color: #5f6368;">{{ current_user.email }}</div>
                         {% endif %}
                     </div>
-                    <!-- Menu items -->
-                    <a href="{{ url_for('dash') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #202124; text-decoration: none; transition: background 0.2s;">
-                        <i class="fas fa-tachometer-alt" style="width: 24px; text-align: center; margin-right: 8px; color: #5f6368;"></i>
-                        <span>Dashboard</span>
-                    </a>
-                    <div style="border-top: 1px solid #e0e0e0; margin: 8px 0;"></div>
-                    <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #d93025; text-decoration: none; transition: background 0.2s;">
-                        <i class="fas fa-sign-out-alt" style="width: 24px; text-align: center; margin-right: 8px;"></i>
-                        <span>Sign out</span>
-                    </a>
+                    <!-- Menu items are now only in base.html to prevent duplicates -->
                 </div>
             </div>
             <script>
@@ -1596,7 +1435,6 @@ if (niftyModal) {
                     });
                 });
             </script>
-            {% endif %}
         </div>
     </nav>
 

@@ -170,12 +170,12 @@
 </head>
 <body{% if theme == 'dark' %} class="dark-theme"{% endif %}>
     {% if request.endpoint not in ['login', 'register', 'forgot_password_page'] %}
-    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top" style="min-height: 80px; height: 80px;">
         <div class="container d-flex justify-content-between align-items-center">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}" style="padding: 0; margin: 0;">
                 <div style="
-                    width: 80px;
-                    height: 80px;
+                    width: 60px;
+                    height: 60px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -185,6 +185,142 @@
                 </div>
                 <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
             </a>
+            <div class="d-flex align-items-center">
+                <span id="next-refresh" class="me-3" style="font-size: 0.9em; font-weight: 500;">
+                    <i class="fas fa-clock" style="font-size: 0.9em;"></i>
+                    <span style="margin-left: 5px;">Next refresh in</span>
+                    <span id="refresh-timer" style="margin-left: 5px;">120 seconds</span>
+                </span>
+                <!-- Dark Mode Toggle with Sun/Moon Icons -->
+                <div class="d-inline-block align-middle" id="themeToggleContainer">
+                    <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
+                        <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                    </button>
+                </div>
+                <!-- Mute/Unmute Button with Theme Style -->
+                <button id="muteToggleBtn" class="btn btn-primary navbar-round-btn ms-2" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Toggle sound">
+                    <i id="muteIcon" class="fas fa-volume-up"></i>
+                </button>
+                <!-- Refresh Button with Theme Style -->
+                <button class="btn btn-primary navbar-round-btn ms-2" onclick="refreshData()" style="font-size: 1.3rem; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Refresh data">
+                    <i class="fas fa-rotate-right"></i>
+                </button>
+                <!-- Home Button -->
+                <a href="{{ url_for('index') }}" class="btn btn-primary navbar-round-btn ms-2" style="
+                    min-width: 80px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    text-decoration: none;
+                    color: white;
+                    font-weight: 500;
+                    border-radius: 20px;
+                    padding: 0 15px;">
+                    <i class="fas fa-home me-1"></i> Home
+                </a>
+                
+                <!-- Logout Button -->
+                <a href="{{ url_for('logout') }}" class="btn btn-danger navbar-round-btn ms-2" style="
+                    min-width: 80px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    text-decoration: none;
+                    color: white;
+                    font-weight: 500;
+                    border-radius: 20px;
+                    padding: 0 15px;">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+                
+                <!-- User Conditions Button with Enhanced Style -->
+                <button id="adminConditionsButton" title="User Conditions" onclick="showAdminConditionsModal()" class="btn btn-primary navbar-round-btn ms-2" style="
+                    background: linear-gradient(135deg, #7b1fa2, #9c27b0);
+                    border: none;
+                    border-radius: 50%;
+                    width: 48px;
+                    height: 48px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.3rem;
+                    color: white;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    transition: all 0.3s ease;
+                ">
+                    <i class="fas fa-list-ul" title="User Conditions"></i>
+                </button>
+                <!-- Help Button with Enhanced Style -->
+                <a href="{{ url_for('help_page') }}" class="btn navbar-round-btn ms-2" style="
+                    background: linear-gradient(135deg, #007bff, #00bcd4);
+                    border: none;
+                    border-radius: 50%;
+                    width: 48px;
+                    height: 48px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.3rem;
+                    color: white;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    transition: all 0.3s ease;
+                    text-decoration: none;
+                ">
+                    <i class="fas fa-question" title="Help"></i>
+                </a>
+                {% if current_user.is_authenticated %}
+                {% set user_data = get_user_data(current_user.id) %}
+                <div class="user-menu ms-2">
+                    <div class="user-menu-avatar-container">
+                        <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
+                            <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
+                            <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
+                                {% if user_data and user_data.account.profile.photo_url %}
+                                    {% set photo_url = user_data.account.profile.photo_url %}
+                                    {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}
+                                    {% if not is_default %}
+                                        <img src="{{ photo_url }}" alt="Profile" class="user-avatar-img" onerror="this.onerror=null; this.src='/static/user_photos/default_free.png';">
+                                    {% else %}
+                                        {% set is_premium = user_data.account.profile.premium == 'yes' %}
+                                        {% set default_img = 'default_premium.png' if is_premium else 'default_free.png' %}
+                                        <img src="{{ url_for('static', filename='user_photos/' ~ default_img) }}" 
+                                             alt="{{ 'Premium' if is_premium else 'Free' }} User" 
+                                             class="user-avatar-img"
+                                             onerror="this.onerror=null; this.src='/static/user_photos/default_free.png';"
+                                        >
+                                    {% endif %}
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='user_photos/default_free.png') }}" 
+                                         alt="User" 
+                                         class="user-avatar-img"
+                                    >
+                                {% endif %}
+                            </button>
+                            <!-- Dropdown menu: moved inside user-avatar-wrapper for proper positioning -->
+                            <div id="userDropdown" style="display: none; position: absolute; right: 0; top: 110%; min-width: 200px; z-index: 1000; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;">
+                                <div style="padding: 12px 16px; border-bottom: 1px solid #e0e0e0;">
+                                    <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">{{ current_user.username }}</div>
+                                    {% if current_user.email %}
+                                    <div style="font-size: 0.85em; color: #5f6368;">{{ current_user.email }}</div>
+                                    {% endif %}
+                                </div>
+                                <a href="{{ url_for('dash') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #202124; text-decoration: none; transition: background 0.2s;">
+                                    <i class="fas fa-tachometer-alt" style="width: 24px; text-align: center; margin-right: 8px; color: #5f6368;"></i>
+                                    <span>Dashboard</span>
+                                </a>
+                                <div style="border-top: 1px solid #e0e0e0; margin: 8px 0;"></div>
+                                <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; padding: 10px 16px; color: #d93025; text-decoration: none; transition: background 0.2s;">
+                                    <i class="fas fa-sign-out-alt" style="width: 24px; text-align: center; margin-right: 8px;"></i>
+                                    <span>Sign out</span>
+                                </a>
+                            </div>
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </nav>
     {% endif %}
