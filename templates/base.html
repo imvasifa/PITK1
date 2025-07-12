@@ -117,17 +117,47 @@
     </style>
     <style>
     .pitk-navbar-gradient {
-        background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%) !important;
+        background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%) !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
     @media (max-width: 767.98px) {
         .brand-title,
-        .refresh-timer {
+        #next-refresh {
             display: none !important;
         }
         .refresh-timer-icon {
             display: inline !important;
+        }
+        
+        /* Make navbar buttons and dropdown toggles smaller on mobile */
+        .navbar-round-btn,
+        .nav-link.dropdown-toggle {
+            width: 40px !important;
+            height: 40px !important;
+            font-size: 1.1rem !important;
+            margin: 0 2px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            border-radius: 50% !important;
+        }
+        
+        /* Adjust spacing between buttons */
+        .navbar .btn {
+            margin-left: 4px !important;
+            margin-right: 4px !important;
+        }
+        
+        /* Make dropdown items more compact */
+        .dropdown-menu {
+            min-width: 160px;
+        }
+        
+        .dropdown-item {
+            padding: 0.25rem 1rem;
+            font-size: 0.9rem;
         }
     }
     @media (min-width: 768px) {
@@ -142,8 +172,17 @@
     {% if request.endpoint not in ['login', 'register', 'forgot_password_page'] %}
     <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
         <div class="container d-flex justify-content-between align-items-center">
-            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}" style="padding: 0; margin: 0;">
+                <div style="
+                    width: 80px;
+                    height: 80px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-right: 15px;
+                ">
+                    <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" style="width: 100%; height: 100%; display: block;">
+                </div>
                 <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
             </a>
         </div>

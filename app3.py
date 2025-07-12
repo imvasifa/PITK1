@@ -18,6 +18,7 @@ import threading
 import time
 import traceback
 import uuid
+from dotenv import load_dotenv
 try:
     import winsound
     WINSOUND_AVAILABLE = True
@@ -26,6 +27,7 @@ except ImportError:
     print("⚠️ winsound module not available (expected on non-Windows systems)")
 import redis
 from werkzeug.exceptions import HTTPException
+from flask_mail import Mail, Message
 
 def env_bool(key, default=False):
     """Helper function to parse boolean environment variables"""
@@ -192,8 +194,9 @@ from itsdangerous import URLSafeTimedSerializer
 import os
 import logging
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, current_app
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, abort, make_response, send_file
+from flask_mail import Mail, Message
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 import os
@@ -207,8 +210,55 @@ import psycopg2.extras
 from wtforms import StringField, PasswordField, SubmitField, validators
 from wtforms.validators import DataRequired, Email, EqualTo
 
-# Initialize Flask app
+# Initialize Flask app first
 app = Flask(__name__)
+
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path)
+    print("✅ Loaded .env file from:", os.path.abspath(env_path))
+else:
+    print(f"⚠️ .env file not found at: {os.path.abspath(env_path)}")
+
+# Configure email settings with safe defaults
+email_config = {
+    'MAIL_SERVER': os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
+    'MAIL_PORT': int(os.getenv('MAIL_PORT', 587)),
+    'MAIL_USE_TLS': os.getenv('MAIL_USE_TLS', 'true').lower() in ('true', '1', 't'),
+    'MAIL_USERNAME': os.getenv('MAIL_USERNAME'),
+    'MAIL_PASSWORD': os.getenv('MAIL_PASSWORD'),
+    'MAIL_DEFAULT_SENDER': os.getenv('MAIL_DEFAULT_SENDER') or os.getenv('MAIL_USERNAME')
+}
+
+# Update app config
+app.config.update(email_config)
+
+# Initialize Flask-Mail
+mail = Mail(app)
+
+# Debug output
+print("\n🔧 Email Configuration:")
+for key in ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USE_TLS', 'MAIL_DEFAULT_SENDER']:
+    value = app.config.get(key)
+    if 'PASSWORD' in key:
+        value = '***' if value else 'Not set'
+    elif key == 'MAIL_USERNAME':
+        value = '***' if value else 'Not set'
+    print(f"  - {key}: {value}")
+
+# Verify .env file exists
+if not os.path.exists(env_path):
+    print(f"⚠️ Warning: .env file not found at {env_path}")
+    print("   Please create a .env file with your email settings.")
+    print("   Required environment variables:")
+    print("   - MAIL_SERVER=smtp.gmail.com")
+    print("   - MAIL_PORT=587")
+    print("   - MAIL_USE_TLS=1")
+    print("   - MAIL_USERNAME=your-email@gmail.com")
+    print("   - MAIL_PASSWORD=your-app-password")
+    print("   - MAIL_DEFAULT_SENDER=your-email@gmail.com")
+
 app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to False for development
@@ -227,6 +277,65 @@ app.config['SECURITY_PASSWORD_SALT'] = os.getenv('SECURITY_PASSWORD_SALT', 'dev-
 # Initialize Flask extensions
 bcrypt = Bcrypt(app)
 mail = Mail(app)
+
+# Configure Flask-Mail
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', '1') == '1'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+
+# Initialize Flask-Mail after configuring it
+mail = Mail(app)
+
+@app.route('/test-email')
+def test_email():
+    """Test endpoint to verify email configuration"""
+    try:
+        # Check if email configuration is set
+        required_settings = ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD']
+        missing = [s for s in required_settings if not app.config.get(s)]
+        
+        if missing:
+            return jsonify({
+                'status': 'error',
+                'message': f'Missing email configuration: {", ".join(missing)}',
+                'current_config': {k: '***' if 'PASSWORD' in k else app.config.get(k) 
+                                for k in ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USE_TLS', 
+                                         'MAIL_USERNAME', 'MAIL_DEFAULT_SENDER']}
+            }), 400
+        
+        # Send test email to the configured email address
+        test_recipient = app.config['MAIL_USERNAME']  # Send to self for testing
+        msg = Message(
+            'Test Email from Your App',
+            sender=app.config['MAIL_DEFAULT_SENDER'] or app.config['MAIL_USERNAME'],
+            recipients=[test_recipient]
+        )
+        msg.body = 'This is a test email to verify your email configuration is working.'
+        
+        mail.send(msg)
+        return jsonify({
+            'status': 'success',
+            'message': f'Test email sent successfully to {test_recipient}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Email test failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to send test email: {str(e)}',
+            'config': {
+                'mail_server': app.config.get('MAIL_SERVER'),
+                'mail_port': app.config.get('MAIL_PORT'),
+                'mail_use_tls': app.config.get('MAIL_USE_TLS'),
+                'mail_username': app.config.get('MAIL_USERNAME'),
+                'mail_default_sender': app.config.get('MAIL_DEFAULT_SENDER')
+            }
+        }), 500
+
+# Initialize Flask-Login
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -1273,10 +1382,6 @@ def load_settings():
             if not isinstance(settings, dict):
                 logger.warning("Invalid settings format in database, using default settings")
                 return default_settings
-            
-            if not isinstance(settings, dict):
-                logger.warning("Invalid settings format in database, using default settings")
-                return default_settings
                 
             logger.info("Successfully loaded settings from database")
             
@@ -1524,16 +1629,16 @@ def fetch_and_process_data(session, condition, selected_conditions=None):
                 stock_list["potential_score"] = stock_list["per_chg"] * stock_list["close"]
                 
                 if condition["name"] == "STRONG":
-                    sorted_stock_list = stock_list.sort_values(by="potential_score", ascending=False).head(10)
+                    sorted_stock_list = stock_list.sort_values(by="per_chg", ascending=False).head(10)
                     
                 elif condition["name"] == "HARSH SELL STOCKS":
-                    sorted_stock_list = stock_list.sort_values(by="potential_score", ascending=True)  # Sort by potential_score ascending
+                    sorted_stock_list = stock_list.sort_values(by="per_chg", ascending=True)  # Sort by per_chg ascending
                 
                 elif condition["name"] == "STRONG STOCKS NEGATIVE":
-                    sorted_stock_list = stock_list.sort_values(by="potential_score", ascending=True)  # Sort by potential_score ascending
+                    sorted_stock_list = stock_list.sort_values(by="per_chg", ascending=True)  # Sort by per_chg ascending
                 
                 else:
-                    sorted_stock_list = stock_list.sort_values(by="potential_score", ascending=False)
+                    sorted_stock_list = stock_list.sort_values(by="per_chg", ascending=False)
                 
                 # Convert DataFrame to dict for JSON serialization
                 return sorted_stock_list.head(10).to_dict('records')
@@ -2082,12 +2187,19 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/register', methods=['GET', 'POST'])
 def send_otp_email(user_email, username, otp):
     """Send OTP to user's email for verification"""
     try:
+        if not is_email_configured():
+            logger.error("Email not configured. Cannot send OTP.")
+            return False
+            
+        logger.info(f"Attempting to send OTP email to {user_email}")
+        logger.info(f"Mail server: {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')}")
+        
         msg = Message(
             'Your Email Verification OTP',
+            sender=app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME'),
             recipients=[user_email],
             html=f'''
             <h2>Hello {username}!</h2>
@@ -2097,10 +2209,19 @@ def send_otp_email(user_email, username, otp):
             <p>If you didn't request this, please ignore this email.</p>
             '''
         )
+        
+        # Debug: Log the message details
+        logger.debug(f"Message details: {msg}")
+        
+        # Send the email
         mail.send(msg)
+        logger.info("OTP email sent successfully")
         return True
+        
     except Exception as e:
-        logger.error(f"Error sending OTP email: {e}")
+        logger.error(f"Error sending OTP email: {str(e)}", exc_info=True)
+        logger.error(f"Email configuration: {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')} "
+                   f"(TLS: {app.config.get('MAIL_USE_TLS')}, User: {app.config.get('MAIL_USERNAME')})")
         return False
 
 def generate_verification_token(email):
@@ -2115,9 +2236,73 @@ def verify_token(token, expiration=86400):
             salt='email-verification-salt',
             max_age=expiration
         )
+        return email
+    except Exception as e:
+        logger.error(f"Token verification failed: {e}")
+        return None
+
+@app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # Basic validation
+        if not all([username, email, password]):
+            return render_template('register.html', error='All fields are required')
+            
+        # Check if username or email already exists
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute('SELECT id FROM users WHERE username = %s OR email = %s', (username, email))
+            if cur.fetchone():
+                return render_template('register.html', error='Username or email already exists')
+                
+            # Hash password and create user
+            hashed_password = generate_password_hash(password)
+            user_data = {
+                'account': {
+                    'profile': {
+                        'email': email,
+                        'email_verified': False,
+                        'premium': 'no',
+                        'name': username
+                    },
+                    'username': username,
+                    'conditions': []
+                }
+            }
+            
+            cur.execute(
+                'INSERT INTO users (username, email, password, user_data) VALUES (%s, %s, %s, %s) RETURNING id',
+                (username, email, hashed_password, json.dumps(user_data))
+            )
+            user_id = cur.fetchone()[0]
+            conn.commit()
+            
+            # Log the user in
+            user = User()
+            user.id = user_id
+            login_user(user)
+            
+            # Redirect to email verification
+            return redirect(url_for('unverified'))
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Registration error: {e}")
+            return render_template('register.html', error='An error occurred during registration')
+            
+        finally:
+            cur.close()
+            conn.close()
+    
+    return render_template('register.html')
     
     error = None
     if request.method == 'POST':
@@ -2253,13 +2438,47 @@ def register():
     
     return render_template('register.html', error=error)
 
-@app.route('/verify-email/<token>')
 def generate_otp():
     """Generate a 6-digit OTP"""
     return ''.join(random.choices('0123456789', k=6))
 
-# Store OTPs temporarily (in production, use Redis or database)
-otp_storage = {}
+# Use Redis for OTP storage
+def get_otp_key(user_id):
+    return f"otp:{user_id}"
+
+def store_otp(user_id, otp, expiry_minutes=10):
+    """Store OTP in Redis with expiry"""
+    try:
+        r = get_redis_client()
+        key = get_otp_key(user_id)
+        r.setex(key, expiry_minutes * 60, json.dumps({
+            'otp': otp,
+            'attempts': 0,
+            'created_at': datetime.utcnow().isoformat()
+        }))
+        return True
+    except Exception as e:
+        logger.error(f"Error storing OTP in Redis: {e}")
+        return False
+
+def get_otp(user_id):
+    """Get OTP data from Redis"""
+    try:
+        r = get_redis_client()
+        data = r.get(get_otp_key(user_id))
+        return json.loads(data) if data else None
+    except Exception as e:
+        logger.error(f"Error getting OTP from Redis: {e}")
+        return None
+
+def delete_otp(user_id):
+    """Delete OTP data from Redis"""
+    try:
+        r = get_redis_client()
+        return r.delete(get_otp_key(user_id)) > 0
+    except Exception as e:
+        logger.error(f"Error deleting OTP from Redis: {e}")
+        return False
 
 @app.route('/send-verification-otp', methods=['POST'])
 @login_required
@@ -2270,11 +2489,13 @@ def send_verification_otp():
         
         # Generate OTP
         otp = generate_otp()
-        otp_storage[current_user.id] = {
-            'otp': otp,
-            'expiry': datetime.utcnow() + timedelta(minutes=10),
-            'attempts': 0
-        }
+        
+        # Store OTP in Redis
+        if not store_otp(current_user.id, otp):
+            return jsonify({
+                'success': False,
+                'message': 'Failed to generate verification code. Please try again.'
+            }), 500
         
         # Send OTP via email
         if send_otp_email(current_user.email, current_user.username, otp):
@@ -2284,6 +2505,8 @@ def send_verification_otp():
                 'expires_in': 10  # minutes
             })
         else:
+            # Clean up stored OTP if email sending fails
+            delete_otp(current_user.id)
             return jsonify({
                 'success': False,
                 'message': 'Failed to send OTP. Please try again.'
@@ -2291,6 +2514,9 @@ def send_verification_otp():
             
     except Exception as e:
         logger.error(f"Error sending OTP: {e}")
+        # Clean up in case of any error
+        if 'current_user' in locals() and hasattr(current_user, 'id'):
+            delete_otp(current_user.id)
         return jsonify({
             'success': False,
             'message': 'An error occurred while sending OTP'
@@ -2299,6 +2525,9 @@ def send_verification_otp():
 @app.route('/verify-email-otp', methods=['POST'])
 @login_required
 def verify_email_otp():
+    conn = None
+    cur = None
+    
     try:
         if current_user.email_verified:
             return jsonify({'success': False, 'message': 'Email already verified'}), 400
@@ -2309,49 +2538,49 @@ def verify_email_otp():
         if not otp or not otp.isdigit() or len(otp) != 6:
             return jsonify({'success': False, 'message': 'Invalid OTP format'}), 400
         
-        # Get stored OTP
-        stored_otp = otp_storage.get(current_user.id)
+        # Get stored OTP from Redis
+        stored_data = get_otp(current_user.id)
         
-        if not stored_otp:
+        if not stored_data:
             return jsonify({
                 'success': False,
                 'message': 'OTP not found or expired. Please request a new one.'
             }), 400
         
-        # Check expiry
-        if datetime.utcnow() > stored_otp['expiry']:
-            del otp_storage[current_user.id]
-            return jsonify({
-                'success': False,
-                'message': 'OTP has expired. Please request a new one.'
-            }), 400
-        
         # Check attempts
-        if stored_otp['attempts'] >= 3:
-            del otp_storage[current_user.id]
+        if stored_data.get('attempts', 0) >= 3:
+            delete_otp(current_user.id)
             return jsonify({
                 'success': False,
                 'message': 'Too many attempts. Please request a new OTP.'
             }), 400
         
         # Verify OTP
-        if stored_otp['otp'] != otp:
-            stored_otp['attempts'] += 1
+        if stored_data.get('otp') != otp:
+            # Increment attempt count
+            stored_data['attempts'] = stored_data.get('attempts', 0) + 1
+            store_otp(
+                current_user.id, 
+                stored_data['otp'],
+                expiry_minutes=10  # Reset expiry on each attempt
+            )
+            
             return jsonify({
                 'success': False,
                 'message': 'Invalid OTP',
-                'attempts_remaining': 3 - stored_otp['attempts']
+                'attempts_remaining': 3 - stored_data['attempts']
             }), 400
         
         # OTP verified, update user's email verification status
         conn = db.get_connection()
         cur = conn.cursor()
         
+        # Update email_verified status in user_data
         cur.execute("""
-            UPDATE users 
+            UPDATE pitk3 
             SET user_data = jsonb_set(
                 COALESCE(user_data, '{}'::jsonb),
-                '{account,email_verified}',
+                '{account,profile,email_verified}',
                 'true'::jsonb,
                 true
             )
@@ -2367,9 +2596,17 @@ def verify_email_otp():
         
         conn.commit()
         
-        # Clean up
-        if current_user.id in otp_storage:
-            del otp_storage[current_user.id]
+        # Clean up OTP from Redis
+        delete_otp(current_user.id)
+        
+        # Update current_user object
+        if not hasattr(current_user, '_user_data'):
+            current_user._user_data = {}
+        if 'account' not in current_user._user_data:
+            current_user._user_data['account'] = {}
+        if 'profile' not in current_user._user_data['account']:
+            current_user._user_data['account']['profile'] = {}
+        current_user._user_data['account']['profile']['email_verified'] = True
         
         return jsonify({
             'success': True,
@@ -2378,7 +2615,7 @@ def verify_email_otp():
         })
         
     except Exception as e:
-        if 'conn' in locals():
+        if conn is not None:
             conn.rollback()
         logger.error(f"Error verifying OTP: {e}")
         return jsonify({
@@ -2386,10 +2623,81 @@ def verify_email_otp():
             'message': 'An error occurred while verifying OTP'
         }), 500
     finally:
+        if cur is not None:
+            try:
+                cur.close()
+            except:
+                pass
+        if conn is not None:
+            try:
+                conn.close()
+            except:
+                pass
+
+@app.route('/verify-email/<token>')
+def verify_email(token):
+    """Verify email using token from verification link"""
+    if current_user.is_authenticated and current_user.email_verified:
+        return redirect(url_for('index'))
+        
+    email = verify_token(token)
+    if not email:
+        flash('Invalid or expired verification link', 'error')
+        return redirect(url_for('login'))
+        
+    # Update user's email verification status
+    try:
+        conn = db.get_connection()
+        cur = conn.cursor()
+        
+        # Update email_verified status in user_data
+        cur.execute("""
+            UPDATE pitk3 
+            SET user_data = jsonb_set(
+                COALESCE(user_data, '{}'::jsonb),
+                '{account,profile,email_verified}',
+                'true'::jsonb,
+                true
+            )
+            WHERE email = %s
+            RETURNING id, user_data
+        """, (email,))
+        
+        result = cur.fetchone()
+        if not result:
+            flash('User not found', 'error')
+            return redirect(url_for('login'))
+            
+        conn.commit()
+        
+        # If user is logged in, update their session
+        if current_user.is_authenticated and current_user.email == email:
+            if not hasattr(current_user, '_user_data'):
+                current_user._user_data = {}
+            if 'account' not in current_user._user_data:
+                current_user._user_data['account'] = {}
+            if 'profile' not in current_user._user_data['account']:
+                current_user._user_data['account']['profile'] = {}
+            current_user._user_data['account']['profile']['email_verified'] = True
+        
+        flash('Email verified successfully! You can now access all features.', 'success')
+        return redirect(url_for('dash'))
+        
+    except Exception as e:
+        logger.error(f"Error verifying email: {e}")
+        flash('An error occurred while verifying your email', 'error')
+        return redirect(url_for('login'))
+    finally:
         if 'cur' in locals() and cur is not None:
-            cur.close()
+            try:
+                cur.close()
+            except:
+                pass
         if 'conn' in locals() and conn is not None:
-            conn.close()
+            try:
+                conn.close()
+            except:
+                pass
 
 @app.route('/unverified')
 @login_required
@@ -2414,6 +2722,138 @@ def resend_verification():
         flash('Failed to send verification email. Please try again later.', 'danger')
     
     return redirect(url_for('unverified'))
+
+# Configure upload folder and allowed extensions
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5MB max file size
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/upload-profile-photo', methods=['POST'])
+@login_required
+def upload_profile_photo():
+    """
+    Handle profile photo uploads and update user's photo URL.
+    """
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part'}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No selected file'}), 400
+        
+    if not allowed_file(file.filename):
+        return jsonify({'success': False, 'error': 'File type not allowed'}), 400
+    
+    # Create uploads directory if it doesn't exist
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    
+    try:
+        # Generate a unique filename
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        filename = f"user_{current_user.id}_{int(time.time())}{file_ext}"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        
+        # Save the file
+        file.save(filepath)
+        
+        # Get the URL for the saved file
+        photo_url = url_for('static', filename=f'uploads/{filename}')
+        
+        # Update the user's photo URL in the database
+        return update_photo_url(photo_url)
+        
+    except Exception as e:
+        logger.error(f"Error uploading profile photo: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to upload photo'}), 500
+
+@app.route('/update-photo-url', methods=['POST'])
+@login_required
+def update_photo_url(photo_url=None):
+    """
+    Update the user's photo URL in the database and clean up old photo if it exists.
+    Can be called directly with a photo_url or from a JSON request.
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    # If no photo_url provided, try to get it from JSON request
+    if photo_url is None:
+        data = request.get_json()
+        if data is None:
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+        photo_url = data.get('photoUrl', '')
+
+    try:
+        # Get the current photo URL before updating
+        cur = db.get_cursor()
+        if not cur:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+            
+        # First, get the current photo URL for cleanup
+        cur.execute("""
+            SELECT user_data->'account'->'profile'->>'photo_url' as current_photo_url
+            FROM PITK3 
+            WHERE id = %s
+        """, (current_user.id,))
+        
+        result = cur.fetchone()
+        current_photo_url = result[0] if result and result[0] else None
+        
+        # Update the user's photo URL in the database
+        update_query = """
+            UPDATE PITK3 
+            SET user_data = jsonb_set(
+                COALESCE(user_data, '{}'::jsonb),
+                '{account,profile,photo_url}',
+                %s::jsonb
+            )
+            WHERE id = %s
+            RETURNING user_data->'account'->'profile'->>'photo_url' as new_photo_url
+        """
+        
+        # Execute the update with the new photo URL (can be empty string to remove)
+        cur.execute(update_query, (json.dumps(photo_url) if photo_url else json.dumps(None), current_user.id))
+        update_result = cur.fetchone()
+        
+        if not update_result:
+            if db.conn is not None:
+                db.conn.rollback()
+            return jsonify({'success': False, 'error': 'Failed to update profile photo URL'}), 500
+        
+        # If we had a previous photo and it's different from the new one, clean it up
+        if current_photo_url and current_photo_url != photo_url:
+            try:
+                # Extract the filename from the URL
+                parsed_url = urlparse(current_photo_url)
+                if parsed_url.netloc == request.host:
+                    # Only delete local files, not external URLs
+                    file_path = os.path.join(app.static_folder, parsed_url.path.lstrip('/'))
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Error cleaning up old photo: {e}")
+        
+        # Commit the transaction
+        if db.conn is not None:
+            db.conn.commit()
+            
+        # Update the current user object
+        current_user._user_data['account']['profile']['photo_url'] = update_result[0] if update_result[0] else None
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Profile photo updated successfully',
+            'photo_url': update_result[0] or ''
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating photo URL: {str(e)}", exc_info=True)
+        if db.conn is not None:
+            db.conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/upload-photo', methods=['POST'])
 @login_required
@@ -2789,6 +3229,51 @@ def test():
         'timestamp': datetime.now(timezone.utc).isoformat()
     }), 200
 
+@app.route('/test-email')
+def test_email():
+    """Test endpoint to verify email configuration"""
+    try:
+        # Check if email configuration is set
+        required_settings = ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD']
+        missing = [s for s in required_settings if not app.config.get(s)]
+        
+        if missing:
+            return jsonify({
+                'status': 'error',
+                'message': f'Missing email configuration: {", ".join(missing)}',
+                'current_config': {k: '***' if 'PASSWORD' in k else app.config.get(k) 
+                                for k in required_settings}
+            }), 500
+            
+        # Try to send a test email
+        test_recipient = app.config['MAIL_USERNAME']  # Send to self for testing
+        msg = Message(
+            'Test Email',
+            sender=app.config['MAIL_DEFAULT_SENDER'] or app.config['MAIL_USERNAME'],
+            recipients=[test_recipient],
+            body='This is a test email from the application.'
+        )
+        
+        mail.send(msg)
+        return jsonify({
+            'status': 'success',
+            'message': f'Test email sent to {test_recipient}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Email test failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to send test email: {str(e)}',
+            'config': {
+                'mail_server': app.config.get('MAIL_SERVER'),
+                'mail_port': app.config.get('MAIL_PORT'),
+                'mail_use_tls': app.config.get('MAIL_USE_TLS'),
+                'mail_username': app.config.get('MAIL_USERNAME'),
+                'mail_default_sender': app.config.get('MAIL_DEFAULT_SENDER')
+            }
+        }), 500, 200
+
 # Error Handlers
 
 @app.errorhandler(AppTemporarilyUnavailable)
@@ -3121,10 +3606,6 @@ def validate_licence():
             
     except Exception as e:
         logger.error(f"Unexpected error in validate_licence: {str(e)}", exc_info=True)
-        return jsonify({
-            'valid': False,
-            'message': 'An unexpected error occurred. Please try again later.'
-        }), 500
 
 @app.route('/api/admin/licenses/revoke', methods=['POST'])
 @login_required

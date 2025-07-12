@@ -1344,7 +1344,7 @@
                 <img src="/static/pitk-logo.svg" alt="PITK Logo" class="me-2">
                 PRICE IS THE KING
                 <span id="next-refresh">
-                    <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i> <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span> <span id="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
+                    <i class="fas fa-clock" style="font-size: 0.7em; font-weight: normal; margin-left: 35px;"></i> <span style="font-size: 0.7em; font-weight: normal; margin-left: 5px;">Next refresh in</span> <span class="refresh-timer" style="font-size: 0.7em; font-weight: normal;">120 seconds</span>
                 </span>
             </div>
             <div class="navbar-buttons">
@@ -2539,7 +2539,7 @@ function populateConditions() {
     </script>
     <script>
         let refreshInterval = 120; // Refresh every 120 seconds
-        let timerElement = document.getElementById('refresh-timer');
+        let timerElement = document.querySelector('.refresh-timer');
 
         function updateTimer() {
             timerElement.textContent = `${refreshInterval} seconds`;

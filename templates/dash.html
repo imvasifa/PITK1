@@ -33,13 +33,78 @@
         font-size: 1rem;
         opacity: 0.8;
     }
+    
+    /* Profile photo styles */
+    .profile-photo-container {
+        position: relative;
+        margin: 0 auto;
+        width: 150px;
+    }
+    
+    .user-avatar-wrapper {
+        position: relative;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .user-avatar-wrapper:hover .photo-upload-overlay {
+        opacity: 1;
+    }
+    
+    .photo-upload-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        border-radius: 50%;
+    }
+    
+    .photo-upload-overlay i {
+        font-size: 24px;
+        margin-bottom: 5px;
+    }
+    
+    .photo-upload-overlay div {
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    /* Premium badge styles */
+    .user-avatar-premium {
+        box-shadow: 0 0 15px rgba(25, 135, 84, 0.5);
+    }
+    
+    .user-avatar-free {
+        box-shadow: 0 0 15px rgba(108, 117, 125, 0.3);
+    }
+    
+    /* Toast notifications */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1100;
+    }
+    
+    .toast {
+        min-width: 250px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
     
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
+    <!-- Removed duplicate navbar: now using only the base.html navbar -->
         <div class="container d-flex justify-content-between align-items-center">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
                 <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="30" class="d-inline-block align-text-top me-2">
@@ -63,36 +128,43 @@
         <div class="col-lg-4">
             <div class="card mb-4">
                 <div class="card-body text-center">
-                    {% set user_photo = profile.photo_url %}
-                    {% if not user_photo or 'default.jpg' in user_photo %}
-                        {% if profile.premium == 'yes' %}
-                            {% set user_photo = url_for('static', filename='user_photos/default_premium.png') %}
-                        {% else %}
-                            {% set user_photo = url_for('static', filename='user_photos/default_free.png') %}
-                        {% endif %}
-                    {% endif %}
-                    <form action="{{ url_for('upload_photo') }}" method="post" enctype="multipart/form-data" id="photo-upload-form">
-                        <span class="user-avatar-wrapper {% if profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="width: 100px; height: 100px; display: inline-block; position: relative;">
-                            <label for="photo_upload" style="cursor: pointer;" title="Click to upload a new photo">
-                                <img src="{{ user_photo }}" class="profile-pic user-avatar-img" style="width: 100%; height: 100%;" alt="User Photo">
-                            </label>
-                        </span>
-                        <input type="file" name="photo" id="photo_upload" style="display: none;" accept="image/png, image/jpeg, image/gif">
-                    </form>
-
-                    <h5 class="my-3">{{ username }}</h5>
+                    {% set has_custom_photo = profile.photo_url and 'default' not in profile.photo_url %}
+                    {% set default_photo = url_for('static', filename='images/avatar_premium.png') if profile.premium == 'yes' else url_for('static', filename='images/avatar.png') %}
+                    {% set user_photo = profile.photo_url if has_custom_photo else default_photo %}
                     
-                    {% if profile.photo_url and 'default' not in profile.photo_url %}
-                    <form action="{{ url_for('remove_photo') }}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-sm btn-outline-danger mb-2">Remove Photo</button>
-                    </form>
-                    {% endif %}
+                    <div class="profile-photo-container mb-3">
+                        <div class="user-avatar-wrapper {% if profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" 
+                             style="width: 150px; height: 150px; margin: 0 auto; position: relative; border-radius: 50%; overflow: hidden; border: 3px solid {% if profile.premium == 'yes' %}#198754{% else %}#6c757d{% endif %};">
+                            <label for="photo_upload" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+                                <img src="{{ user_photo }}" class="profile-pic img-fluid" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile Photo">
+                                <div class="photo-upload-overlay">
+                                    <i class="fas fa-camera"></i>
+                                    <div>Change Photo</div>
+                                </div>
+                            </label>
+                        </div>
+                        <input type="file" name="photo" id="photo_upload" style="display: none;" accept="image/png, image/jpeg, image/gif" onchange="uploadPhoto(event)">
+                        
+                        {% if has_custom_photo %}
+                        <div class="text-center mt-2">
+                            <button type="button" id="remove-photo-btn" class="btn btn-sm btn-outline-danger" onclick="removePhoto()">
+                                <i class="fas fa-trash-alt me-1"></i> Remove Photo
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
 
-                    <div>
+                    <h5 class="my-3 text-center">{{ username }}</h5>
+                    
+                    <div class="text-center mb-3">
                         {% if profile.premium == 'yes' %}
-                            <span class="badge" style="background-color: #198754;">Premium</span>
+                            <span class="badge" style="background-color: #198754; font-size: 0.9rem; padding: 0.5em 1em;">
+                                <i class="fas fa-crown me-1"></i> Premium Member
+                            </span>
                         {% else %}
-                            <span class="badge bg-secondary">Free</span>
+                            <span class="badge bg-secondary" style="font-size: 0.9rem; padding: 0.5em 1em;">
+                                <i class="fas fa-user me-1"></i> Free Account
+                            </span>
                         {% endif %}
                     </div>
 
@@ -1248,5 +1320,224 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    // Function to handle photo upload to PHP server
+    async function uploadPhoto(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Show loading state on the profile picture
+        const img = document.querySelector('.profile-pic');
+        const originalSrc = img ? img.src : '';
+        if (img) {
+            img.style.opacity = '0.7';
+            img.style.transition = 'opacity 0.3s';
+        }
+
+        // Validate file type
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        if (!validTypes.includes(file.type)) {
+            showToast('Please upload a valid image file (JPEG, PNG, GIF)', 'danger');
+            if (img) img.style.opacity = '1';
+            return;
+        }
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            showToast('Image size should be less than 5MB', 'danger');
+            if (img) img.style.opacity = '1';
+            return;
+        }
+
+        // Show loading state
+        const photoUpload = document.getElementById('photo_upload');
+        const originalButton = photoUpload.previousElementSibling;
+        const originalHTML = originalButton ? originalButton.innerHTML : '';
+        if (originalButton) {
+            originalButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            originalButton.disabled = true;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // Upload to PHP server
+            const uploadResponse = await fetch('https://pitk.free.nf/upload.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error('Failed to upload image to server');
+            }
+
+            const result = await uploadResponse.json();
+            
+            if (result.success && result.url) {
+                // Update the image source with the new URL
+                if (img) {
+                    // Force browser to load the new image
+                    const newUrl = result.url + (result.url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+                    
+                    // Update the database with the new URL
+                    const updateResponse = await fetch('/update-photo-url', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ photoUrl: result.url })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        const errorData = await updateResponse.json().catch(() => ({}));
+                        throw new Error(errorData.error || 'Failed to update profile');
+                    }
+                    
+                    const updateResult = await updateResponse.json();
+                    
+                    if (updateResult.success) {
+                        img.src = newUrl;
+                        img.style.opacity = '1';
+                        showToast('Profile picture updated successfully!', 'success');
+                        
+                        // Show the remove photo button if it exists
+                        const removePhotoBtn = document.getElementById('remove-photo-btn');
+                        if (removePhotoBtn) {
+                            removePhotoBtn.style.display = 'inline-block';
+                        }
+                    } else {
+                        throw new Error(updateResult.error || 'Failed to update profile');
+                    }
+                }
+            } else {
+                throw new Error(result.error || 'Failed to process uploaded image');
+            }
+        } catch (error) {
+            console.error('Error uploading photo:', error);
+            showToast('Error: ' + (error.message || 'Failed to upload photo'), 'danger');
+            if (img) img.style.opacity = '1';
+        } finally {
+            // Reset the input and button
+            photoUpload.value = '';
+            if (originalButton) {
+                originalButton.innerHTML = originalHTML;
+                originalButton.disabled = false;
+            }
+        }
+    }
+
+    // Function to remove the current profile photo
+    async function removePhoto() {
+        if (!confirm('Are you sure you want to remove your profile photo?')) {
+            return;
+        }
+
+        const removeBtn = document.getElementById('remove-photo-btn');
+        const originalHTML = removeBtn ? removeBtn.innerHTML : '';
+        
+        if (removeBtn) {
+            removeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing...';
+            removeBtn.disabled = true;
+        }
+
+        try {
+            // Get current photo URL to delete from server
+            const img = document.querySelector('.profile-pic');
+            const currentPhotoUrl = img ? img.src : '';
+            
+            // First, update the database to remove the photo URL
+            const response = await fetch('/update-photo-url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ photoUrl: '' })
+            });
+
+            const result = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to remove photo');
+            }
+
+            // If we had a photo, try to delete it from the server
+            if (currentPhotoUrl && currentPhotoUrl.includes('pitk.free.nf')) {
+                try {
+                    // Extract the filename from the URL
+                    const filename = currentPhotoUrl.split('/').pop().split('?')[0];
+                    await fetch('https://pitk.free.nf/upload.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `delete=${encodeURIComponent(filename)}`
+                    });
+                } catch (deleteError) {
+                    console.error('Error deleting photo from server:', deleteError);
+                    // Continue even if delete fails
+                }
+            }
+
+            // Update the UI
+            if (img) {
+                // Set to default avatar based on user type
+                {% if profile.premium == 'yes' %}
+                    img.src = "{{ url_for('static', filename='images/avatar_premium.png') }}";
+                {% else %}
+                    img.src = "{{ url_for('static', filename='images/avatar.png') }}";
+                {% endif %}
+                
+                // Hide the remove button
+                if (removeBtn) {
+                    removeBtn.style.display = 'none';
+                }
+                
+                showToast('Profile photo removed successfully!', 'success');
+            }
+        } catch (error) {
+            console.error('Error removing photo:', error);
+            showToast('Error removing photo: ' + (error.message || 'Unknown error'), 'danger');
+        } finally {
+            if (removeBtn) {
+                removeBtn.innerHTML = originalHTML;
+                removeBtn.disabled = false;
+            }
+        }
+    }
+
+    // Helper function to show toast messages
+    function showToast(message, type = 'info') {
+        // Create toast element if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.style.position = 'fixed';
+            toastContainer.style.top = '20px';
+            toastContainer.style.right = '20px';
+            toastContainer.style.zIndex = '9999';
+            document.body.appendChild(toastContainer);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} alert-dismissible fade show`;
+        toast.role = 'alert';
+        toast.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        toastContainer.appendChild(toast);
+        
+        // Auto-remove toast after 5 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 150);
+        }, 5000);
+    }
 </script>
 {% endblock %}
