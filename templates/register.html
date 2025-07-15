@@ -105,9 +105,9 @@
 <div class="container-fluid">
     <div class="row min-vh-100">
         <div class="col-md-6 col-lg-7 d-none d-md-block">
-            <div class="bg-register-image">
-                <h1 class="display-4 fw-bold mb-4">Welcome to PITK</h1>
-                <p class="lead mb-5">Join our community of smart investors</p>
+            <div class="bg-register-image d-flex flex-column justify-content-center align-items-center h-100">
+                <h1 class="display-4 fw-bold mb-3 text-center">PRICE IS THE KING</h1>
+                <p class="text-white-50 mb-2 text-center">Monitor and manage your Chartink scans collectively</p>
             </div>
         </div>
         <div class="col-md-6 col-lg-5">
@@ -167,7 +167,14 @@
             </div>
         </div>
     </div>
+    <div class="container mt-4">
+        <div class="alert alert-warning text-center" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Disclaimer:</strong> This application is not affiliated with, endorsed by, or connected to Chartink in any way. We are an independent service providing Chartink scans collectively at a place to make monitoring easy.
+        </div>
+    </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -214,36 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(registerForm);
-            loadingOverlay.style.display = 'flex';
-            registerBtn.disabled = true;
-            
-            fetch(registerForm.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    loadingOverlay.style.display = 'none';
-                    registerBtn.disabled = false;
-                    return response.json();
-                }
-            })
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                }
-            })
-            .catch(error => {
-                loadingOverlay.style.display = 'none';
-                registerBtn.disabled = false;
-                console.error('Error:', error);
-            });
-        });
+
     }
 });
 </script>

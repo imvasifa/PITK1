@@ -115,8 +115,10 @@ def get_redis_connection():
         return None
 
 # Basic logging setup
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+# Suppress all logs from __main__ except CRITICAL to reduce terminal noise
+logging.getLogger("__main__").setLevel(logging.CRITICAL)
 
 # Thread-safe Redis client initialization
 import threading
@@ -462,9 +464,9 @@ def get_user_data(user_id):
         # Convert user_id to integer
         try:
             user_id_int = int(user_id)
-            print(f"🔍 [get_user_data] Fetching data for user ID: {user_id_int} (type: {type(user_id_int)})")
+            logger.debug(f"[get_user_data] Fetching data for user ID: {user_id_int} (type: {type(user_id_int)})")
         except (ValueError, TypeError) as e:
-            print(f"❌ [get_user_data] Invalid user_id format: {user_id} (type: {type(user_id)}), returning default user data")
+            logger.warning(f"[get_user_data] Invalid user_id format: {user_id} (type: {type(user_id)}), returning default user data")
             return default_user_data
             
         # Get database cursor
@@ -487,7 +489,7 @@ def get_user_data(user_id):
             # Check if we got a result and it has the user_data field
             if result and 'user_data' in result and result['user_data']:
                 user_data = result['user_data']
-                print(f"✅ [get_user_data] Successfully fetched data for user ID: {user_id_int}")
+                logger.debug(f"✅ [get_user_data] Successfully fetched data for user ID: {user_id_int}")
                 
                 # Ensure the user_data has the proper structure with default values
                 if 'account' not in user_data:
@@ -507,16 +509,16 @@ def get_user_data(user_id):
                 
                 return user_data
             else:
-                print(f"⚠️ [get_user_data] No data found for user ID: {user_id_int}, returning default user data")
+                logger.debug(f"⚠️ [get_user_data] No data found for user ID: {user_id_int}, returning default user data")
                 return default_user_data
                 
         except Exception as query_error:
-            print(f"❌ [get_user_data] Database query failed: {query_error}, returning default user data")
+            logger.error(f"❌ [get_user_data] Database query failed: {query_error}, returning default user data")
             traceback.print_exc()
             return default_user_data
             
     except Exception as e:
-        print(f"❌ [get_user_data] Unexpected error: {e}, returning default user data")
+        logger.error(f"❌ [get_user_data] Unexpected error: {e}, returning default user data")
         traceback.print_exc()
         return default_user_data
 
@@ -542,7 +544,7 @@ class User(UserMixin):
         try:
             self.id = int(id) if id is not None and str(id).strip() not in ['', 'id'] else None
         except (ValueError, TypeError, AttributeError):
-            print(f"⚠️ Warning: Invalid ID format: {id} (type: {type(id)}), using None")
+            logger.warning(f"⚠️ Warning: Invalid ID format: {id} (type: {type(id)}), using None")
             self.id = None
             
         self.username = username
@@ -551,7 +553,7 @@ class User(UserMixin):
         self._user_data = user_data or {}
         
         # Debug logging
-        print(f"🔍 Created User - ID: {self.id} (type: {type(self.id)}), Username: {self.username}")
+        logger.debug(f"🔍 Created User - ID: {self.id} (type: {type(self.id)}), Username: {self.username}")
     
     @property
     def email_verified(self):
@@ -2243,144 +2245,33 @@ def verify_token(token, expiration=86400):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    print('[REGISTER] Route entered')
     if current_user.is_authenticated:
+        print('[REGISTER] User already authenticated, redirecting to index')
         return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        # Basic validation
-        if not all([username, email, password]):
-            return render_template('register.html', error='All fields are required')
-            
-        # Check if username or email already exists
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute('SELECT id FROM users WHERE username = %s OR email = %s', (username, email))
-            if cur.fetchone():
-                return render_template('register.html', error='Username or email already exists')
-                
-            # Hash password and create user
-            hashed_password = generate_password_hash(password)
-            user_data = {
-                'account': {
-                    'profile': {
-                        'email': email,
-                        'email_verified': False,
-                        'premium': 'no',
-                        'name': username
-                    },
-                    'username': username,
-                    'conditions': []
-                }
-            }
-            
-            cur.execute(
-                'INSERT INTO users (username, email, password, user_data) VALUES (%s, %s, %s, %s) RETURNING id',
-                (username, email, hashed_password, json.dumps(user_data))
-            )
-            user_id = cur.fetchone()[0]
-            conn.commit()
-            
-            # Log the user in
-            user = User()
-            user.id = user_id
-            login_user(user)
-            
-            # Redirect to email verification
-            return redirect(url_for('unverified'))
-            
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"Registration error: {e}")
-            return render_template('register.html', error='An error occurred during registration')
-            
-        finally:
-            cur.close()
-            conn.close()
-    
-    return render_template('register.html')
     
     error = None
     if request.method == 'POST':
+        print('[REGISTER] POST request received')
         username = request.form.get('username')
+        email = request.form.get('email')
         password = request.form.get('password')
-        email = request.form.get('email', '').strip()
-        name = request.form.get('name', username)
-        phone = request.form.get('phone', '')
-        address = request.form.get('address', '')
-        
-        # New profile fields
-        premium = "no"  # Default to "no" for new users
-        dob = ""  # Default to empty string
-        gender = "Prefer not to say"  # Default
-        bio = "" # Default to empty string
-        
-        # You can add more fields as needed
-        conditions = []  # Start with empty or default conditions
-        misc1 = []
-        misc2 = []
-        misc3 = []
-        misc4 = []
-        misc5 = []
-        misc6 = []
-        misc7 = []
-        misc8 = []
-        misc9 = []
-        misc10 = []
+        print(f'[REGISTER] Received data - username: {username}, email: {email}, password: {"yes" if password else "no"}')
         
         if not username or not password:
             error = 'Username and password are required'
+            print('[REGISTER] Missing username or password')
         else:
-            # Create user data structure
-            user_data = {
-                'account': {
-                    'username': username,
-                    'password': password,
-                    'email': email,
-                    'profile': {
-                        'name': name or username,
-                        'phone': phone,
-                        'address': address,
-                        'premium': premium,
-                        'dob': dob,
-                        'gender': gender,
-                        'bio': bio,
-                        'photo_url': ''
-                    },
-                    'conditions': [],
-                    'misc1': [],
-                    'misc2': [],
-                    'misc3': [],
-                    'misc4': [],
-                    'misc5': [],
-                    'misc6': [],
-                    'misc7': [],
-                    'misc8': [],
-                    'misc9': [],
-                    'misc10': []
-                }
-            }
-            
             # Get a new cursor for this transaction
             conn = db.conn
             cur = None
             try:
-                # Start a new transaction
-                conn = psycopg2.connect(
-                    dbname="pitk",
-                    user="pitk_user",
-                    password="N63uWAQkpdSDg8SFvoggKxCDw5OY1aPx",
-                    host="dpg-d1efmamuk2gs73allkt0-a.singapore-postgres.render.com",
-                    port="5432"
-                )
-                conn.autocommit = False
+                print('[REGISTER] Starting DB transaction')
+                conn = db.conn
                 cur = conn.cursor()
                 
                 # Check if username already exists
+                print('[REGISTER] Checking if username exists')
                 cur.execute("""
                     SELECT id FROM PITK3 
                     WHERE user_data->'account'->>'username' = %s
@@ -2388,13 +2279,28 @@ def register():
                 
                 if cur.fetchone():
                     error = 'Username already exists'
+                    print('[REGISTER] Username already exists')
                 else:
+                    print('[REGISTER] Username is new, proceeding to hash password')
                     # Hash the password before storing
                     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
                     
-                    # Update user_data with hashed password
-                    user_data['account']['password'] = hashed_password
-                    
+                    # Create user data structure
+                    user_data = {
+                        'account': {
+                            'username': username,
+                            'password': hashed_password,
+                            'email': email,
+                            'profile': {
+                                'name': username,
+                                'email': email,
+                                'premium': 'no',
+                                'email_verified': False
+                            },
+                            'conditions': []
+                        }
+                    }
+                    print('[REGISTER] Inserting new user into PITK3')
                     # Insert new user into PostgreSQL with hashed password
                     cur.execute("""
                         INSERT INTO PITK3 (username, password, email, user_data)
@@ -2406,36 +2312,30 @@ def register():
                     if result:
                         user_id = result[0]
                         conn.commit()
-                        
-                        # Generate verification token
-                        verification_token = generate_verification_token(email)
-                        
-                        # Send verification email
-                        if send_verification_email(email, username, verification_token):
-                            flash('Registration successful! Please check your email to verify your account.', 'success')
-                        else:
-                            flash('Registration successful, but we couldn\'t send the verification email. Please contact support.', 'warning')
-                        
-                        # Log the user in with the hashed password
+                        print(f'[REGISTER] User created successfully with ID: {user_id}')
+                        # Log the user in
                         user = User(id=str(user_id), username=username, password=hashed_password, email=email)
                         login_user(user)
+                        print('[REGISTER] User logged in, redirecting to unverified')
                         return redirect(url_for('unverified'))
                     else:
-                        print("❌ Failed to get user ID after insert")
                         error = 'Error creating user. Please try again.'
+                        print('[REGISTER] No user ID returned after insert')
                 
             except Exception as e:
                 if 'conn' in locals() and conn is not None:
                     conn.rollback()
                 error = 'Error creating user. Please try again.'
-                print(f"Registration error: {str(e)}")
+                print(f"[REGISTER] Registration error: {str(e)}")
                 traceback.print_exc()
             finally:
                 if 'cur' in locals() and cur is not None:
                     cur.close()
-                if 'conn' in locals() and conn is not None and conn.closed == 0:
-                    conn.close()
+    else:
+        print('[REGISTER] GET request received')
     
+    if error:
+        print(f'[REGISTER] Returning error to template: {error}')
     return render_template('register.html', error=error)
 
 def generate_otp():
@@ -2715,8 +2615,8 @@ def resend_verification():
     # Generate new verification token
     verification_token = generate_verification_token(current_user.email)
     
-    # Send verification email
-    if send_verification_email(current_user.email, current_user.username, verification_token):
+    # Send verification email using the existing OTP function
+    if send_otp_email(current_user.email, current_user.username, verification_token):
         flash('A new verification email has been sent. Please check your inbox.', 'info')
     else:
         flash('Failed to send verification email. Please try again later.', 'danger')
