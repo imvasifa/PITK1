@@ -4,6 +4,88 @@
 
 {% block extra_css %}
 <style>
+    .bg-login-image {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+    }
+    
+    .bg-login-image h1 {
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+    }
+    
+    .bg-login-image p {
+        font-size: 1.25rem;
+        opacity: 0.9;
+    }
+    
+    .card {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-body {
+        padding: 2.5rem;
+    }
+    
+    .form-control {
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        border-color: #86b7fe;
+    }
+    
+    .input-group-text {
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 0.5rem 0 0 0.5rem;
+    }
+    
+    .btn-login {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .alert {
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .alert-dismissible .btn-close {
+        opacity: 0.5;
+        transition: opacity 0.3s ease;
+    }
+    
+    .alert-dismissible .btn-close:hover {
+        opacity: 1;
+    }
+    
     .loading-overlay {
         position: fixed;
         top: 0;
@@ -46,15 +128,21 @@
     </div>
 </div>
 
-<div class="container">
-    <div class="row justify-content-center">
+<div class="container-fluid">
+    <div class="row min-vh-100">
+        <div class="col-md-6 col-lg-7 d-none d-md-block">
+            <div class="bg-login-image">
+                <h1 class="display-4 fw-bold mb-4">Welcome Back</h1>
+                <p class="lead mb-5">Join our community of smart investors</p>
+            </div>
+        </div>
         <div class="col-md-6 col-lg-5">
-            <div class="card shadow-lg mt-5">
-                <div class="card-body p-5">
+            <div class="card shadow-lg border-0 rounded-lg mt-5 mx-4">
+                <div class="card-body">
                     <div class="text-center mb-4">
                         <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="80" class="mb-3">
                         <h2 class="h4">PRICE IS THE KING</h2>
-                        <p class="text-muted">Please sign in to continue</p>
+                        <p class="text-muted">Sign in to your account</p>
                     </div>
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
@@ -69,32 +157,45 @@
                         {% endif %}
                     {% endwith %}
                     <form method="POST" action="{{ url_for('login') }}" id="loginForm">
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                <input type="text" class="form-control form-control-lg" id="username" name="username" required>
+                            </div>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                <input type="password" class="form-control form-control-lg" id="password" name="password" required>
+                                <span class="input-group-text" id="passwordToggle">
+                                    <i class="fas fa-eye"></i>
+                                </span>
+                            </div>
                         </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="remember" name="remember">
-                            <label class="form-check-label" for="remember">Remember me</label>
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                                <label class="form-check-label" for="remember">Remember me</label>
+                            </div>
                         </div>
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg" id="loginBtn">
+                            <button type="submit" class="btn btn-primary btn-lg btn-login">
                                 <i class="fas fa-sign-in-alt me-2"></i>Login
                             </button>
                         </div>
-                        <div class="text-end mt-2">
-                            <a href="{{ url_for('forgot_password_page') }}" class="text-decoration-none small">Forgot password?</a>
+                        <div class="text-center mt-4">
+                            <a href="{{ url_for('forgot_password_page') }}" class="text-decoration-none small text-muted">
+                                <i class="fas fa-lock-open me-1"></i>Forgot password?
+                            </a>
+                        </div>
+                        <div class="text-center mt-4">
+                            <p class="mb-0">Don't have an account? 
+                                <a href="{{ url_for('register') }}" class="fw-bold text-primary">Register here</a>
+                            </p>
                         </div>
                     </form>
-                    <div class="text-center mt-4">
-                        <p class="mb-0">Don't have an account? 
-                            <a href="{{ url_for('register') }}" class="fw-bold">Create one here</a>
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
@@ -107,38 +208,50 @@
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
     const loadingOverlay = document.getElementById('loadingOverlay');
-    const loginBtn = document.getElementById('loginBtn');
-    
+    const loginBtn = document.querySelector('.btn-login');
+    const passwordInput = document.getElementById('password');
+    const passwordToggle = document.getElementById('passwordToggle');
+
+    // Password visibility toggle
+    if (passwordToggle) {
+        passwordToggle.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+    }
+
     if (loginForm) {
-        loginForm.addEventListener('submit', async function(e) {
+        loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            
-            // Show loader
+            const formData = new FormData(loginForm);
             loadingOverlay.style.display = 'flex';
-            
-            // Disable submit button to prevent double submission
             loginBtn.disabled = true;
-            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Signing in...';
             
-            try {
-                const formData = new FormData(loginForm);
-                const response = await fetch(loginForm.action, {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                });
-                
-                if (response.redirected) {
-                    // If we get a redirect, follow it
-                    window.location.href = response.url;
+            fetch(loginForm.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/';
                 } else {
-                    // If no redirect, reload to show any error messages
-                    window.location.reload();
+                    loadingOverlay.style.display = 'none';
+                    loginBtn.disabled = false;
+                    return response.json();
                 }
-            } catch (error) {
-                console.error('Login error:', error);
-                window.location.reload();
-            }
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                loadingOverlay.style.display = 'none';
+                loginBtn.disabled = false;
+                console.error('Error:', error);
+            });
         });
     }
 });

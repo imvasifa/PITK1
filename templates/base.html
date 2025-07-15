@@ -22,14 +22,23 @@
     <style>
         /* User image border for premium/free */
         .user-avatar-wrapper {
-            display: inline-block;
-            width: 48px;
-            height: 48px;
+            display: inline-flex;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             padding: 0;
             position: relative;
-            vertical-align: middle;
+            align-items: center;
+            justify-content: center;
+            overflow: visible;
             transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            box-sizing: border-box;
+        }
+        @media (max-width: 767.98px) {
+            .user-avatar-wrapper {
+                width: 36px;
+                height: 36px;
+            }
         }
         .user-avatar-wrapper:hover, .user-avatar-wrapper:focus {
             transform: scale(1.13);
@@ -37,33 +46,52 @@
             z-index: 1;
             filter: brightness(0.94);
         }
-        .user-avatar-premium {
-            outline: 3px solid #19d142; /* Green outline, no gap */
-            outline-offset: 0;
+        .user-avatar-premium .user-avatar-img,
+        .user-avatar-premium .profile-pic {
+            border: 2.5px solid #19d142 !important; /* Green border */
         }
-        .user-avatar-free {
-            outline: 3px solid orange; /* Orange outline, no gap */
-            outline-offset: 0;
+        .user-avatar-free .user-avatar-img,
+        .user-avatar-free .profile-pic {
+            border: 2.5px solid orange !important; /* Orange border */
         }
         .user-avatar-img, .profile-pic {
             border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            object-fit: cover;
-            border: none !important;
+            width: 48px !important;
+            height: 48px !important;
+            object-fit: cover !important;
+            border: 2.5px solid orange !important;
             box-shadow: none !important;
+            display: block;
+            margin: 0;
+            padding: 0;
+        }
+        @media (max-width: 767.98px) {
+            .user-avatar-img, .profile-pic {
+                width: 34px !important;
+                height: 34px !important;
+            }
         }
         .user-online-dot {
             position: absolute;
-            top: 2px;
-            right: 2px;
+            top: -1px;
+            right: -1px;
             width: 12px;
             height: 12px;
-            background: #28a745; /* Changed to Bootstrap green */
+            background: #28a745;
             border: 2px solid #fff;
             border-radius: 50%;
             z-index: 2;
-            box-shadow: 0 0 5px rgba(40, 167, 69, 0.5); /* Optional: Add subtle glow */
+            transform: translate(25%, -25%);
+            box-sizing: border-box;
+        }
+        @media (max-width: 767.98px) {
+            .user-online-dot {
+                width: 10px;
+                height: 10px;
+                top: -1px;
+                right: -1px;
+                transform: translate(25%, -25%);
+            }
         }
         /* Make alert-warning text black for readability */
         .alert-warning, .alert-warning *, .alert-warning strong, .alert-warning a, .alert-warning svg {
@@ -117,7 +145,7 @@
     </style>
     <style>
     .pitk-navbar-gradient {
-        background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%) !important;
+        background: linear-gradient(90deg, #2E3192 0%, #1BFFFF 100%) !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
@@ -164,35 +192,92 @@
         .refresh-timer-icon {
             display: none !important;
         }
+        
+        /* Large screen navbar styles */
+        .navbar {
+            min-height: 90px;
+            height: 90px;
+        }
+        
+        .navbar-brand img {
+            width: 70px !important;
+            height: 70px !important;
+        }
+        
+        .brand-title {
+            font-size: 1.5rem !important;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .navbar-round-btn {
+            width: 50px !important;
+            height: 50px !important;
+            font-size: 1.3rem !important;
+            margin: 0 8px !important;
+        }
+        
+        #next-refresh {
+            font-size: 1rem !important;
+            margin-right: 20px !important;
+        }
+        
+        #refresh-timer {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .user-avatar-wrapper {
+            width: 55px !important;
+            height: 55px !important;
+        }
+    }
+    
+    @media (min-width: 992px) {
+        .brand-title {
+            font-size: 1.7rem !important;
+        }
+        
+        .navbar-round-btn {
+            margin: 0 10px !important;
+        }
+        
+        #next-refresh {
+            margin-right: 30px !important;
+        }
     }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body{% if theme == 'dark' %} class="dark-theme"{% endif %}>
     {% if request.endpoint == 'index' %}
-    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top" style="min-height: 80px; height: 80px;">
+    <nav class="navbar navbar-expand-lg navbar-dark pitk-navbar-gradient fixed-top">
         <div class="container-fluid h-100 d-flex flex-column justify-content-center align-items-center p-0">
             <div class="d-flex justify-content-between align-items-center w-100" style="height: 100%;">
-                <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}" style="padding: 0; margin: 0;">
-                    <div class="d-none d-sm-flex" style="
-                        width: 60px;
-                        height: 60px;
-                        align-items: center;
-                        justify-content: center;
-                        margin-right: 15px;
-                    ">
-                        <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" style="width: 100%; height: 100%; display: block;">
-                    </div>
-                    <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
-                </a>
-                <!-- Centered Navigation Buttons -->
-                <div class="d-flex justify-content-center align-items-center flex-grow-1" style="height: 100%;">
-                    <div class="d-flex align-items-center justify-content-center gap-2" style="height: 100%;">
-                        <span id="next-refresh" style="font-size: 0.85em; font-weight: 500; white-space: nowrap;">
-                            <i class="fas fa-clock d-none d-sm-inline" style="font-size: 0.9em;"></i>
-                            <span class="d-none d-sm-inline" style="margin-left: 5px;">Next:</span>
-                            <span id="refresh-timer" style="margin-left: 3px;">120s</span>
-                        </span>
+                <div class="d-flex align-items-center">
+                    <a class="navbar-brand d-flex align-items-center me-0" href="{{ url_for('index') }}" style="padding: 0; margin: 0;">
+                        <div class="d-none d-sm-flex" style="
+                            width: 60px;
+                            height: 60px;
+                            align-items: center;
+                            justify-content: center;
+                            margin-right: 15px;
+                        ">
+                            <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" style="width: 100%; height: 100%; display: block;">
+                        </div>
+                        <span class="brand-title d-none d-sm-inline me-2">PRICE IS THE KING</span>
+                    </a>
+                </div>
+                
+                <!-- Right-aligned Navigation Buttons -->
+                <div class="d-flex align-items-center">
+                    <span id="next-refresh" class="me-3" style="font-size: 0.85em; font-weight: 500; white-space: nowrap;">
+                        <i class="fas fa-clock d-none d-sm-inline" style="font-size: 0.9em;"></i>
+                        <span class="d-none d-sm-inline" style="margin-left: 5px;">Next:</span>
+                        <span id="refresh-timer" style="margin-left: 3px;">120s</span>
+                    </span>
+                    
+                    <div class="d-flex align-items-center gap-2 me-3">
                         <button id="themeSwitchBtn" class="btn btn-primary navbar-round-btn" style="font-size: 1.1rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;" title="Toggle theme">
                             <i id="themeIcon" class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
                         </button>
@@ -236,14 +321,13 @@
                             <i class="fas fa-question" title="Help"></i>
                         </a>
                     </div>
-                </div>
                 {% if current_user.is_authenticated %}
                 {% set user_data = get_user_data(current_user.id) %}
                 <div class="user-menu">
                     <div class="user-menu-avatar-container">
                         <span class="user-avatar-wrapper {% if user_data and user_data.account.profile.premium == 'yes' %}user-avatar-premium{% else %}user-avatar-free{% endif %}" style="position: relative;">
                             <span class="user-status-dot {% if user_data and user_data.account.profile.premium == 'yes' %}user-status-dot-premium{% else %}user-status-dot-free{% endif %}"></span>
-                            <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: none;">
+                            <button id="userMenuButton" title="{{ current_user.username }}" style="width: 48px; height: 48px; border-radius: 50%; padding: 0; margin: 0; overflow: hidden; background: none; border: none; display: flex; align-items: center; justify-content: center;">
                                 {% if user_data and user_data.account.profile.photo_url %}
                                     {% set photo_url = user_data.account.profile.photo_url %}
                                     {% set is_default = 'default_premium.png' in photo_url or 'default_free.png' in photo_url %}

@@ -4,85 +4,165 @@
 
 {% block extra_css %}
 <style>
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: none;
-        justify-content: center;
+    .bg-register-image {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        height: 100vh;
+        display: flex;
         align-items: center;
-        flex-direction: column;
-        z-index: 9999;
-    }
-    
-    .loading-message {
-        color: white;
+        justify-content: center;
         text-align: center;
-        margin-top: 20px;
+        color: white;
     }
     
-    .loading-message h3 {
-        margin-bottom: 10px;
-        font-size: 1.5rem;
+    .bg-register-image h1 {
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
     }
     
-    .loading-message p {
-        font-size: 1rem;
-        opacity: 0.8;
+    .bg-register-image p {
+        font-size: 1.25rem;
+        opacity: 0.9;
+    }
+    
+    .card {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-body {
+        padding: 2.5rem;
+    }
+    
+    .form-control {
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        border-color: #86b7fe;
+    }
+    
+    .input-group-text {
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 0.5rem 0 0 0.5rem;
+    }
+    
+    .btn-register {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-register:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .alert {
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .alert-dismissible .btn-close {
+        opacity: 0.5;
+        transition: opacity 0.3s ease;
+    }
+    
+    .alert-dismissible .btn-close:hover {
+        opacity: 1;
+    }
+    
+    .password-strength {
+        margin-top: 0.5rem;
+        height: 5px;
+        border-radius: 3px;
+        background-color: #f8f9fa;
+    }
+    
+    .password-strength-bar {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loadingOverlay">
-    <img src="/static/loader.svg" alt="Loading..." style="width: 150px; height: 150px;">
-    <div class="loading-message">
-        <h3>PRICE IS THE KING</h3>
-        <p>Creating your account...</p>
-    </div>
-</div>
-
-<div class="container">
-    <div class="row justify-content-center">
+<div class="container-fluid">
+    <div class="row min-vh-100">
+        <div class="col-md-6 col-lg-7 d-none d-md-block">
+            <div class="bg-register-image">
+                <h1 class="display-4 fw-bold mb-4">Welcome to PITK</h1>
+                <p class="lead mb-5">Join our community of smart investors</p>
+            </div>
+        </div>
         <div class="col-md-6 col-lg-5">
-            <div class="card shadow-lg mt-5">
-                <div class="card-body p-5">
+            <div class="card shadow-lg border-0 rounded-lg mt-5 mx-4">
+                <div class="card-body">
                     <div class="text-center mb-4">
                         <img src="{{ url_for('static', filename='pitk-logo.svg') }}" alt="PITK Logo" height="80" class="mb-3">
                         <h2 class="h4">PRICE IS THE KING</h2>
-                        <p class="text-muted">Create your account below</p>
+                        <p class="text-muted">Create your account</p>
                     </div>
                     {% if error %}
-                        <div class="alert alert-danger">{{ error }}</div>
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            {{ error }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                     {% endif %}
                     <form method="POST" action="{{ url_for('register') }}" id="registerForm">
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                <input type="text" class="form-control form-control-lg" id="username" name="username" required>
+                            </div>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="email" class="form-label">Email (optional)</label>
-                            <input type="email" class="form-control" id="email" name="email">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                <input type="email" class="form-control form-control-lg" id="email" name="email">
+                            </div>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                <input type="password" class="form-control form-control-lg" id="password" name="password" required>
+                                <span class="input-group-text" id="passwordToggle">
+                                    <i class="fas fa-eye"></i>
+                                </span>
+                            </div>
+                            <div class="password-strength">
+                                <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                            </div>
                         </div>
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg" id="registerBtn">
+                            <button type="submit" class="btn btn-primary btn-lg btn-register">
                                 <i class="fas fa-user-plus me-2"></i>Register
                             </button>
                         </div>
+                        <div class="text-center mt-4">
+                            <p class="mb-0">Already have an account? 
+                                <a href="{{ url_for('login') }}" class="fw-bold text-primary">Login here</a>
+                            </p>
+                        </div>
                     </form>
-                    <div class="text-center mt-4">
-                        <p class="mb-0">Already have an account? 
-                            <a href="{{ url_for('login') }}" class="fw-bold">Login here</a>
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
@@ -95,16 +175,74 @@
 document.addEventListener('DOMContentLoaded', function() {
     const registerForm = document.getElementById('registerForm');
     const loadingOverlay = document.getElementById('loadingOverlay');
-    const registerBtn = document.getElementById('registerBtn');
-    
+    const registerBtn = document.querySelector('.btn-register');
+    const passwordInput = document.getElementById('password');
+    const passwordStrengthBar = document.getElementById('passwordStrengthBar');
+    const passwordToggle = document.getElementById('passwordToggle');
+
+    // Password visibility toggle
+    if (passwordToggle) {
+        passwordToggle.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+    }
+
     if (registerForm) {
-        registerForm.addEventListener('submit', function() {
-            // Show loader
-            loadingOverlay.style.display = 'flex';
+        // Password strength indicator
+        passwordInput.addEventListener('input', function(e) {
+            const password = e.target.value;
+            let strength = 0;
             
-            // Disable submit button to prevent double submission
+            if (password.length >= 8) strength += 25;
+            if (password.length >= 12) strength += 25;
+            if (/[A-Z]/.test(password)) strength += 25;
+            if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) strength += 25;
+            
+            passwordStrengthBar.style.width = strength + '%';
+            
+            if (strength >= 75) {
+                passwordStrengthBar.style.backgroundColor = '#28a745';
+            } else if (strength >= 50) {
+                passwordStrengthBar.style.backgroundColor = '#ffc107';
+            } else if (strength >= 25) {
+                passwordStrengthBar.style.backgroundColor = '#dc3545';
+            } else {
+                passwordStrengthBar.style.backgroundColor = '#6c757d';
+            }
+        });
+        
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(registerForm);
+            loadingOverlay.style.display = 'flex';
             registerBtn.disabled = true;
-            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating account...';
+            
+            fetch(registerForm.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    loadingOverlay.style.display = 'none';
+                    registerBtn.disabled = false;
+                    return response.json();
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                loadingOverlay.style.display = 'none';
+                registerBtn.disabled = false;
+                console.error('Error:', error);
+            });
         });
     }
 });
