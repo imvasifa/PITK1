@@ -29,6 +29,125 @@ import redis
 from werkzeug.exceptions import HTTPException
 from flask_mail import Mail, Message
 
+# Redis Configuration
+REDIS_CONFIG = {
+    'host': os.getenv('REDIS_HOST', 'localhost'),
+    'port': int(os.getenv('REDIS_PORT', 6379)),
+    'db': int(os.getenv('REDIS_DB', 0)),
+    'password': os.getenv('REDIS_PASSWORD', None),
+    'decode_responses': True  # Important for string handling
+}
+
+# Test Redis connection
+def test_redis_connection():
+    """Test Redis connection and print debug information"""
+    try:
+        print("\n" + "="*50)
+        print("[REDIS] Testing Redis connection...")
+        print(f"[REDIS] Configuration: {REDIS_CONFIG}")
+        
+        r = redis.Redis(**REDIS_CONFIG)
+        ping_result = r.ping()
+        
+        if ping_result:
+            print("[REDIS] Connection successful! ✅")
+            print(f"[REDIS] Server info: {r.info()}")
+        else:
+            print("[REDIS] Connection failed! ❌")
+    except Exception as e:
+        print(f"[REDIS] Connection error: {str(e)} ❌")
+        print("[REDIS] Redis server may not be running or accessible")
+    finally:
+        print("="*50 + "\n")
+
+# OTP Functions using database
+def generate_otp(length=4):
+    """Generate a random OTP of specified length"""
+    import random
+    digits = "0123456789"
+    otp = ""
+    for _ in range(length):
+        otp += random.choice(digits)
+    print(f"[OTP] Generated OTP: {otp}")
+    return otp
+
+def store_otp(username, otp):
+    """Store OTP in database"""
+    try:
+        conn = db.get_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE pitk3 SET otp = %s WHERE username = %s", (otp, username))
+        conn.commit()
+        print(f"[DEBUG] OTP {otp} stored in database for user: {username}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to store OTP in database: {e}")
+        return False
+
+def get_otp(username):
+    """Get stored OTP from database for the user"""
+    try:
+        conn = db.get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT otp FROM pitk3 WHERE username = %s", (username,))
+        result = cur.fetchone()
+        if result:
+            print(f"[DEBUG] Retrieved OTP from database for user: {username} - OTP: {result[0]}")
+            return result[0]
+        return None
+    except Exception as e:
+        print(f"[ERROR] Failed to get OTP from database: {e}")
+        return None
+
+def verify_otp(username, otp):
+    """Verify OTP for the user"""
+    stored_otp_data = get_otp(username)
+    if stored_otp_data and stored_otp_data.get('otp') == otp:
+        mark_otp_verified(username)
+        return True
+    return False
+
+def mark_otp_verified(username):
+    """Mark OTP as VERIFIED in database"""
+    try:
+        cur = db.conn.cursor()
+        cur.execute("UPDATE PITK3 SET otp = 'VERIFIED' WHERE username = %s", (username,))
+        db.conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        print(f"[MARK_OTP_VERIFIED] ERROR: {str(e)}")
+        return False
+
+def is_otp_verified(username):
+    """Check if user's OTP is verified"""
+    try:
+        cur = db.conn.cursor()
+        cur.execute("SELECT otp FROM PITK3 WHERE username = %s", (username,))
+        result = cur.fetchone()
+        cur.close()
+        
+        if result and result[0] == 'VERIFIED':
+            return True
+        return False
+    except Exception as e:
+        print(f"[IS_OTP_VERIFIED] ERROR: {str(e)}")
+        return False
+        
+        if ping_result:
+            print("[REDIS] Connection successful! ✅")
+            print(f"[REDIS] Server info: {r.info('server')}")
+        else:
+            print("[REDIS] Connection failed - ping returned False ❌")
+            
+        print("="*50 + "\n")
+        return ping_result
+    except Exception as e:
+        print("[REDIS] Connection error: ❌")
+        print(f"[REDIS] Error details: {str(e)}")
+        print("="*50 + "\n")
+        return False
+
 def env_bool(key, default=False):
     """Helper function to parse boolean environment variables"""
     return os.getenv(key, str(default)).lower() in ('1', 'true', 'yes')
@@ -291,6 +410,109 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
 # Initialize Flask-Mail after configuring it
 mail = Mail(app)
 
+# Run Redis connection test on startup
+print("\nTesting Redis connection on startup:")
+test_redis_connection()
+
+# OTP Helper Functions
+def generate_otp(length=4):
+    """Generate a random numeric OTP of specified length"""
+    digits = '0123456789'
+    return ''.join(random.choice(digits) for _ in range(length))
+
+def store_otp(user_id, otp, expiry_minutes=30):
+    """Store OTP in database"""
+    try:
+        print(f"\n[STORE_OTP] Storing OTP for user {user_id}")
+        print(f"[STORE_OTP] OTP value: {otp}, Expiry: {expiry_minutes} minutes")
+        
+        cur = db.conn.cursor()
+        cur.execute("UPDATE PITK3 SET otp = %s WHERE username = %s", (otp, user_id))
+        db.conn.commit()
+        cur.close()
+        
+        print(f"[STORE_OTP] OTP stored in database for user: {user_id}")
+        return True
+    except Exception as e:
+        print(f"[STORE_OTP] ERROR: {str(e)}")
+        return False
+
+def get_otp(user_id):
+    """Retrieve OTP from database"""
+    try:
+        print(f"\n[GET_OTP] Retrieving OTP for user {user_id}")
+        
+        cur = db.conn.cursor()
+        cur.execute("SELECT otp FROM PITK3 WHERE username = %s", (user_id,))
+        result = cur.fetchone()
+        cur.close()
+        if result and result[0]:
+            return {'otp': result[0]}
+        else:
+            return None
+    except Exception as e:
+        print(f"[GET_OTP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def delete_otp(user_id):
+    """Delete OTP from database after successful verification"""
+    try:
+        print(f"\n[DELETE_OTP] Deleting OTP for user {user_id}")
+        
+        # Mark OTP as empty in database
+        cur = db.conn.cursor()
+        cur.execute("UPDATE PITK3 SET otp = NULL WHERE username = %s", (user_id,))
+        db.conn.commit()
+        cur.close()
+        
+        print(f"[DELETE_OTP] OTP deleted from database for user: {user_id}")
+        return True
+    except Exception as e:
+        print(f"[DELETE_OTP] ERROR: {str(e)}")
+        return False
+
+def send_otp_email(email, username, otp):
+    """Send OTP via email"""
+    try:
+        print(f"\n[SEND_OTP] Sending OTP email to {email}")
+        
+        subject = "Your Login Verification Code"
+        html_content = f"""
+        <html>
+        <body>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Login Verification Code</h2>
+                <p>Hello {username},</p>
+                <p>Your verification code is:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 5px;">
+                    {otp}
+                </div>
+                <p>This code will expire in 30 minutes.</p>
+                <p>If you didn't request this code, please ignore this email.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg = Message(
+            subject=subject,
+            recipients=[email],
+            html=html_content,
+            sender=app.config.get('MAIL_DEFAULT_SENDER')
+        )
+        
+        mail.send(msg)
+        print(f"[SEND_OTP] OTP email sent successfully to {email}")
+        return True
+    except Exception as e:
+        print(f"[SEND_OTP] ERROR sending email: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+# Test Endpoint
 @app.route('/test-email')
 def test_email():
     """Test endpoint to verify email configuration"""
@@ -310,6 +532,8 @@ def test_email():
         
         # Send test email to the configured email address
         test_recipient = app.config['MAIL_USERNAME']  # Send to self for testing
+        
+        # First test with simple text email
         msg = Message(
             'Test Email from Your App',
             sender=app.config['MAIL_DEFAULT_SENDER'] or app.config['MAIL_USERNAME'],
@@ -318,9 +542,28 @@ def test_email():
         msg.body = 'This is a test email to verify your email configuration is working.'
         
         mail.send(msg)
+        
+        # Then test with HTML email similar to OTP email
+        html_msg = Message(
+            'Test HTML Email from Your App',
+            sender=app.config['MAIL_DEFAULT_SENDER'] or app.config['MAIL_USERNAME'],
+            recipients=[test_recipient]
+        )
+        html_msg.html = '''
+        <html>
+        <body>
+            <h1>Test HTML Email</h1>
+            <p>This is a test of the HTML email system.</p>
+            <div style="color: blue;">This text should be blue if HTML is working.</div>
+        </body>
+        </html>
+        '''
+        
+        mail.send(html_msg)
+        
         return jsonify({
             'status': 'success',
-            'message': f'Test email sent successfully to {test_recipient}'
+            'message': f'Test emails sent successfully to {test_recipient} (both plain text and HTML)'
         })
         
     except Exception as e:
@@ -332,10 +575,26 @@ def test_email():
                 'mail_server': app.config.get('MAIL_SERVER'),
                 'mail_port': app.config.get('MAIL_PORT'),
                 'mail_use_tls': app.config.get('MAIL_USE_TLS'),
+                'mail_use_ssl': app.config.get('MAIL_USE_SSL'),
                 'mail_username': app.config.get('MAIL_USERNAME'),
-                'mail_default_sender': app.config.get('MAIL_DEFAULT_SENDER')
-            }
+                'mail_default_sender': app.config.get('MAIL_DEFAULT_SENDER'),
+                'mail_debug': app.config.get('MAIL_DEBUG')
+            },
+            'error_details': str(e)
         }), 500
+
+# User class for Flask-Login
+class User(UserMixin):
+    def __init__(self, id=None, username=None, password=None, email=None):
+        self.id = id
+        self.username = username
+        self.password = password
+        self.email = email
+        self.is_active = True
+        self.is_authenticated = True
+    
+    def get_id(self):
+        return str(self.id)
 
 # Initialize Flask-Login
 login_manager = LoginManager(app)
@@ -360,12 +619,14 @@ def load_user(user_id):
         # Convert user_id to integer if it's a string
         user_id = int(user_id)
         # Get user from database
-        conn = get_db_connection()
+        conn = db.get_connection()
+        if not conn:
+            print(f"[LOAD_USER] Database connection failed for user_id: {user_id}")
+            return None
+            
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cur.execute('SELECT * FROM users WHERE id = %s', (user_id,))
         user_data = cur.fetchone()
-        cur.close()
-        conn.close()
         
         if user_data:
             user = User(
@@ -378,6 +639,45 @@ def load_user(user_id):
     except (ValueError, psycopg2.Error) as e:
         app.logger.error(f"Error loading user {user_id}: {str(e)}")
     return None
+
+def authenticate_user(username, password):
+    """Authenticate user with username and password"""
+    try:
+        print(f"[AUTH] Authenticating user: {username}")
+        # Connect to database
+        conn = db.get_connection()
+        if not conn:
+            print("[AUTH] Database connection failed")
+            return None
+            
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Query for user with matching username
+        cur.execute("SELECT * FROM PITK3 WHERE username = %s", (username,))
+        user_data = cur.fetchone()
+        
+        if not user_data:
+            print(f"[AUTH] No user found with username: {username}")
+            return None
+            
+        if check_password_hash(user_data['password'], password):
+            # Create User object
+            user = User(
+                id=user_data['id'],
+                username=user_data['username'],
+                password=user_data['password'],
+                email=user_data.get('email', '')
+            )
+            print(f"[AUTH] Authentication successful for user: {username} (ID: {user.id})")
+            return user
+        else:
+            print(f"[AUTH] Invalid password for user: {username}")
+            return None
+    except Exception as e:
+        print(f"[AUTH] Error authenticating user: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 # Set maximum content length for file uploads (16MB)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -395,6 +695,17 @@ beep_interval = 30  # Beep every 30 seconds
 beep_running = True  # Control the beep thread
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
+
+# Load email configuration from environment variables
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', '1') == '1'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+
+# Initialize Flask-Mail
+mail = Mail(app)
 
 # Generate a secure secret key if not exists, or use environment variable
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
@@ -2111,7 +2422,7 @@ def forgot_password_page():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Handle user login with proper session management."""
+    """Handle user login with OTP verification."""
     logger.info("Login endpoint called")
     
     # Redirect if already logged in
@@ -2125,53 +2436,153 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
+        email = request.form.get('email', '').strip()
         remember = request.form.get('remember', 'true').lower() == 'true'
+        otp = request.form.get('otp', '').strip()
+        verify_otp = request.form.get('verify_otp', '').strip() == 'true'
         
-        logger.info(f"Login attempt for user: {username}, remember_me: {remember}")
+        # Validate that username is a valid email format
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if username and not re.match(email_pattern, username):
+            error = 'Username must be a valid email address.'
+            logger.warning(f"Invalid email format for username: {username}")
+            return render_template('login.html', error=error)
+        
+        print("\n" + "=" * 80)
+        print(f"[LOGIN] Form data received: username={username}, email={email}, remember={remember}, otp={'*' * len(otp) if otp else 'None'}, verify_otp={verify_otp}")
+        print(f"[LOGIN] Request headers: {dict(request.headers)}")
+        print(f"[LOGIN] Request form data: {dict(request.form)}")
+        
+        logger.info(f"Login attempt for user: {username}, email: {email}, remember_me: {remember}")
         
         try:
             # Authenticate user
             user = authenticate_user(username, password)
             
             if user and user.id is not None:
-                # Log in the user using Flask-Login with remember me
-                login_success = login_user(user, remember=remember)
-                
-                if login_success:
-                    # Configure session
-                    session.permanent = True
-                    app.permanent_session_lifetime = timedelta(minutes=30)
-                    
-                    # Update session with user info
-                    session['_fresh'] = True
-                    
-                    logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
-                    
-                    # Get next URL or default to index
-                    next_url = request.args.get('next') or url_for('index')
-                    
-                    # Create response
-                    response = make_response(redirect(next_url))
-                    
-                    # Set remember me cookie if requested
-                    if remember:
-                        token = user.get_auth_token()
-                        response.set_cookie(
-                            'remember_token',
-                            value=token,
-                            max_age=1800,  # 30 minutes
-                            httponly=True,
-                            samesite='Lax',
-                            secure=app.config['SESSION_COOKIE_SECURE']
-                        )
-                        logger.debug(f"Set remember_token cookie for user {user.id}")
-                    
-                    # Ensure session is saved
-                    session.modified = True
-                    return response
+                # Check if OTP is required
+                if not otp:
+                    # Generate and send OTP
+                    otp = generate_otp()
+                    if send_otp_email(username, username, otp):  # Send to username (which is email)
+                        # Store OTP in database
+                        store_otp(username, otp)
+                        logger.info(f"OTP sent successfully to {username} for user {username}")
+                        print(f"[LOGIN] OTP {otp} stored in database and sent to email: {username}")
+                        
+                        # Return the login template with OTP input field
+                        return render_template('login.html', 
+                                            username=username, 
+                                            email=email, 
+                                            password=password,  # Will be hidden in form
+                                            remember=remember,
+                                            otp=True,  # Flag to show OTP input
+                                            error=None)
+                    else:
+                        error = 'Failed to send OTP. Please try again.'
+                        logger.error(f"Failed to send OTP for user: {username}")
                 else:
-                    error = 'Login failed. Please try again.'
-                    logger.warning(f"Login failed for user: {username}")
+                    # Check database connection
+                    try:
+                        conn = db.get_connection()
+                        if conn:
+                            print(f"[LOGIN] Database connection test: SUCCESS")
+                        else:
+                            print(f"[LOGIN] Database connection test: FAILED")
+                    except Exception as e:
+                        print(f"[LOGIN] Database connection error: {str(e)}")
+                    
+                    # Verify OTP using database function
+                    print(f"[LOGIN] Verifying OTP for user: {username}")
+                    print(f"[LOGIN] Submitted OTP: {otp}")
+                    logger.info(f"Verifying OTP for user {username}")
+                    
+                    if verify_otp(username, otp):
+                        # OTP verified, proceed with login
+                        print(f"[LOGIN] OTP VERIFIED SUCCESSFULLY for user {username}")
+                        stored_otp = get_otp(username)
+                        print(f"[LOGIN] OTP verification successful")
+                        logger.info(f"OTP verified successfully for user {username}")
+                        
+                        # OTP already marked as VERIFIED by verify_otp function
+                        print(f"[LOGIN] OTP VERIFIED and marked as VERIFIED in database for user: {username}")
+                        
+                        # Log in the user using Flask-Login with remember me
+                        login_success = login_user(user, remember=remember)
+                        
+                        if login_success:
+                            # Configure session
+                            session.permanent = True
+                            app.permanent_session_lifetime = timedelta(minutes=30)
+                            
+                            # Update session with user info
+                            session['_fresh'] = True
+                            
+                            logger.info(f"Login successful for user: {user.username} (ID: {user.id})")
+                            
+                            # Get next URL or default to index
+                            next_url = request.args.get('next') or url_for('index')
+                            logger.info(f"Redirecting user {username} to {next_url}")
+                            
+                            # Check if this is an AJAX request expecting JSON
+                            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.form.get('verify_otp'):
+                                print(f"[LOGIN] Returning JSON response with redirect URL: {next_url}")
+                                logger.info(f"Returning JSON response with redirect URL: {next_url}")
+                                response_data = {
+                                    'success': True,
+                                    'message': 'Login successful!',
+                                    'redirect': next_url
+                                }
+                                print(f"[LOGIN] JSON response data: {response_data}")
+                                
+                                # Create the JSON response
+                                json_response = jsonify(response_data)
+                                
+                                # Debug the response headers
+                                print("\n" + "=" * 80)
+                                print(f"[OTP DEBUG] ✅ OTP VERIFICATION SUCCESSFUL")
+                                print(f"[OTP DEBUG] 🔑 User ID: {user.id}, Username: {user.username}")
+                                print(f"[OTP DEBUG] 📱 Client requested format: {'AJAX/JSON' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'Standard HTML'}")
+                                print(f"[OTP DEBUG] 🌐 Redirect URL: {next_url}")
+                                print(f"[OTP DEBUG] 📦 Response data: {response_data}")
+                                print(f"[OTP DEBUG] 📋 Response headers: {dict(json_response.headers)}")
+                                print(f"[OTP DEBUG] 🔢 Response status: {json_response.status_code}")
+                                print(f"[OTP DEBUG] 📄 Response mimetype: {json_response.mimetype}")
+                                print(f"[OTP DEBUG] 🔐 OTP verification method: Database")
+                                print(f"[OTP DEBUG] 🚀 REDIRECTING TO: {next_url}")
+                                print("=" * 80 + "\n")
+                                
+                                # Set explicit content type header
+                                json_response.headers['Content-Type'] = 'application/json'
+                                
+                                # Add Cache-Control header to prevent caching
+                                json_response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                                json_response.headers['Pragma'] = 'no-cache'
+                                json_response.headers['Expires'] = '0'
+                                
+                                # Add custom header to force redirect
+                                json_response.headers['X-Force-Redirect'] = 'true'
+                                
+                                return json_response
+                            else:
+                                # Create response with redirect for non-AJAX requests
+                                return redirect(next_url)
+                        else:
+                            error = 'Login failed. Please try again.'
+                            logger.warning(f"Login failed for user: {username}")
+                    else:
+                        # OTP verification failed, show OTP form again with error
+                        error = 'Invalid OTP. Please try again.'
+                        logger.warning(f"Invalid OTP for user: {username}. Expected: {stored_otp_data.get('otp') if stored_otp_data else 'None'}, Got: {otp}")
+                        
+                        return render_template('login.html',
+                                            username=username,
+                                            email=email,
+                                            password=password,
+                                            remember=remember,
+                                            otp=True,
+                                            error=error)
             else:
                 error = 'Invalid username or password'
                 logger.warning(f"Invalid credentials for user: {username}")
@@ -2189,41 +2600,104 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+def is_email_configured():
+    """Check if email settings are properly configured"""
+    required_settings = ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD']
+    return all(app.config.get(setting) for setting in required_settings)
+
 def send_otp_email(user_email, username, otp):
     """Send OTP to user's email for verification"""
+    print('\n' + '='*80)
+    print(f'[SEND_OTP_EMAIL] Starting email to {user_email}')
+    print(f'[SEND_OTP_EMAIL] Mail server: {app.config.get("MAIL_SERVER")}:{app.config.get("MAIL_PORT")}')
+    print(f'[SEND_OTP_EMAIL] Using sender: {app.config.get("MAIL_DEFAULT_SENDER") or app.config.get("MAIL_USERNAME")}')
+    print(f'[SEND_OTP_EMAIL] TLS: {app.config.get("MAIL_USE_TLS")}, SSL: {app.config.get("MAIL_USE_SSL")}')
+    
+    if not is_email_configured():
+        print('[SEND_OTP_EMAIL] ERROR: Email not properly configured')
+        return False
+    
     try:
+        logger.info(f"[send_otp_email] Starting OTP email to {user_email}")
+        
+        # Log current email configuration
+        logger.info(f"[send_otp_email] Mail config - Server: {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')}")
+        logger.info(f"[send_otp_email] Using sender: {app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')}")
+        logger.info(f"[send_otp_email] TLS: {app.config.get('MAIL_USE_TLS')}, SSL: {app.config.get('MAIL_USE_SSL')}")
+        
         if not is_email_configured():
-            logger.error("Email not configured. Cannot send OTP.")
+            logger.error("[send_otp_email] Email not properly configured. Missing required settings.")
+            return False
+        
+        # Verify recipient email is valid
+        if not user_email or '@' not in user_email:
+            logger.error(f"[send_otp_email] Invalid recipient email: {user_email}")
             return False
             
-        logger.info(f"Attempting to send OTP email to {user_email}")
-        logger.info(f"Mail server: {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')}")
+        sender_email = app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
+        logger.info(f"[send_otp_email] Sending from {sender_email} to {user_email}")
         
         msg = Message(
-            'Your Email Verification OTP',
-            sender=app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME'),
+            'Welcome to Price Is The King - Email Verification',
+            sender=sender_email,
             recipients=[user_email],
             html=f'''
-            <h2>Hello {username}!</h2>
-            <p>Your OTP for email verification is:</p>
-            <h1 style="font-size: 36px; letter-spacing: 5px; color: #4CAF50;">{otp}</h1>
-            <p>This OTP is valid for 10 minutes.</p>
-            <p>If you didn't request this, please ignore this email.</p>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .logo {{ text-align: center; margin-bottom: 30px; }}
+                    .logo img {{ max-width: 200px; height: auto; }}
+                    .otp-container {{ text-align: center; margin: 30px 0; }}
+                    .otp {{ font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #4CAF50; }}
+                    .button {{ display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }}
+                    .button:hover {{ background-color: #45a049; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="logo">
+                        <img src="https://raw.githubusercontent.com/imvasifa/PITK1/e8e2b83a4c13ea278d988521e5294cd8317b95d9/static/pitk-logo.svg" alt="Price Is The King Logo" style="max-width: 200px; height: auto;">
+                    </div>
+                    <h2>Welcome {username}!</h2>
+                    <p>Thank you for registering with Price Is The King. Your account has been successfully created.</p>
+                    <div class="otp-container">
+                        <p>Your Email Verification OTP is:</p>
+                        <h1 class="otp">{otp}</h1>
+                        <p>This OTP is valid for 30 minutes. Please use it to verify your email address.</p>
+                    </div>
+                    <p><strong>Please log in with your credentials to verify email.</strong></p>
+                    <p>For security reasons, please keep this OTP confidential and do not share it with anyone.</p>
+                    <p>If you didn't request this verification, please ignore this email.</p>
+                    <p>Best regards,<br>The Price Is The King Team</p>
+                </div>
+            </body>
+            </html>
             '''
         )
         
-        # Debug: Log the message details
-        logger.debug(f"Message details: {msg}")
+        # Log the message details
+        print(f'[SEND_OTP_EMAIL] Email prepared. Subject: {msg.subject}')
+        print(f'[SEND_OTP_EMAIL] Recipients: {msg.recipients}')
         
         # Send the email
-        mail.send(msg)
-        logger.info("OTP email sent successfully")
-        return True
+        try:
+            print('[SEND_OTP_EMAIL] Attempting to send email...')
+            mail.send(msg)
+            print('[SEND_OTP_EMAIL] Email sent successfully')
+            return True
+        except Exception as send_error:
+            print(f'[SEND_OTP_EMAIL] ERROR sending email: {str(send_error)}')
+            print(traceback.format_exc())
+            return False
         
     except Exception as e:
-        logger.error(f"Error sending OTP email: {str(e)}", exc_info=True)
-        logger.error(f"Email configuration: {app.config.get('MAIL_SERVER')}:{app.config.get('MAIL_PORT')} "
-                   f"(TLS: {app.config.get('MAIL_USE_TLS')}, User: {app.config.get('MAIL_USERNAME')})")
+        print(f'[SEND_OTP_EMAIL] UNEXPECTED ERROR: {str(e)}')
+        print(traceback.format_exc())
+        return False
+        return False
         return False
 
 def generate_verification_token(email):
@@ -2245,140 +2719,156 @@ def verify_token(token, expiration=86400):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    print('\n' + '='*80)
     print('[REGISTER] Route entered')
+    error = None
+    
+    # Log current email configuration
+    print('\n[REGISTER] Current Email Configuration:')
+    print(f"MAIL_SERVER: {app.config.get('MAIL_SERVER')}")
+    print(f"MAIL_PORT: {app.config.get('MAIL_PORT')}")
+    print(f"MAIL_USE_TLS: {app.config.get('MAIL_USE_TLS')}")
+    print(f"MAIL_USERNAME: {app.config.get('MAIL_USERNAME')}")
+    print(f"MAIL_DEFAULT_SENDER: {app.config.get('MAIL_DEFAULT_SENDER')}")
+    print('='*80 + '\n')
+    
     if current_user.is_authenticated:
         print('[REGISTER] User already authenticated, redirecting to index')
         return redirect(url_for('index'))
     
-    error = None
     if request.method == 'POST':
         print('[REGISTER] POST request received')
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        print(f'[REGISTER] Received data - username: {username}, email: {email}, password: {"yes" if password else "no"}')
+        email = request.form.get('email', '').strip().lower()  # Normalize email to lowercase
+        password = request.form.get('password', '')
         
-        if not username or not password:
-            error = 'Username and password are required'
-            print('[REGISTER] Missing username or password')
-        else:
-            # Get a new cursor for this transaction
+        print(f'[REGISTER] Form data - Email: {email}, Password: {bool(password)}')
+        
+        if not email or not password:
+            error = 'Email and password are required'
+            print('[REGISTER] Missing email or password')
+            return render_template('register.html', error=error)
+            
+        # Basic email validation
+        if '@' not in email or '.' not in email.split('@')[-1]:
+            error = 'Please enter a valid email address'
+            print('[REGISTER] Invalid email format')
+            return render_template('register.html', error=error)
+            
+        # Get a new cursor for this transaction
+        conn = db.conn
+        cur = None
+        try:
+            print('[REGISTER] Starting DB transaction')
             conn = db.conn
-            cur = None
-            try:
-                print('[REGISTER] Starting DB transaction')
-                conn = db.conn
-                cur = conn.cursor()
+            cur = conn.cursor()
+            
+            # Check if email already exists
+            print('[REGISTER] Checking if email exists')
+            cur.execute("""
+                SELECT id FROM PITK3 
+                WHERE user_data->'account'->>'email' = %s
+            """, (email,))
+            
+            if cur.fetchone():
+                error = 'An account with this email already exists'
+                print('[REGISTER] Email already exists')
+                return render_template('register.html', error=error)
                 
-                # Check if username already exists
-                print('[REGISTER] Checking if username exists')
-                cur.execute("""
-                    SELECT id FROM PITK3 
-                    WHERE user_data->'account'->>'username' = %s
-                """, (username,))
-                
-                if cur.fetchone():
-                    error = 'Username already exists'
-                    print('[REGISTER] Username already exists')
-                else:
-                    print('[REGISTER] Username is new, proceeding to hash password')
-                    # Hash the password before storing
-                    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+            print('[REGISTER] Email is new, proceeding to hash password')
+            # Hash the password before storing
+            hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+            
+            # Create user data structure with email as username
+            user_data = {
+                'account': {
+                    'username': email,  # Using email as username
+                    'password': hashed_password,
+                    'email': email,
+                    'profile': {
+                        'name': email.split('@')[0],  # Use part before @ as display name
+                        'email': email,
+                        'premium': 'no',
+                        'email_verified': False
+                    },
+                    'conditions': []
+                }
+            }
+            print('[REGISTER] Inserting new user into PITK3')
+            # Insert new user into PostgreSQL with hashed password
+            cur.execute("""
+                INSERT INTO PITK3 (username, password, email, user_data)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            """, (email, hashed_password, email, json.dumps(user_data)))
+            
+            result = cur.fetchone()
+            if result:
+                user_id = result[0]
+                # Don't commit yet - wait until we confirm email was sent
+                print(f'[REGISTER] User created but not committed yet. ID: {user_id}')
+                try:
+                    # Generate and send OTP
+                    print(f'[REGISTER] Generating OTP for user {user_id}')
+                    otp = generate_otp()
+                    print(f'[REGISTER] Generated OTP: {otp}')
                     
-                    # Create user data structure
-                    user_data = {
-                        'account': {
-                            'username': username,
-                            'password': hashed_password,
-                            'email': email,
-                            'profile': {
-                                'name': username,
-                                'email': email,
-                                'premium': 'no',
-                                'email_verified': False
-                            },
-                            'conditions': []
-                        }
-                    }
-                    print('[REGISTER] Inserting new user into PITK3')
-                    # Insert new user into PostgreSQL with hashed password
-                    cur.execute("""
-                        INSERT INTO PITK3 (username, password, email, user_data)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id
-                    """, (username, hashed_password, email, json.dumps(user_data)))
+                    # Store OTP first
+                    print('[REGISTER] Storing OTP in Redis')
+                    store_success = store_otp(user_id, otp)
+                    print(f'[REGISTER] OTP stored in Redis: {store_success}')
                     
-                    result = cur.fetchone()
-                    if result:
-                        user_id = result[0]
+                    # Then send email
+                    print(f'[REGISTER] Sending OTP email to {email}')
+                    email_sent = send_otp_email(email, email.split('@')[0], otp)
+                    print(f'[REGISTER] OTP email send result: {email_sent}')
+                    
+                    if email_sent:
+                        # Only commit if email was sent successfully
                         conn.commit()
-                        print(f'[REGISTER] User created successfully with ID: {user_id}')
+                        print('[REGISTER] User creation committed to database')
+                        print('[REGISTER] OTP sent successfully')
+                        
                         # Log the user in
-                        user = User(id=str(user_id), username=username, password=hashed_password, email=email)
+                        user = User(id=str(user_id), username=email, password=hashed_password, email=email)
                         login_user(user)
                         print('[REGISTER] User logged in, redirecting to unverified')
                         return redirect(url_for('unverified'))
                     else:
-                        error = 'Error creating user. Please try again.'
-                        print('[REGISTER] No user ID returned after insert')
-                
-            except Exception as e:
-                if 'conn' in locals() and conn is not None:
-                    conn.rollback()
+                        # Rollback if email sending failed
+                        conn.rollback()
+                        error = 'Failed to send verification email. Please try registering again.'
+                        print('[REGISTER] Failed to send verification email - rolling back user creation')
+                        return render_template('register.html', error=error)
+                        
+                except Exception as e:
+                    # Rollback on any exception during the process
+                    if 'conn' in locals() and conn is not None:
+                        conn.rollback()
+                    error = 'An error occurred during registration. Please try again.'
+                    print(f'[REGISTER] Error during registration: {str(e)}')
+                    print(traceback.format_exc())
+                    return render_template('register.html', error=error)
+            else:
                 error = 'Error creating user. Please try again.'
-                print(f"[REGISTER] Registration error: {str(e)}")
-                traceback.print_exc()
-            finally:
-                if 'cur' in locals() and cur is not None:
-                    cur.close()
+                print('[REGISTER] No user ID returned after insert')
+                return render_template('register.html', error=error)
+                
+        except Exception as e:
+            if 'conn' in locals() and conn is not None:
+                conn.rollback()
+            error = 'Error creating user. Please try again.'
+            print(f"[REGISTER] Registration error: {str(e)}")
+            traceback.print_exc()
+            return render_template('register.html', error=error)
+        finally:
+            if 'cur' in locals() and cur is not None:
+                cur.close()
     else:
         print('[REGISTER] GET request received')
     
     if error:
         print(f'[REGISTER] Returning error to template: {error}')
     return render_template('register.html', error=error)
-
-def generate_otp():
-    """Generate a 6-digit OTP"""
-    return ''.join(random.choices('0123456789', k=6))
-
-# Use Redis for OTP storage
-def get_otp_key(user_id):
-    return f"otp:{user_id}"
-
-def store_otp(user_id, otp, expiry_minutes=10):
-    """Store OTP in Redis with expiry"""
-    try:
-        r = get_redis_client()
-        key = get_otp_key(user_id)
-        r.setex(key, expiry_minutes * 60, json.dumps({
-            'otp': otp,
-            'attempts': 0,
-            'created_at': datetime.utcnow().isoformat()
-        }))
-        return True
-    except Exception as e:
-        logger.error(f"Error storing OTP in Redis: {e}")
-        return False
-
-def get_otp(user_id):
-    """Get OTP data from Redis"""
-    try:
-        r = get_redis_client()
-        data = r.get(get_otp_key(user_id))
-        return json.loads(data) if data else None
-    except Exception as e:
-        logger.error(f"Error getting OTP from Redis: {e}")
-        return None
-
-def delete_otp(user_id):
-    """Delete OTP data from Redis"""
-    try:
-        r = get_redis_client()
-        return r.delete(get_otp_key(user_id)) > 0
-    except Exception as e:
-        logger.error(f"Error deleting OTP from Redis: {e}")
-        return False
 
 @app.route('/send-verification-otp', methods=['POST'])
 @login_required
@@ -2428,27 +2918,42 @@ def verify_email_otp():
     conn = None
     cur = None
     
+    print('\n' + '='*80)
+    print('[VERIFY_EMAIL_OTP] Starting OTP verification')
+    
     try:
         if current_user.email_verified:
+            print('[VERIFY_EMAIL_OTP] Email already verified')
             return jsonify({'success': False, 'message': 'Email already verified'}), 400
         
         data = request.get_json()
         otp = data.get('otp')
         
+        print(f'[VERIFY_EMAIL_OTP] Received OTP: {otp}')
+        
         if not otp or not otp.isdigit() or len(otp) != 6:
+            print(f'[VERIFY_EMAIL_OTP] Invalid OTP format: {otp}')
             return jsonify({'success': False, 'message': 'Invalid OTP format'}), 400
         
         # Get stored OTP from Redis
+        print(f'[VERIFY_EMAIL_OTP] Getting OTP for user ID: {current_user.id}')
         stored_data = get_otp(current_user.id)
         
+        print(f'[VERIFY_EMAIL_OTP] Stored OTP data: {stored_data}')
+        
         if not stored_data:
+            print('[VERIFY_EMAIL_OTP] No OTP found in Redis')
             return jsonify({
                 'success': False,
                 'message': 'OTP not found or expired. Please request a new one.'
             }), 400
         
         # Check attempts
-        if stored_data.get('attempts', 0) >= 3:
+        attempts = stored_data.get('attempts', 0)
+        print(f'[VERIFY_EMAIL_OTP] Current attempt count: {attempts}')
+        
+        if attempts >= 3:
+            print('[VERIFY_EMAIL_OTP] Too many attempts, deleting OTP')
             delete_otp(current_user.id)
             return jsonify({
                 'success': False,
@@ -2456,57 +2961,92 @@ def verify_email_otp():
             }), 400
         
         # Verify OTP
-        if stored_data.get('otp') != otp:
+        stored_otp = stored_data.get('otp')
+        print(f'[VERIFY_EMAIL_OTP] Comparing OTPs - Stored: {stored_otp}, Provided: {otp}')
+        
+        if stored_otp != otp:
             # Increment attempt count
-            stored_data['attempts'] = stored_data.get('attempts', 0) + 1
+            new_attempts = stored_data.get('attempts', 0) + 1
+            print(f'[VERIFY_EMAIL_OTP] OTP mismatch, incrementing attempt count to {new_attempts}')
+            
+            stored_data['attempts'] = new_attempts
             store_otp(
                 current_user.id, 
-                stored_data['otp'],
+                stored_otp,
                 expiry_minutes=10  # Reset expiry on each attempt
             )
             
             return jsonify({
                 'success': False,
                 'message': 'Invalid OTP',
-                'attempts_remaining': 3 - stored_data['attempts']
+                'attempts_remaining': 3 - new_attempts
             }), 400
         
         # OTP verified, update user's email verification status
-        conn = db.get_connection()
-        cur = conn.cursor()
+        print('[VERIFY_EMAIL_OTP] OTP verified, updating user record')
         
-        # Update email_verified status in user_data
-        cur.execute("""
-            UPDATE pitk3 
-            SET user_data = jsonb_set(
-                COALESCE(user_data, '{}'::jsonb),
-                '{account,profile,email_verified}',
-                'true'::jsonb,
-                true
-            )
-            WHERE id = %s
-            RETURNING id
-        """, (current_user.id,))
-        
-        if cur.rowcount == 0:
+        try:
+            conn = db.get_connection()
+            cur = conn.cursor()
+            
+            # First, get the current user_data to debug
+            cur.execute("""
+                SELECT user_data FROM pitk3 WHERE id = %s
+            """, (current_user.id,))
+            
+            current_data = cur.fetchone()
+            print(f'[VERIFY_EMAIL_OTP] Current user_data: {current_data}')
+            
+            # Update email_verified status in user_data
+            update_query = """
+                UPDATE pitk3 
+                SET user_data = jsonb_set(
+                    COALESCE(user_data, '{}'::jsonb),
+                    '{account,profile,email_verified}',
+                    'true'::jsonb,
+                    true
+                )
+                WHERE id = %s
+                RETURNING id
+            """
+            print(f'[VERIFY_EMAIL_OTP] Executing query: {update_query % (current_user.id,)}')
+            
+            cur.execute(update_query, (current_user.id,))
+            
+            if cur.rowcount == 0:
+                return jsonify({
+                    'success': False,
+                    'message': 'User not found'
+                }), 404
+            
+            conn.commit()
+            
+            # Clean up OTP from Redis
+            delete_otp(current_user.id)
+            
+            # Update current_user object
+            if not hasattr(current_user, '_user_data'):
+                current_user._user_data = {}
+            if 'account' not in current_user._user_data:
+                current_user._user_data['account'] = {}
+            if 'profile' not in current_user._user_data['account']:
+                current_user._user_data['account']['profile'] = {}
+            current_user._user_data['account']['profile']['email_verified'] = True
+            
+            return jsonify({
+                'success': True,
+                'message': 'Email verified successfully!',
+                'redirect': url_for('dash')
+            })
+            
+        except Exception as e:
+            if conn is not None:
+                conn.rollback()
+            logger.error(f"Error updating user verification status: {e}")
             return jsonify({
                 'success': False,
-                'message': 'User not found'
-            }), 404
-        
-        conn.commit()
-        
-        # Clean up OTP from Redis
-        delete_otp(current_user.id)
-        
-        # Update current_user object
-        if not hasattr(current_user, '_user_data'):
-            current_user._user_data = {}
-        if 'account' not in current_user._user_data:
-            current_user._user_data['account'] = {}
-        if 'profile' not in current_user._user_data['account']:
-            current_user._user_data['account']['profile'] = {}
-        current_user._user_data['account']['profile']['email_verified'] = True
+                'message': 'An error occurred while updating your verification status.'
+            }), 500
         
         return jsonify({
             'success': True,
@@ -2533,6 +3073,39 @@ def verify_email_otp():
                 conn.close()
             except:
                 pass
+
+@app.route('/debug/otp/<int:user_id>')
+@login_required
+def debug_otp(user_id):
+    """Debug endpoint to check OTP data in Redis"""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        # Get OTP data from Redis
+        otp_key = get_otp_key(user_id)
+        redis_client = get_redis_client()
+        raw_data = redis_client.get(otp_key)
+        
+        if not raw_data:
+            return jsonify({
+                'exists': False,
+                'message': 'No OTP data found for this user'
+            })
+        
+        data = json.loads(raw_data)
+        return jsonify({
+            'exists': True,
+            'otp': data.get('otp'),
+            'created_at': data.get('created_at'),
+            'attempts': data.get('attempts', 0),
+            'ttl': redis_client.ttl(otp_key)
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/verify-email/<token>')
 def verify_email(token):
@@ -2612,16 +3185,22 @@ def resend_verification():
     if current_user.email_verified:
         return redirect(url_for('index'))
     
-    # Generate new verification token
-    verification_token = generate_verification_token(current_user.email)
-    
-    # Send verification email using the existing OTP function
-    if send_otp_email(current_user.email, current_user.username, verification_token):
-        flash('A new verification email has been sent. Please check your inbox.', 'info')
-    else:
-        flash('Failed to send verification email. Please try again later.', 'danger')
-    
-    return redirect(url_for('unverified'))
+    try:
+        # Generate new OTP
+        otp = generate_otp()
+        # Store the OTP in Redis
+        store_otp(current_user.id, otp)
+        # Send verification email
+        if send_otp_email(current_user.email, current_user.username, otp):
+            flash('A new verification OTP has been sent. Please check your inbox.', 'info')
+            return redirect(url_for('unverified'))
+        else:
+            flash('Failed to send verification email. Please try again later.', 'danger')
+            return redirect(url_for('unverified'))
+    except Exception as e:
+        logger.error(f"Error in resend_verification: {str(e)}", exc_info=True)
+        flash('An error occurred while sending the verification email. Please try again later.', 'danger')
+        return redirect(url_for('unverified'))
 
 # Configure upload folder and allowed extensions
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
@@ -2933,6 +3512,13 @@ def remove_photo():
 @app.route('/dash', methods=['GET', 'POST'])
 @login_required
 def dash():
+    # Check if user has verified OTP
+    if current_user.is_authenticated and not is_otp_verified(current_user.username):
+        print(f"[DASH] User {current_user.username} has not verified OTP, redirecting to login")
+        logout_user()
+        flash('Please complete OTP verification to access the application.', 'warning')
+        return redirect(url_for('login'))
+    
     error = None
     success = None
     
@@ -3200,6 +3786,13 @@ def help_page():
 @login_required
 def index():
     """Render the main index page"""
+    # Check if user has verified OTP
+    if current_user.is_authenticated and not is_otp_verified(current_user.username):
+        print(f"[INDEX] User {current_user.username} has not verified OTP, redirecting to login")
+        logout_user()
+        flash('Please complete OTP verification to access the application.', 'warning')
+        return redirect(url_for('login'))
+    
     # Start the background thread if not already started
     global threads_started
     if not threads_started:
@@ -3806,6 +4399,36 @@ from flask_cors import CORS
 
 # Enable CORS for all routes
 CORS(app)
+
+@app.route('/send-test-email', methods=['GET'])
+def send_test_email():
+    try:
+        if not app.config.get('MAIL_SERVER'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Email configuration not set'
+            }), 400
+            
+        test_recipient = 'indianplans@gmail.com'
+        msg = Message(
+            'Test Email Configuration',
+            sender=app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME'),
+            recipients=[test_recipient]
+        )
+        msg.body = 'This is a test email to verify your email configuration is working.'
+        
+        mail.send(msg)
+        return jsonify({
+            'status': 'success',
+            'message': f'Test email sent successfully to {test_recipient}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Test email failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to send test email: {str(e)}'
+        }), 500
 
 @app.route('/app3')
 def app3_output():

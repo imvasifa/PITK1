@@ -14,27 +14,32 @@
                     <div class="mb-4">
                         <i class="fas fa-envelope fa-5x text-primary mb-3"></i>
                         <h4>Thank you for registering!</h4>
-                        <p class="lead">We've sent a verification link to <strong>{{ current_user.email }}</strong>.</p>
-                        <p>Please check your email and click on the verification link to activate your account.</p>
+                        <p class="lead">We've sent an OTP (One-Time Password) to <strong>{{ current_user.email }}</strong>.</p>
+                        <p>We've sent a 4-digit OTP to your email. Please enter it below to verify your email address.</p>
                     </div>
                     
                     <div class="alert alert-info">
                         <p class="mb-0">
                             <i class="fas fa-info-circle me-2"></i>
-                            If you don't see the email, please check your spam/junk folder.
+                            The OTP is valid for 30 minutes. If you don't see the email, please check your spam/junk folder.
                         </p>
                     </div>
                     
-                    <form method="POST" action="{{ url_for('resend_verification') }}" class="mt-4">
-                        <p>Didn't receive the email?</p>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane me-2"></i>Resend Verification Email
+                    <form method="POST" action="{{ url_for('verify_email_otp') }}" class="mt-4">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" name="otp" placeholder="Enter 4-digit OTP" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-check me-2"></i>Verify Now
                         </button>
                     </form>
                     
-                    <div class="mt-4">
-                        <!-- <p>Having trouble? <a href="#">Contact support</a></p> -->
-                    </div>
+                    <form method="POST" action="{{ url_for('resend_verification') }}" class="mt-4">
+                        <p>Didn't receive the OTP?</p>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-paper-plane me-2"></i>Resend OTP
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

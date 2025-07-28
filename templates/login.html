@@ -147,7 +147,7 @@
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             {% for category, message in messages %}
-                                {% if message != 'Please log in to access this page.' %}
+                                {% if message == '4-digit OTP has been sent to your email. Please check your inbox and enter the OTP within 30 minutes to proceed.' %}
                                     <div class="alert alert-{{ category }} alert-dismissible fade show">
                                         {{ message }}
                                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -157,34 +157,71 @@
                         {% endif %}
                     {% endwith %}
                     <form method="POST" action="{{ url_for('login') }}" id="loginForm">
-                        <div class="mb-4">
-                            <label for="username" class="form-label">Username</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-user"></i></span>
-                                <input type="text" class="form-control form-control-lg" id="username" name="username" required>
+                        {% if otp is defined %}
+                            <!-- OTP Input Form -->
+                            <div class="text-center mb-4">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    A 4-digit OTP has been sent to your email. Please check your inbox and enter the code below.
+                                </div>
                             </div>
-                        </div>
-                        <div class="mb-4">
-                            <label for="password" class="form-label">Password</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                <input type="password" class="form-control form-control-lg" id="password" name="password" required>
-                                <span class="input-group-text" id="passwordToggle">
-                                    <i class="fas fa-eye"></i>
-                                </span>
+                            <input type="hidden" name="username" value="{{ username }}">
+                            <input type="hidden" name="email" value="{{ email }}">
+                            <input type="hidden" name="password" value="{{ password }}">
+                            <input type="hidden" name="remember" value="{{ remember }}">
+                            
+                            <div class="mb-3 otp-input-container">
+                                <label for="otp" class="form-label">Enter 4-digit OTP</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="otp" name="otp" placeholder="Enter OTP" maxlength="4" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="resendOtp">Resend OTP</button>
+                                </div>
+                                <small class="form-text text-muted">OTP has been sent to your email address.</small>
                             </div>
-                        </div>
-                        <div class="mb-4">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="remember" name="remember">
-                                <label class="form-check-label" for="remember">Remember me</label>
+                            <input type="hidden" name="verify_otp" value="true">
+                            
+                            <div class="d-grid gap-2 mb-3">
+                                <button type="submit" class="btn btn-primary btn-lg btn-login">
+                                    <i class="fas fa-check-circle me-2"></i>Verify OTP
+                                </button>
                             </div>
-                        </div>
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg btn-login">
-                                <i class="fas fa-sign-in-alt me-2"></i>Login
-                            </button>
-                        </div>
+                            
+                            <div class="text-center">
+                                <button id="resendOtp" class="btn btn-link text-decoration-none">
+                                    <i class="fas fa-sync-alt me-1"></i>Resend OTP
+                                </button>
+                            </div>
+                        {% else %}
+                            <!-- Regular Login Form -->
+                            <div class="mb-4">
+                                <label for="username" class="form-label">Username (Email)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                    <input type="email" class="form-control form-control-lg" id="username" name="username" value="{{ username if username else '' }}" placeholder="Enter your email address" required>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="password" class="form-label">Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                    <input type="password" class="form-control form-control-lg" id="password" name="password" required>
+                                    <span class="input-group-text" id="passwordToggle">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="remember" name="remember" {% if remember %}checked{% endif %}>
+                                    <label class="form-check-label" for="remember">Remember me</label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg btn-login">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Login
+                                </button>
+                            </div>
+                        {% endif %}
                         <div class="text-center mt-4">
                             <a href="{{ url_for('forgot_password_page') }}" class="text-decoration-none small text-muted">
                                 <i class="fas fa-lock-open me-1"></i>Forgot password?
@@ -212,12 +249,14 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+// Function to initialize all event listeners
+function initializeEventListeners() {
     const loginForm = document.getElementById('loginForm');
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loginBtn = document.querySelector('.btn-login');
     const passwordInput = document.getElementById('password');
     const passwordToggle = document.getElementById('passwordToggle');
+    const resendOtpBtn = document.getElementById('resendOtp');
 
     // Password visibility toggle
     if (passwordToggle) {
@@ -228,39 +267,229 @@ document.addEventListener('DOMContentLoaded', function() {
             this.querySelector('i').classList.toggle('fa-eye-slash');
         });
     }
+    
+    // Resend OTP functionality
+    if (resendOtpBtn) {
+        resendOtpBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Get the hidden email and username values
+            const email = document.querySelector('input[name="email"]').value;
+            const username = document.querySelector('input[name="username"]').value;
+            
+            if (!email || !username) {
+                alert('Missing email or username information. Please try again.');
+                return;
+            }
+            
+            loadingOverlay.style.display = 'flex';
+            
+            // Create form data for resend request
+            const formData = new FormData();
+            formData.append('email', email);
+            formData.append('username', username);
+            
+            fetch('/login', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                loadingOverlay.style.display = 'none';
+                
+                // Show success message
+                const successAlert = document.createElement('div');
+                successAlert.className = 'alert alert-success alert-dismissible fade show';
+                successAlert.textContent = 'OTP has been resent to your email.';
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'btn-close';
+                closeBtn.setAttribute('data-bs-dismiss', 'alert');
+                closeBtn.setAttribute('aria-label', 'Close');
+                successAlert.appendChild(closeBtn);
+                
+                const existingAlert = document.querySelector('.alert');
+                if (existingAlert) {
+                    existingAlert.parentNode.replaceChild(successAlert, existingAlert);
+                } else {
+                    loginForm.parentNode.insertBefore(successAlert, loginForm);
+                }
+            })
+            .catch(error => {
+                loadingOverlay.style.display = 'none';
+                console.error('Error:', error);
+                
+                // Show error message
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                errorAlert.textContent = 'Failed to resend OTP. Please try again.';
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'btn-close';
+                closeBtn.setAttribute('data-bs-dismiss', 'alert');
+                closeBtn.setAttribute('aria-label', 'Close');
+                errorAlert.appendChild(closeBtn);
+                
+                const existingAlert = document.querySelector('.alert');
+                if (existingAlert) {
+                    existingAlert.parentNode.replaceChild(errorAlert, existingAlert);
+                } else {
+                    loginForm.parentNode.insertBefore(errorAlert, loginForm);
+                }
+            });
+        });
+    }
 
     if (loginForm) {
         loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log('Form submitted');
             const formData = new FormData(loginForm);
+            
+            // Debug: Log form data
+            console.log('Form data:');
+            for (let pair of formData.entries()) {
+                console.log(pair[0] + ': ' + (pair[0] === 'password' ? '******' : pair[1]));
+            }
+            
             loadingOverlay.style.display = 'flex';
             loginBtn.disabled = true;
             
             fetch(loginForm.action, {
                 method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    loadingOverlay.style.display = 'none';
-                    loginBtn.disabled = false;
-                    return response.json();
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
             })
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
+            .then(response => {
+                console.log('Response received:', response);
+                console.log('Response headers:', response.headers);
+                console.log('Response status:', response.status);
+                
+                // Try to parse as JSON first
+                const contentType = response.headers.get('content-type');
+                console.log('Content-Type:', contentType);
+                
+                if (contentType && contentType.includes('application/json')) {
+                    console.log('Parsing as JSON');
+                    return response.json().then(data => {
+                        console.log('JSON data:', data);
+                        return { isJson: true, data: data };
+                    });
+                } else {
+                    console.log('Parsing as text');
+                    return response.text().then(text => {
+                        console.log('Text data (first 100 chars):', text.substring(0, 100));
+                        return { isJson: false, data: text };
+                    });
+                }
+            })
+            .then(result => {
+                loadingOverlay.style.display = 'none';
+                loginBtn.disabled = false;
+                console.log('Processed result:', result);
+                
+                // Handle JSON response
+                if (result.isJson) {
+                    console.log('%c[OTP DEBUG] Processing JSON response', 'background: #222; color: #bada55; font-size: 16px');
+                    console.log('%c[OTP DEBUG] Full JSON data:', 'background: #222; color: #bada55', result.data);
+                    
+                    if (result.data.success && result.data.redirect) {
+                        console.log('%c[OTP DEBUG] SUCCESS! Redirect URL:', 'background: green; color: white; font-size: 16px', result.data.redirect);
+                        console.log('%c[OTP DEBUG] REDIRECTING IMMEDIATELY...', 'background: blue; color: white; font-size: 16px');
+                        
+                        // Display a visible message on the page
+                        const successMsg = document.createElement('div');
+                        successMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: green; color: white; padding: 20px; border-radius: 5px; z-index: 9999; font-size: 18px;';
+                        successMsg.innerHTML = 'Login successful! Redirecting to dashboard...';
+                        document.body.appendChild(successMsg);
+                        
+                        // Force immediate redirect
+                        console.log('%c[OTP DEBUG] EXECUTING REDIRECT NOW', 'background: red; color: white; font-size: 16px');
+                        
+                        // Direct redirect to index page
+                        window.location.href = '/index';
+                        
+                        // Fallback after a short delay
+                        setTimeout(function() {
+                            console.log('%c[OTP DEBUG] Fallback redirect', 'color: orange');
+                            window.location.replace('/index');
+                            
+                            // Final fallback with alert
+                            setTimeout(function() {
+                                alert('Click OK to continue to the dashboard.');
+                                window.location.href = '/index';
+                            }, 1000);
+                        }, 500);
+                        return;
+                    } else if (!result.data.success) {
+                        console.log('%c[OTP DEBUG] ERROR from server:', 'background: red; color: white', result.data.message);
+                        alert(result.data.message || 'An error occurred');
+                        return;
+                    }
+                }
+                
+                // Handle HTML response
+                const html = result.isJson ? JSON.stringify(result.data) : result.data;
+                console.log('Processing HTML response');
+                
+                // Check if the response contains OTP input field
+                if (html.includes('name="otp"')) {
+                    console.log('OTP input field found in response');
+                    // Replace the current form with the OTP form
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    
+                    // Extract the form from the response
+                    const newForm = tempDiv.querySelector('#loginForm');
+                    if (newForm) {
+                        console.log('Found new form, replacing content');
+                        loginForm.innerHTML = newForm.innerHTML;
+                        
+                        // Re-initialize event listeners for the new form elements
+                        console.log('Re-initializing event listeners');
+                        initializeEventListeners();
+                    } else {
+                        console.log('Form not found, replacing entire page');
+                        // If we can't find the form, just show the whole page
+                        document.body.innerHTML = html;
+                    }
+                } else if (html.includes('window.location.href')) {
+                    // If the response contains a redirect, follow it
+                    const redirectMatch = html.match(/window\.location\.href\s*=\s*['"]([^'"]+)['"]/);
+                    if (redirectMatch && redirectMatch[1]) {
+                        window.location.href = redirectMatch[1];
+                    } else {
+                        window.location.href = '/';
+                    }
+                } else {
+                    // Check for error messages
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    const errorElement = tempDiv.querySelector('.alert-danger');
+                    
+                    if (errorElement) {
+                        const errorMessage = errorElement.textContent.trim();
+                        alert(errorMessage || 'Login failed. Please try again.');
+                    } else {
+                        // If no specific error found, redirect to home
+                        window.location.href = '/';
+                    }
                 }
             })
             .catch(error => {
                 loadingOverlay.style.display = 'none';
                 loginBtn.disabled = false;
                 console.error('Error:', error);
+                alert('An error occurred during login. Please try again.');
             });
         });
     }
+    
+}
+
+// Initialize event listeners when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEventListeners();
 });
 </script>
 {% endblock %}
